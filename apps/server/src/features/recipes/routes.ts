@@ -1,0 +1,97 @@
+import fs from "node:fs/promises";
+import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { imageSizes, recipeInputSchema, recipeListQuerySchema, z, type ImageSize } from "@meally/shared";
+import type { AppEnv } from "../../lib/context.js";
+import { ApiError } from "../../lib/errors.js";
+import { requireAuth } from "../auth/middleware.js";
+import {
+  createRecipe,
+  deleteRecipe,
+  findImage,
+  getRecipe,
+  imagePath,
+  listRecipes,
+  replaceRecipe,
+  setRecipeImage,
+} from "./service.js";
+
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    const where = i?.path.length ? `${i.path.join(".")}: ` : "";
+    throw new ApiError(400, "invalid_body", `${where}${i?.message ?? "Invalid request"}`);
+  }
+  return parsed.data;
+}
+const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
+
+export const recipeRoutes = new Hono<AppEnv>();
+recipeRoutes.use("*", requireAuth);
+
+recipeRoutes
+  .get("/", async (c) => {
+    const query = parse(c.req.query(), recipeListQuerySchema);
+    return c.json(await listRecipes(c.get("db"), c.get("householdId"), query));
+  })
+  .post("/", async (c) => {
+    const data = parse(await json(c), recipeInputSchema);
+    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data), 201);
+  })
+  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"))))
+  .put("/:slug", async (c) => {
+    const data = parse(await json(c), recipeInputSchema);
+    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data));
+  })
+  .delete("/:slug", async (c) => {
+    await deleteRecipe(c.get("db"), c.get("dataDir"), c.get("householdId"), c.req.param("slug"));
+    return c.body(null, 204);
+  })
+  .post(
+    "/:slug/image",
+    bodyLimit({
+      maxSize: MAX_IMAGE_BYTES + 512 * 1024,
+      onError: () => {
+        throw new ApiError(413, "too_large", "Image must be 10 MB or smaller");
+      },
+    }),
+    async (c) => {
+      const db = c.get("db");
+      const householdId = c.get("householdId");
+      const slug = c.req.param("slug");
+      await getRecipe(db, householdId, slug); // 404 before touching the upload
+      const form = await c.req.parseBody().catch(() => null);
+      const file = form?.file;
+      if (!(file instanceof File)) throw new ApiError(400, "invalid_body", "Attach an image as the 'file' field");
+      if (file.size > MAX_IMAGE_BYTES) throw new ApiError(413, "too_large", "Image must be 10 MB or smaller");
+      if (!file.type.startsWith("image/")) throw new ApiError(415, "unsupported_media", "Only image files are allowed");
+      try {
+        await setRecipeImage(db, c.get("dataDir"), householdId, slug, Buffer.from(await file.arrayBuffer()));
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(415, "unsupported_media", "That file is not a readable image");
+      }
+      return c.json(await getRecipe(db, householdId, slug), 201);
+    },
+  );
+
+export const imageRoutes = new Hono<AppEnv>();
+imageRoutes.use("*", requireAuth);
+imageRoutes.get("/:id/:size", async (c) => {
+  const size = Number(c.req.param("size")) as ImageSize;
+  if (!imageSizes.includes(size)) throw new ApiError(404, "not_found", "Image not found");
+  const householdId = c.get("householdId");
+  const id = c.req.param("id");
+  const img = await findImage(c.get("db"), householdId, id);
+  if (!img) throw new ApiError(404, "not_found", "Image not found");
+  const data = await fs.readFile(imagePath(c.get("dataDir"), householdId, id, size)).catch(() => null);
+  if (!data) throw new ApiError(404, "not_found", "Image not found");
+  // An image never changes and ids are never reused, so it is cacheable for a year (per browser only).
+  return c.body(new Uint8Array(data), 200, {
+    "Content-Type": "image/webp",
+    "Cache-Control": "private, max-age=31536000, immutable",
+  });
+});

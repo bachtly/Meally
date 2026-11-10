@@ -19,6 +19,7 @@ export interface AuthSettings {
 export type AppEnv = {
   Variables: {
     db: Db;
+    dataDir: string;
     flags: FlagsService;
     auth: AuthSettings;
     user: SessionUser;

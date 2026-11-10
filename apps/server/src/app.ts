@@ -8,6 +8,7 @@ import { createFlagsService, type FlagsService } from "./features/features/servi
 import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
 import { authRoutes } from "./features/auth/routes.js";
+import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
@@ -24,6 +25,8 @@ export interface AppOptions {
   env?: Record<string, string | undefined>;
   /** log2 of the scrypt cost; lowered in tests only. */
   scryptLogN?: number;
+  /** Root for uploaded files; defaults to DATA_DIR or ./data. */
+  dataDir?: string;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -31,6 +34,7 @@ export function createApp(opts: AppOptions = {}) {
   const db = opts.db ?? owned!.db;
   const flags = opts.flags ?? createFlagsService(db, opts.env ?? process.env);
   const env = opts.env ?? process.env;
+  const dataDir = opts.dataDir ?? env.DATA_DIR ?? "./data";
   const baseUrl = parseBaseUrl(env.BASE_URL);
   const auth: AuthSettings = {
     lockedSignupMode: signupModes.find((m) => m === env.MEALLY_SIGNUP_MODE) as SignupMode | undefined ?? null,
@@ -48,6 +52,7 @@ export function createApp(opts: AppOptions = {}) {
   api.use("*", async (c, next) => {
     await owned?.ready;
     c.set("db", db);
+    c.set("dataDir", dataDir);
     c.set("flags", flags);
     c.set("auth", auth);
     await next();
@@ -55,6 +60,8 @@ export function createApp(opts: AppOptions = {}) {
   api.use("*", csrfProtection);
   api.route("/auth", authRoutes);
   api.route("/features", featureRoutes);
+  api.route("/recipes", recipeRoutes);
+  api.route("/images", imageRoutes);
   api.get("/health", (c) => c.json({ ok: true, version, name: appName }));
   app.route("/api/v1", api);
   app.all("/api/*", notFoundHandler);

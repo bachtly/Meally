@@ -16,7 +16,8 @@
     "@libsql/client": "^0.18.0",
     "@meally/shared": "^0.0.0",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.17"
+    "hono": "^4.13.17",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
