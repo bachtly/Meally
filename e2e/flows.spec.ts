@@ -83,7 +83,13 @@ test("4. plan the recipe, add the week to the shopping list, tick an item", asyn
   await expect(page.getByRole("heading", { name: "Plan" })).toBeVisible();
   await expect(page.getByText(recipe.name).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Add week to shopping list" }).click();
+  // On phones the week actions sit in the "Plan actions" menu.
+  const inline = page.getByRole("button", { name: "Add week to shopping list" });
+  if (await inline.isVisible()) await inline.click();
+  else {
+    await page.getByRole("button", { name: "Plan actions" }).click();
+    await page.getByRole("menuitem", { name: "Add week to shopping list" }).click();
+  }
   const dialog = page.getByRole("dialog", { name: "Add week to shopping list" });
   const add = dialog.getByRole("button", { name: "Add ingredients" });
   await expect(add).toBeVisible();
