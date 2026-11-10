@@ -1,4 +1,4 @@
-import { CalendarDays, ShoppingCart } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
 import { EmptyState, ThemeToggle } from "../../ui";
@@ -9,17 +9,6 @@ export function PlanPage() {
       <h1 className="mb-4 text-2xl font-semibold">Plan</h1>
       <EmptyState icon={<CalendarDays className="size-10" />} title="Nothing planned">
         Your week will show up here.
-      </EmptyState>
-    </>
-  );
-}
-
-export function ShoppingPage() {
-  return (
-    <>
-      <h1 className="mb-4 text-2xl font-semibold">Shopping</h1>
-      <EmptyState icon={<ShoppingCart className="size-10" />} title="No lists yet">
-        Your shopping lists will show up here.
       </EmptyState>
     </>
   );

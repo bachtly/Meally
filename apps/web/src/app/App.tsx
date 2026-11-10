@@ -9,7 +9,9 @@ import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
 import { RecipePage } from "../features/recipes/RecipePage";
 import { RecipeEditPage, RecipeNewPage } from "../features/recipes/RecipeEditor";
 import { RecipeImportPage } from "../features/import-url/ImportPage";
-import { MorePage, PlanPage, ShoppingPage } from "./pages/Placeholders";
+import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
+import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
+import { MorePage, PlanPage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
 let router: ReturnType<typeof createBrowserRouter> | undefined;
@@ -52,7 +54,15 @@ export const appRoutes = createRoutesFromElements(
           path="/shopping"
           element={
             <FeatureRoute on="shopping-lists">
-              <ShoppingPage />
+              <ShoppingListsPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/shopping/:id"
+          element={
+            <FeatureRoute on="shopping-lists">
+              <ShoppingListPage />
             </FeatureRoute>
           }
         />

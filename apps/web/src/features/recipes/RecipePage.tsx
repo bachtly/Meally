@@ -5,6 +5,7 @@ import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
+import { AddToListButton } from "../shopping/AddToListButton";
 import { useChecks } from "./useChecks";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
@@ -134,6 +135,9 @@ export function RecipePage() {
             </Meta>
           )}
         </dl>
+        <div className="mt-4">
+          <AddToListButton slug={r.slug} servings={r.servings} />
+        </div>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
