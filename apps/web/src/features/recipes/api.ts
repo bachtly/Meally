@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import type { Recipe, RecipeInput, RecipeListResponse } from "@meally/shared";
 import { api } from "../../lib/api";
 
-export type RecipeSort = "updated" | "name" | "created" | "rating";
+export type RecipeSort = "updated" | "name" | "created" | "rating" | "last-made";
 
 export function useRecipes(opts: { q?: string; sort?: RecipeSort; tag?: string[]; category?: string[]; tool?: string[]; favourites?: boolean; minRating?: number; limit?: number; enabled?: boolean } = {}) {
   const { q = "", sort = "updated", tag = [], category = [], tool = [], favourites = false, minRating, limit = 24, enabled = true } = opts;

@@ -14,6 +14,7 @@ import { HeartButton } from "../ratings/HeartButton";
 import { StarRating } from "../ratings/StarRating";
 import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
+import { Timeline } from "../timeline/Timeline";
 import { Feature } from "../features/Feature";
 import { useChecks } from "./useChecks";
 import { ShareDialog } from "../share/ShareDialog";
@@ -47,6 +48,7 @@ export function RecipePage() {
   const cookbooksOn = useFeature("cookbooks");
   const planOn = useFeature("meal-plan");
   const scalingOn = useFeature("scaling");
+  const timelineOn = useFeature("timeline");
   const [params, setParams] = useSearchParams();
   const setParam = (key: string, value: string | null) =>
     setParams(
@@ -317,6 +319,8 @@ export function RecipePage() {
           <p className="whitespace-pre-line">{r.notes}</p>
         </section>
       )}
+
+      {timelineOn && <Timeline slug={r.slug} />}
 
       <Dialog
         open={confirm}

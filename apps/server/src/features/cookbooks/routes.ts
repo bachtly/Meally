@@ -29,7 +29,7 @@ function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
 const opts = async (c: Context<AppEnv>) => {
   const f = await c.get("flags").getFeatures();
-  return { org: f.organizers.enabled, ratings: f.ratings.enabled, userId: c.get("user").id };
+  return { org: f.organizers.enabled, ratings: f.ratings.enabled, timeline: f.timeline.enabled, userId: c.get("user").id };
 };
 const slugBody = z.object({ slug: z.string().trim().min(1).max(100) });
 const orderBody = z.object({ slugs: z.array(z.string().trim().min(1).max(100)).max(1000) });

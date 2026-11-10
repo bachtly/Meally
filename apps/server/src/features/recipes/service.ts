@@ -5,13 +5,13 @@ import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-or
 import type { ImageSize, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
 import { imageSizes } from "@meally/shared";
 import type { Db } from "../../db/index.js";
-import { images, recipeIngredients, recipes, recipeSteps, recipeUserData } from "../../db/schema/index.js";
+import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { getMe, householdRating } from "../ratings/service.js";
 import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
 
 /** `org` is true when the organizers flag is on; when off, organiser fields are ignored and omitted. */
-type Org = { org?: boolean; userId?: string; ratings?: boolean };
+type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boolean };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
@@ -115,7 +115,7 @@ async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Reci
   };
 }
 
-async function findRow(db: Pick<Db, "select">, householdId: string, slug: string): Promise<Row> {
+export async function findRow(db: Pick<Db, "select">, householdId: string, slug: string): Promise<Row> {
   const [row] = await db.select().from(recipes).where(and(eq(recipes.householdId, householdId), eq(recipes.slug, slug))).limit(1);
   if (!row) throw new ApiError(404, "not_found", "Recipe not found");
   return row;
@@ -160,14 +160,21 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
 }
 
 export async function deleteRecipe(db: Db, dataDir: string, householdId: string, slug: string) {
+  const extra: string[] = [];
   const imageId = await db.transaction(async (tx) => {
     const existing = await findRow(tx, householdId, slug);
+    const tlImgs = (await tx.select({ id: timelineEvents.imageId }).from(timelineEvents).where(eq(timelineEvents.recipeId, existing.id)))
+      .map((r) => r.id)
+      .filter((x): x is string => !!x);
+    extra.push(...tlImgs);
     await tx.run(sql`DELETE FROM recipes_fts WHERE recipe_id = ${existing.id}`);
     await tx.delete(recipes).where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)));
     if (existing.imageId) await tx.delete(images).where(eq(images.id, existing.imageId));
+    if (tlImgs.length) await tx.delete(images).where(inArray(images.id, tlImgs));
     return existing.imageId;
   });
   if (imageId) await removeImageFiles(dataDir, householdId, imageId);
+  for (const id of extra) await removeImageFiles(dataDir, householdId, id);
 }
 
 /** Turns free text into an FTS5 prefix query: every word must match as a prefix. */
@@ -176,8 +183,8 @@ export function ftsQuery(q: string): string | null {
   return words.length ? words.map((w) => `"${w}"*`).join(" ") : null;
 }
 
-const encode = (v: string | number, id: string) => Buffer.from(JSON.stringify([v, id])).toString("base64url");
-function decode(cursor: string): [string | number, string] {
+export const encode = (v: string | number, id: string) => Buffer.from(JSON.stringify([v, id])).toString("base64url");
+export function decode(cursor: string): [string | number, string] {
   try {
     const v = JSON.parse(Buffer.from(cursor, "base64url").toString());
     if (Array.isArray(v) && v.length === 2 && ["string", "number"].includes(typeof v[0]) && typeof v[1] === "string")
@@ -193,7 +200,7 @@ export async function listRecipes(
   householdId: string,
   opts: {
     q?: string;
-    sort: "updated" | "name" | "created" | "rating";
+    sort: "updated" | "name" | "created" | "rating" | "last-made";
     favourites?: boolean;
     minRating?: number;
     cursor?: string;
@@ -225,9 +232,14 @@ export async function listRecipes(
   if (rt && opts.favourites) conds.push(eq(recipeUserData.favourite, true));
   if (rt && opts.minRating) conds.push(sql`${recipeUserData.rating} >= ${opts.minRating}`);
   // Keyset pagination on (sort key, id). updated/created/rating are highest or newest first; name is A to Z.
-  const sort = opts.sort === "rating" && !rt ? "updated" : opts.sort;
+  const sort = (opts.sort === "rating" && !rt) || (opts.sort === "last-made" && !opts.timeline) ? "updated" : opts.sort;
+  const tl = !!opts.timeline;
+  const lastMadeSql = sql`(SELECT max(created_at) FROM timeline_events te WHERE te.recipe_id = ${recipes.id} AND te.kind = 'made')`;
+  const madeCountSql = sql`(SELECT count(*) FROM timeline_events te WHERE te.recipe_id = ${recipes.id} AND te.kind = 'made')`;
   const key =
-    sort === "name"
+    sort === "last-made" && tl
+      ? sql`coalesce(${lastMadeSql}, 0)`
+      : sort === "name"
       ? sql`lower(${recipes.name})`
       : sort === "created"
         ? recipes.createdAt
@@ -242,7 +254,7 @@ export async function listRecipes(
   }
   const dir = ascending ? asc : desc;
   const rows = await db
-    .select({ row: recipes, k: sql<string | number>`${key}`.as("k"), fav: recipeUserData.favourite, rating: recipeUserData.rating })
+    .select({ row: recipes, k: sql<string | number>`${key}`.as("k"), fav: recipeUserData.favourite, rating: recipeUserData.rating, lm: tl ? lastMadeSql : sql<null>`null`, mc: tl ? madeCountSql : sql<null>`null` })
     .from(recipes)
     .leftJoin(recipeUserData, and(eq(recipeUserData.recipeId, recipes.id), eq(recipeUserData.userId, opts.userId ?? "")))
     .where(and(...conds))
@@ -253,7 +265,7 @@ export async function listRecipes(
   const ids = page.map(({ row }) => row.id);
   const tagMap = opts.org ? await loadRefs(db, "tags", ids) : null;
   const catMap = opts.org ? await loadRefs(db, "categories", ids) : null;
-  const items: RecipeSummary[] = page.map(({ row, fav, rating }) => ({
+  const items: RecipeSummary[] = page.map(({ row, fav, rating, lm, mc }) => ({
     id: row.id,
     slug: row.slug,
     name: row.name,
@@ -262,6 +274,7 @@ export async function listRecipes(
     servings: row.servings,
     updatedAt: row.updatedAt.getTime(),
     ...(rt ? { favourite: fav ?? false, rating: rating ?? null } : {}),
+    ...(tl ? { lastMadeAt: lm == null ? null : Number(lm), madeCount: Number(mc ?? 0) } : {}),
     ...(tagMap && catMap ? { tags: tagMap.get(row.id) ?? [], categories: catMap.get(row.id) ?? [] } : {}),
   }));
   return { items, nextCursor: rows.length > opts.limit && last ? encode(last.k, last.row.id) : null };
@@ -273,14 +286,13 @@ const imageDir = (dataDir: string, householdId: string) => path.join(dataDir, "i
 export const imagePath = (dataDir: string, householdId: string, id: string, size: ImageSize) =>
   path.join(imageDir(dataDir, householdId), `${id}-${size}.webp`);
 
-async function removeImageFiles(dataDir: string, householdId: string, id: string) {
+export async function removeImageFiles(dataDir: string, householdId: string, id: string) {
   await Promise.all(imageSizes.map((s) => fs.rm(imagePath(dataDir, householdId, id, s), { force: true })));
 }
 
-/** Resizes to WebP at every size, stores the files, and points the recipe at the new image. */
-export async function setRecipeImage(db: Db, dataDir: string, householdId: string, slug: string, input: Buffer): Promise<string> {
+/** Resizes to WebP at every size and stores the files; returns the new image id. The caller records the row. */
+export async function processImage(dataDir: string, householdId: string, input: Buffer): Promise<string> {
   const { default: sharp } = await import("sharp");
-  const row = await findRow(db, householdId, slug);
   const id = randomUUID();
   await fs.mkdir(imageDir(dataDir, householdId), { recursive: true });
   try {
@@ -298,6 +310,13 @@ export async function setRecipeImage(db: Db, dataDir: string, householdId: strin
     await removeImageFiles(dataDir, householdId, id);
     throw e;
   }
+  return id;
+}
+
+/** Stores a new image and points the recipe at it. */
+export async function setRecipeImage(db: Db, dataDir: string, householdId: string, slug: string, input: Buffer): Promise<string> {
+  const row = await findRow(db, householdId, slug);
+  const id = await processImage(dataDir, householdId, input);
   await db.transaction(async (tx) => {
     await tx.insert(images).values({ id, householdId, createdAt: new Date() });
     await tx

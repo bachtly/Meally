@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { formatClock, parseDurations } from "@meally/shared";
 import { Button, EmptyState, IconButton, Sheet, Skeleton, useToast } from "../../ui";
 import { useFeature } from "../features/FeaturesProvider";
+import { LogMade } from "../timeline/LogMade";
 import { useRecipe } from "../recipes/api";
 import { useChecks } from "../recipes/useChecks";
 import { ingredientsForStep, scaledIngredients } from "./helpers";
@@ -40,6 +41,7 @@ export function CookPage() {
   const query = useRecipe(slug);
   const toast = useToast();
   const scalingOn = useFeature("scaling");
+  const timelineOn = useFeature("timeline");
   const { checks, toggle } = useChecks(slug);
   const [i, setI] = useState(0);
   const [drawer, setDrawer] = useState(false);
@@ -134,6 +136,7 @@ export function CookPage() {
             <Check className="size-12 text-success" aria-hidden />
             <h1 className="text-3xl font-semibold">All done</h1>
             <p className="text-muted">Enjoy your {r.name.toLowerCase()}.</p>
+            {timelineOn && <LogMade slug={r.slug} />}
             <Link to={back} className="inline-flex min-h-12 items-center rounded-md bg-accent px-6 text-lg font-medium text-accent-contrast">
               Done
             </Link>

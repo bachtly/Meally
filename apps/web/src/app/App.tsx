@@ -20,6 +20,7 @@ import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { PublicRecipePage } from "../features/share/PublicRecipePage";
+import { ActivityPage } from "../features/timeline/ActivityPage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -90,6 +91,14 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="shopping-lists">
               <ShoppingListPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/activity"
+          element={
+            <FeatureRoute on="timeline">
+              <ActivityPage />
             </FeatureRoute>
           }
         />

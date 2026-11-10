@@ -90,6 +90,9 @@ export const recipeSummarySchema = z.object({
   /** The caller's own favourite and rating; present only when the `ratings` flag is on. */
   favourite: z.boolean().optional(),
   rating: z.number().nullable().optional(),
+  /** Household-wide, from the timeline; present only when the `timeline` flag is on. */
+  lastMadeAt: z.number().nullable().optional(),
+  madeCount: z.number().optional(),
   updatedAt: z.number(),
 });
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
@@ -99,7 +102,7 @@ const slugList = z
   .optional()
   .transform((v) => (v === undefined ? [] : (Array.isArray(v) ? v : [v]).map((x) => x.trim()).filter(Boolean).slice(0, 20)));
 
-export const recipeSorts = ["updated", "name", "created", "rating"] as const;
+export const recipeSorts = ["updated", "name", "created", "rating", "last-made"] as const;
 export const recipeListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   sort: z.enum(recipeSorts).default("updated"),

@@ -18,6 +18,7 @@ const SORTS: { value: RecipeSort; label: string }[] = [
   { value: "name", label: "Name" },
   { value: "created", label: "Newest" },
   { value: "rating", label: "Top rated" },
+  { value: "last-made", label: "Last made" },
 ];
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
 export const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5";
@@ -54,6 +55,7 @@ export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: R
               </span>
             ) : null}
           </p>
+          {recipe.madeCount ? <p className="text-xs text-muted">Made {recipe.madeCount}×</p> : null}
         </div>
       </Link>
       {recipe.favourite !== undefined && (
@@ -74,6 +76,7 @@ export function RecipeLibrary() {
   const organizersOn = useFeature("organizers");
   const { filters, count: filterCount } = useOrganizerFilters();
   const ratingsOn = useFeature("ratings");
+  const timelineOn = useFeature("timeline");
   const favourites = ratingsOn && params.get("favourites") === "1";
   const query = useRecipes({ q, sort: !ratingsOn && sort === "rating" ? "updated" : sort, ...(favourites ? { favourites } : {}), ...(organizersOn ? { tag: filters.tags, category: filters.categories, tool: filters.tools } : {}) });
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
@@ -181,7 +184,7 @@ export function RecipeLibrary() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {SORTS.filter((s) => ratingsOn || s.value !== "rating").map((s) => (
+              {SORTS.filter((s) => (ratingsOn || s.value !== "rating") && (timelineOn || s.value !== "last-made")).map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setSort(s.value)}>
                   {s.label}
                 </DropdownMenuItem>
