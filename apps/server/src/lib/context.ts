@@ -1,6 +1,7 @@
 import type { SessionUser, SignupMode } from "@meally/shared";
 import type { Db } from "../db/index.js";
 import type { FlagsService } from "../features/features/service.js";
+import type { Fetcher } from "../features/import-url/fetch.js";
 import type { RateLimiter } from "./rate-limit.js";
 
 export interface AuthSettings {
@@ -22,6 +23,8 @@ export type AppEnv = {
     dataDir: string;
     flags: FlagsService;
     auth: AuthSettings;
+    fetcher: Fetcher;
+    importLimiter: RateLimiter;
     user: SessionUser;
     householdId: string;
   };

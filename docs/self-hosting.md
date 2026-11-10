@@ -21,3 +21,8 @@ The first visit shows a setup page that creates the first admin and household.
   user. Use `invite` or `closed` on a public instance.
 - `BASE_URL` should be your public URL. With an https URL, session cookies are marked `Secure`.
 - `MEALLY_TRUST_PROXY=true` makes the rate limiter use `X-Forwarded-For`. Set it only behind a reverse proxy you control.
+
+## Importing recipes from URLs
+
+Imports only fetch public http(s) pages on ports 80 and 443; private, loopback, link-local and metadata addresses are refused.
+`MEALLY_IMPORT_ALLOW_PRIVATE=true` removes those checks (any address and port). Use it only on a home lab where users are trusted.

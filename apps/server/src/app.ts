@@ -9,6 +9,8 @@ import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
 import { authRoutes } from "./features/auth/routes.js";
 import { ingredientRoutes } from "./features/ingredients/routes.js";
+import { createFetcher, type Fetcher } from "./features/import-url/fetch.js";
+import { importRoutes } from "./features/import-url/routes.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
@@ -28,6 +30,8 @@ export interface AppOptions {
   scryptLogN?: number;
   /** Root for uploaded files; defaults to DATA_DIR or ./data. */
   dataDir?: string;
+  /** SSRF-safe page fetcher; tests replace it. */
+  fetcher?: Fetcher;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -46,6 +50,8 @@ export function createApp(opts: AppOptions = {}) {
     loginLimiter: createRateLimiter({ max: 10, windowMs: 15 * 60_000 }),
     registerLimiter: createRateLimiter({ max: 20, windowMs: 60 * 60_000 }),
   };
+  const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
+  const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
 
@@ -56,6 +62,8 @@ export function createApp(opts: AppOptions = {}) {
     c.set("dataDir", dataDir);
     c.set("flags", flags);
     c.set("auth", auth);
+    c.set("fetcher", fetcher);
+    c.set("importLimiter", importLimiter);
     await next();
   });
   api.use("*", csrfProtection);
@@ -63,6 +71,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/features", featureRoutes);
   api.route("/recipes", recipeRoutes);
   api.route("/ingredients", ingredientRoutes);
+  api.route("/import/url", importRoutes);
   api.route("/images", imageRoutes);
   api.get("/health", (c) => c.json({ ok: true, version, name: appName }));
   app.route("/api/v1", api);
