@@ -40,7 +40,7 @@ function renderAt(path: string, shopping = true) {
 }
 
 it("renders the shell with nav items", async () => {
-  renderAt("/");
+  renderAt("/recipes");
   const navs = await screen.findAllByRole("navigation");
   expect(navs).toHaveLength(2);
   expect(await within(navs[0]!).findByRole("link", { name: "Shopping" })).toBeInTheDocument();
@@ -49,7 +49,7 @@ it("renders the shell with nav items", async () => {
 });
 
 it("hides a nav item when its flag is off", async () => {
-  renderAt("/", false);
+  renderAt("/recipes", false);
   const navs = await screen.findAllByRole("navigation");
   await within(navs[0]!).findByRole("link", { name: "Plan" });
   expect(within(navs[0]!).queryByRole("link", { name: "Shopping" })).not.toBeInTheDocument();

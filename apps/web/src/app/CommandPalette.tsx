@@ -1,15 +1,28 @@
 import { Command } from "cmdk";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useRecipes } from "../features/recipes/api";
 import { useVisibleNav } from "./useVisibleNav";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const items = useVisibleNav();
   const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+  const recipes = useRecipes({ q: debounced, limit: 8, enabled: open && debounced.length > 0 });
+  const found = debounced ? (recipes.data?.pages[0]?.items ?? []) : [];
   return (
     <Command.Dialog
       open={open}
-      onOpenChange={onOpenChange}
       label="Command palette"
+      onOpenChange={(o) => {
+        if (!o) setSearch("");
+        onOpenChange(o);
+      }}
       overlayClassName="fixed inset-0 z-40 bg-black/50"
       contentClassName="fixed left-1/2 top-24 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 overflow-hidden rounded-lg border border-line bg-raised text-ink shadow-md"
     >
@@ -32,6 +45,23 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             </Command.Item>
           ))}
         </Command.Group>
+        {found.length > 0 && (
+          <Command.Group heading="Recipes" className="text-sm text-muted">
+            {found.map((r) => (
+              <Command.Item
+                key={r.id}
+                value={`${r.name} ${search}`}
+                onSelect={() => {
+                  navigate(`/recipes/${r.slug}`);
+                  onOpenChange(false);
+                }}
+                className="flex min-h-11 cursor-pointer items-center gap-3 rounded-sm px-3 text-base text-ink data-[selected=true]:bg-sunken"
+              >
+                {r.name}
+              </Command.Item>
+            ))}
+          </Command.Group>
+        )}
       </Command.List>
     </Command.Dialog>
   );

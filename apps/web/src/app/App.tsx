@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { FeatureRoute } from "../features/features/Feature";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { RequireAuth, SetupPage, SignInPage, SignUpPage } from "../features/auth/AuthPages";
 import { AppShell } from "./AppShell";
 import { Gallery } from "./pages/Gallery";
-import { MorePage, PlanPage, RecipesPage, ShoppingPage } from "./pages/Placeholders";
+import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
+import { RecipePage } from "../features/recipes/RecipePage";
+import { MorePage, PlanPage, RecipeEditPage, RecipeImportPage, RecipeNewPage, ShoppingPage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +24,19 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<RecipesPage />} />
+        <Route path="/" element={<Navigate to="/recipes" replace />} />
+        <Route path="/recipes" element={<RecipeLibrary />} />
+        <Route path="/recipes/new" element={<RecipeNewPage />} />
+        <Route
+          path="/recipes/import"
+          element={
+            <FeatureRoute on="import-url">
+              <RecipeImportPage />
+            </FeatureRoute>
+          }
+        />
+        <Route path="/recipes/:slug" element={<RecipePage />} />
+        <Route path="/recipes/:slug/edit" element={<RecipeEditPage />} />
         <Route
           path="/plan"
           element={

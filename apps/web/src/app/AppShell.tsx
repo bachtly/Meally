@@ -1,10 +1,11 @@
 import { LogOut, Search, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { useFeaturesState } from "../features/features/FeaturesProvider";
 import { useSession } from "../features/auth/useSession";
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, ToastProvider } from "../ui";
 import { CommandPalette } from "./CommandPalette";
+import { HeaderSearch } from "./HeaderSearch";
 import { useVisibleNav } from "./useVisibleNav";
 
 export function AppShell() {
@@ -13,6 +14,19 @@ export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const { user, signOut } = useSession();
   const navigate = useNavigate();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl/Cmd+K focuses the search field on desktop and opens the palette on small screens.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey))) return;
+      e.preventDefault();
+      if (searchRef.current && searchRef.current.offsetParent !== null) searchRef.current.focus();
+      else setPaletteOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <ToastProvider>
@@ -24,7 +38,7 @@ export function AppShell() {
               <NavLink
                 key={to}
                 to={to}
-                end={to === "/"}
+                end={to === "/recipes"}
                 className={({ isActive }) =>
                   cn(
                     "flex min-h-11 items-center gap-3 rounded-md px-3 text-base",
@@ -41,6 +55,7 @@ export function AppShell() {
 
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
           <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
+          <HeaderSearch ref={searchRef} />
           <div className="flex items-center gap-1">
             <IconButton aria-label="Search and commands" onClick={() => setPaletteOpen(true)}>
               <Search className="size-5" aria-hidden />
@@ -69,7 +84,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 lg:pb-10" aria-busy={isLoading || undefined}>
+        <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 lg:pb-10" aria-busy={isLoading || undefined}>
           <Outlet />
         </main>
 
@@ -79,7 +94,7 @@ export function AppShell() {
               <li key={to} className="flex-1">
                 <NavLink
                   to={to}
-                  end={to === "/"}
+                  end={to === "/recipes"}
                   className={({ isActive }) =>
                     cn(
                       "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs",

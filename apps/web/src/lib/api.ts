@@ -21,6 +21,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     if (res.status === 401 && data.error === "unauthenticated") window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
     throw new ApiRequestError(res.status, data.error ?? "error", data.message ?? `Request failed: ${res.status}`);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 

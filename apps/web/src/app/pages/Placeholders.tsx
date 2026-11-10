@@ -1,18 +1,22 @@
-import { BookOpen, CalendarDays, ShoppingCart } from "lucide-react";
+import { CalendarDays, ShoppingCart } from "lucide-react";
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
 import { EmptyState, ThemeToggle } from "../../ui";
 
-export function RecipesPage() {
+function Soon({ title }: { title: string }) {
   return (
     <>
-      <h1 className="mb-4 text-2xl font-semibold">Recipes</h1>
-      <EmptyState icon={<BookOpen className="size-10" />} title="No recipes yet">
-        Recipes you add will show up here.
-      </EmptyState>
+      <h1 className="mb-4 text-2xl font-semibold">{title}</h1>
+      <p className="mb-4 text-muted">This screen is coming soon.</p>
+      <Link to="/recipes" className="text-accent underline">
+        Back to recipes
+      </Link>
     </>
   );
 }
+export const RecipeNewPage = () => <Soon title="New recipe" />;
+export const RecipeImportPage = () => <Soon title="Import from URL" />;
+export const RecipeEditPage = () => <Soon title="Edit recipe" />;
 
 export function PlanPage() {
   return (

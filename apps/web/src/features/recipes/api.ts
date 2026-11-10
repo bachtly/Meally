@@ -1,0 +1,42 @@
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Recipe, RecipeListResponse } from "@meally/shared";
+import { api } from "../../lib/api";
+
+export type RecipeSort = "updated" | "name" | "created";
+
+export function useRecipes(opts: { q?: string; sort?: RecipeSort; limit?: number; enabled?: boolean } = {}) {
+  const { q = "", sort = "updated", limit = 24, enabled = true } = opts;
+  return useInfiniteQuery({
+    queryKey: ["recipes", "list", { q, sort, limit }],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ sort, limit: String(limit) });
+      if (q.trim()) params.set("q", q.trim());
+      if (pageParam) params.set("cursor", pageParam);
+      return api<RecipeListResponse>(`/recipes?${params}`);
+    },
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+export function useRecipe(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["recipes", "detail", slug],
+    queryFn: () => api<Recipe>(`/recipes/${encodeURIComponent(slug!)}`),
+    enabled: !!slug,
+    retry: (count, err) => !(err as { status?: number }).status && count < 2,
+  });
+}
+
+export function useDeleteRecipe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) => api<void>(`/recipes/${encodeURIComponent(slug)}`, { method: "DELETE" }),
+    onSuccess: (_d, slug) => {
+      qc.removeQueries({ queryKey: ["recipes", "detail", slug] });
+      void qc.invalidateQueries({ queryKey: ["recipes", "list"] });
+    },
+  });
+}
