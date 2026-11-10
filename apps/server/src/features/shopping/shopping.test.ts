@@ -161,7 +161,7 @@ describe("shopping API", () => {
       food: "milk",
       quantity: 2,
       unit: "cup",
-      aisle: null,
+      aisle: dairy,
     });
     await call(A, "PATCH", `/shopping/lists/${id}/items/${added.items[0].id}`, {
       aisle: dairy,
@@ -180,6 +180,27 @@ describe("shopping API", () => {
     await call(A, "DELETE", `/shopping/aisles/${dairy}`);
     const { items } = await json(await call(A, "GET", `/shopping/lists/${id}`));
     expect(items.every((i: any) => i.aisle === null)).toBe(true);
+  });
+
+  it("guesses aisles, and a remembered aisle overrides the guess", async () => {
+    const { A, call, json, list } = await mk();
+    const id = await list();
+    const aisles = (await json(await call(A, "GET", "/shopping/aisles"))).items;
+    const by = (n: string) => aisles.find((a: any) => a.name === n).id;
+    const add = async (text: string) =>
+      (await json(await call(A, "POST", `/shopping/lists/${id}/items`, { text })))
+        .items[0];
+    const onion = await add("2 onions");
+    expect(onion.aisle).toBe(by("Produce"));
+    expect((await add("xylitol")).aisle).toBeNull();
+    await call(A, "PATCH", `/shopping/lists/${id}/items/${onion.id}`, {
+      aisle: by("Pantry"),
+    });
+    await call(A, "DELETE", `/shopping/lists/${id}/items/${onion.id}`);
+    expect((await add("1 onion")).aisle).toBe(by("Pantry"));
+    // Guess is skipped when the household deleted that aisle.
+    await call(A, "DELETE", `/shopping/aisles/${by("Bakery")}`);
+    expect((await add("bread")).aisle).toBeNull();
   });
 
   it("aisle labels CRUD and reorder", async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import {
   formatQuantity,
+  guessAisle,
   mergeQuantities,
   parseIngredient,
   unitByKey,
@@ -225,7 +226,17 @@ async function rememberedAisle(
         eq(foodAisles.food, normalizeFood(food)),
       ),
     );
-  return r?.a ?? null;
+  if (r?.a) return r.a;
+  // No remembered choice: fall back to the built-in guess, if the household still has that aisle.
+  const guess = guessAisle(food);
+  if (!guess) return null;
+  const [g] = await db
+    .select({ id: aisleLabels.id })
+    .from(aisleLabels)
+    .where(
+      and(eq(aisleLabels.householdId, householdId), eq(aisleLabels.name, guess)),
+    );
+  return g?.id ?? null;
 }
 
 async function rememberAisle(

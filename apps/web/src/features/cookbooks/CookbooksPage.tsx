@@ -1,10 +1,9 @@
 import { BookMarked, Plus } from "lucide-react";
-import type { CSSProperties } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Cookbook } from "@meally/shared";
 import { Button, EmptyState, Skeleton } from "../../ui";
-import { warmHue } from "../recipes/format";
+import { RecipeThumb } from "../recipes/RecipeThumb";
 import { CookbookDialog } from "./CookbookDialog";
 import { useCookbooks } from "./api";
 
@@ -13,9 +12,7 @@ export function CookbookCover({ cookbook }: { cookbook: Pick<Cookbook, "covers" 
   const imgs = cookbook.covers;
   if (imgs.length === 0)
     return (
-      <div aria-hidden style={{ "--h": warmHue(cookbook.name) } as CSSProperties} className="recipe-tint flex size-full items-center justify-center text-5xl font-semibold">
-        {cookbook.name.trim().charAt(0).toUpperCase()}
-      </div>
+      <RecipeThumb name={cookbook.name} imageUrl={null} textClass="text-5xl" className="size-full" />
     );
   if (imgs.length < 3) return <img src={imgs[0]} alt="" loading="lazy" className="size-full object-cover" />;
   return (

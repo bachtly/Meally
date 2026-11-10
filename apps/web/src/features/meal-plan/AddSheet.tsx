@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Shuffle } from "lucide-react";
 import type { MealPlanRecipeSummary, MealType } from "@meally/shared";
 import { Button, Field, Input, Sheet, Skeleton, useToast } from "../../ui";
+import { RecipeThumb } from "../recipes/RecipeThumb";
 import { useRecipes } from "../recipes/api";
 import { suggest, useAddEntry } from "./api";
 import { MealTypeControl } from "./MealTypeControl";
@@ -88,7 +89,8 @@ function AddForm({ onOpenChange, date: initialDate, mealType: initialType = "din
             <ul className="flex max-h-48 flex-col overflow-y-auto" aria-label="Recipes">
               {results.map((r) => (
                 <li key={r.id}>
-                  <button type="button" onClick={() => setPicked({ id: r.id, name: r.name })} className="min-h-11 w-full rounded-md px-3 text-left hover:bg-sunken">
+                  <button type="button" onClick={() => setPicked({ id: r.id, name: r.name })} className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-1 text-left hover:bg-sunken">
+                    <RecipeThumb name={r.name} imageUrl={r.imageUrl} sizes="32px" className="size-8 shrink-0 rounded" textClass="text-sm" />
                     {r.name}
                   </button>
                 </li>

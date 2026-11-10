@@ -5,12 +5,12 @@ import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Ellipsis, GripVe
 import { mealTypes, type MealPlanEntry, type MealType } from "@meally/shared";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, Skeleton, useToast, cn } from "../../ui";
 import { useFeature } from "../features/FeaturesProvider";
-import { imageSrcSet } from "../recipes/format";
 import { AddSheet } from "./AddSheet";
 import { useRemoveEntry, usePatchEntry, usePlanRange } from "./api";
 import { addDays, dayLabel, localToday, startOfWeek, weekDays, weekLabel } from "./dates";
 import { MealTypeControl, MEAL_LABEL } from "./MealTypeControl";
 import { CalendarSheet, RulesSheet, ShoppingDialog } from "./WeekActions";
+import { RecipeThumb } from "../recipes/RecipeThumb";
 import { useIsDesktop } from "./useIsDesktop";
 
 type Target = { date: string; mealType?: MealType };
@@ -102,13 +102,27 @@ export function PlanPage() {
           <IconButton aria-label="Next week" onClick={() => setStart(addDays(start, 7))}>
             <ChevronRight className="size-5" aria-hidden />
           </IconButton>
+          <div className="lg:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton aria-label="Plan actions">
+                  <Ellipsis className="size-5" aria-hidden />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {shopping && <DropdownMenuItem onSelect={() => setPanel("shopping")}>Add week to shopping list</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={() => setPanel("calendar")}>Subscribe in calendar</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("rules")}>Suggestion rules</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium" aria-live="polite">
           {weekLabel(start)}
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="hidden flex-wrap gap-2 lg:flex">
           {shopping && (
             <Button variant="secondary" size="sm" onClick={() => setPanel("shopping")}>
               Add week to shopping list
@@ -192,11 +206,7 @@ function Entry({ e, days, draggable }: { e: MealPlanEntry; days: string[]; dragg
       )}
       {e.recipe ? (
         <Link to={`/recipes/${e.recipe.slug}`} className={cn("flex min-w-0 flex-1 items-center gap-2", draggable && "flex-col items-stretch gap-1 pt-7")}>
-          {e.recipe.imageUrl ? (
-            <img src={e.recipe.imageUrl} srcSet={imageSrcSet(e.recipe.imageUrl)} sizes="40px" alt="" className={cn("shrink-0 rounded object-cover", draggable ? "h-12 w-full" : "size-10")} />
-          ) : (
-            <span className={cn("shrink-0 rounded bg-sunken", draggable ? "h-8 w-full" : "size-10")} aria-hidden />
-          )}
+          <RecipeThumb name={name} imageUrl={e.recipe.imageUrl} sizes="40px" className={cn("shrink-0 rounded", draggable ? "h-12 w-full" : "size-10")} />
           <span className={cn("min-w-0 text-sm", draggable ? "line-clamp-2 px-1" : "truncate")}>{name}</span>
         </Link>
       ) : (

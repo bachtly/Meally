@@ -1,5 +1,5 @@
 import { ArrowDownUp, BookOpen, ChevronDown, Heart, SearchX, Star } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { BookMarked } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -11,7 +11,8 @@ import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilter
 import { HeartButton } from "../ratings/HeartButton";
 import { CookbookDialog } from "../cookbooks/CookbookDialog";
 import { useRecipes, type RecipeSort } from "./api";
-import { formatMinutes, imageSrcSet, warmHue } from "./format";
+import { formatMinutes, imageSrcSet } from "./format";
+import { RecipeThumb } from "./RecipeThumb";
 
 const SORTS: { value: RecipeSort; label: string }[] = [
   { value: "updated", label: "Recently updated" },
@@ -39,9 +40,7 @@ export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: R
               className="size-full object-cover"
             />
           ) : (
-            <div aria-hidden style={{ "--h": warmHue(recipe.name) } as CSSProperties} className="recipe-tint flex size-full items-center justify-center text-4xl font-semibold">
-              {recipe.name.trim().charAt(0).toUpperCase()}
-            </div>
+            <RecipeThumb name={recipe.name} imageUrl={null} textClass="text-4xl" className="size-full" />
           )}
         </div>
         <div className="p-3">

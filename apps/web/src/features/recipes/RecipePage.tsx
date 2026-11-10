@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
 import { ServingsStepper, UnitsToggle } from "./ScalingControls";
 import { ApiRequestError } from "../../lib/api";
-import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
+import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast, cn } from "../../ui";
 import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
 import { AddToCookbook } from "../cookbooks/AddToCookbook";
@@ -111,7 +111,7 @@ export function RecipePage() {
     });
 
   return (
-    <article className="mx-auto max-w-5xl">
+    <article className={cn("mx-auto max-w-5xl", r.steps.length > 0 && "pb-20 lg:pb-0")}>
       {r.imageUrl && (
         <img
           src={r.imageUrl}
@@ -223,7 +223,7 @@ export function RecipePage() {
             <Feature on="cook-mode">
               <Link
                 to={`/recipes/${r.slug}/cook${params.toString() ? `?${params}` : ""}`}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 font-medium text-accent-contrast"
+                className="fixed inset-x-4 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] z-20 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent px-6 font-semibold text-accent-contrast shadow-lg lg:static lg:inset-auto lg:min-h-11 lg:justify-start lg:rounded-md lg:px-4 lg:font-medium lg:shadow-none"
               >
                 <ChefHat className="size-4" aria-hidden />
                 Start cooking
