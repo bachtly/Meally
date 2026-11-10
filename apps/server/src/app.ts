@@ -16,7 +16,7 @@ import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
 import { authRoutes } from "./features/auth/routes.js";
 import { ingredientRoutes } from "./features/ingredients/routes.js";
-import { createFetcher, type Fetcher } from "./features/import-url/fetch.js";
+import { allowPrivateUrls, createFetcher, type Fetcher } from "./features/import-url/fetch.js";
 import { importRoutes } from "./features/import-url/routes.js";
 import { importFileRoutes } from "./features/import-files/routes.js";
 import { failStaleJobs } from "./features/import-files/service.js";
@@ -25,6 +25,8 @@ import { csrfProtection } from "./features/auth/middleware.js";
 import { householdRoutes } from "./features/households/routes.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { publicRoutes, shareRoutes } from "./features/share/routes.js";
+import { webhookRoutes } from "./features/webhooks/routes.js";
+import { createDispatcher } from "./features/webhooks/service.js";
 import { tokenRoutes } from "./features/tokens/routes.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 
@@ -46,6 +48,8 @@ export interface AppOptions {
   fetcher?: Fetcher;
   /** Requests per 10 minutes per API token; lowered in tests only. */
   tokenLimit?: number;
+  /** Starts the daily-digest timer; the server entry point turns this on. */
+  webhookScheduler?: boolean;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -65,7 +69,9 @@ export function createApp(opts: AppOptions = {}) {
     registerLimiter: createRateLimiter({ max: 20, windowMs: 60 * 60_000 }),
     inviteLimiter: createRateLimiter({ max: 30, windowMs: 15 * 60_000 }),
   };
-  const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
+  const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
+  const webhooks = createDispatcher({ db, fetcher, flags });
+  if (opts.webhookScheduler) webhooks.start();
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
   const tokenLimiter = createRateLimiter({ max: opts.tokenLimit ?? 600, windowMs: 10 * 60_000 });
@@ -82,6 +88,7 @@ export function createApp(opts: AppOptions = {}) {
     c.set("flags", flags);
     c.set("auth", auth);
     c.set("fetcher", fetcher);
+    c.set("webhooks", webhooks);
     c.set("importLimiter", importLimiter);
     c.set("shareLimiter", shareLimiter);
     c.set("tokenLimiter", tokenLimiter);
@@ -101,6 +108,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/meal-plan", mealPlanRoutes);
   api.route("/shopping", shoppingRoutes);
   api.route("/tokens", tokenRoutes);
+  api.route("/webhooks", webhookRoutes);
   api.route("/cookbooks", cookbookRoutes);
   api.route("/household", householdRoutes);
   api.route("/ingredients", ingredientRoutes);

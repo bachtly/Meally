@@ -14,15 +14,26 @@ export interface FetchResult {
   body: Buffer;
   contentType: string;
   finalUrl: string;
+  /** HTTP status; always set for `post` requests, which return any non-redirect answer. */
+  status?: number;
 }
 export interface FetchOptions {
-  kind: "html" | "image";
+  /** `post` sends `body` with `headers` and never follows redirects (used by webhooks). */
+  kind: "html" | "image" | "post";
+  body?: string;
+  headers?: Record<string, string>;
 }
+
+/** MEALLY_ALLOW_PRIVATE_URLS, or its older name MEALLY_IMPORT_ALLOW_PRIVATE. */
+export const allowPrivateUrls = (env: Record<string, string | undefined>) =>
+  env.MEALLY_ALLOW_PRIVATE_URLS === "true" || env.MEALLY_IMPORT_ALLOW_PRIVATE === "true";
 /** Fetches a public web resource safely; replaceable in tests. */
 export type Fetcher = (url: string, opts: FetchOptions) => Promise<FetchResult>;
 
 export interface TransportRequest {
   url: URL;
+  method?: "GET" | "POST";
+  body?: string;
   /** The vetted address to connect to. */
   ip: string;
   headers: Record<string, string>;
@@ -49,13 +60,13 @@ const failed = (msg: string) => new ApiError(502, "fetch_failed", msg);
 const defaultResolve = async (host: string) => (await dns.lookup(host, { all: true, verbatim: true })).map((a) => a.address);
 
 /** Connects to the already-vetted IP, so a second DNS answer cannot redirect us (DNS rebinding). */
-const defaultTransport: Transport = ({ url, ip, headers, signal }) =>
+const defaultTransport: Transport = ({ url, ip, headers, signal, method = "GET", body }) =>
   new Promise((resolve, reject) => {
     const mod = url.protocol === "https:" ? https : http;
     const req = mod.request(
       url,
       {
-        method: "GET",
+        method,
         headers,
         signal,
         lookup: ((_h: string, o: { all?: boolean }, cb: (...a: unknown[]) => void) =>
@@ -73,7 +84,7 @@ const defaultTransport: Transport = ({ url, ip, headers, signal }) =>
       },
     );
     req.on("error", reject);
-    req.end();
+    req.end(body);
   });
 
 export function checkUrlShape(raw: string, allowPrivate: boolean): URL {
@@ -112,7 +123,7 @@ export function createFetcher(deps: FetcherDeps = {}): Fetcher {
     return ips[0]!;
   }
 
-  return async (raw, { kind }) => {
+  return async (raw, { kind, body, headers: extra }) => {
     const max = kind === "html" ? MAX_HTML_BYTES : MAX_IMAGE_BYTES;
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
@@ -126,14 +137,20 @@ export function createFetcher(deps: FetcherDeps = {}): Fetcher {
             url: current,
             ip,
             signal: ctl.signal,
+            ...(kind === "post" ? { method: "POST" as const, body } : {}),
             headers: {
               "User-Agent": ua,
-              Accept: kind === "html" ? "text/html,application/xhtml+xml" : "image/*",
+              Accept: kind === "html" ? "text/html,application/xhtml+xml" : kind === "post" ? "*/*" : "image/*",
               "Accept-Encoding": "identity",
+              ...(kind === "post" ? { ...extra, "Content-Length": String(Buffer.byteLength(body ?? "")) } : {}),
             },
           });
         } catch {
           throw failed(ctl.signal.aborted ? "The site took too long to respond" : "Could not reach that site");
+        }
+        if (kind === "post") {
+          res.destroy(); // the answer body is not needed; redirects are reported, not followed
+          return { body: Buffer.alloc(0), contentType: "", finalUrl: current.href, status: res.status };
         }
         if ([301, 302, 303, 307, 308].includes(res.status)) {
           res.destroy();

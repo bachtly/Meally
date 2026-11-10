@@ -16,6 +16,8 @@ type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boole
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
 
+import { emitWebhookEvent } from "../webhooks/events.js";
+
 export const imageUrl = (id: string | null, size: ImageSize) => (id ? `/api/v1/images/${id}/${size}` : null);
 
 export function slugify(name: string): string {
@@ -135,6 +137,7 @@ export async function createRecipe(db: Db, householdId: string, userId: string, 
     await reindex(tx, householdId, id, data);
     return row!;
   });
+  emitWebhookEvent(db, householdId, "recipe.created", { slug: row.slug, name: row.name });
   return load(db, row, o);
 }
 
@@ -156,13 +159,16 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
     await reindex(tx, householdId, existing.id, data);
     return row!;
   });
+  emitWebhookEvent(db, householdId, "recipe.updated", { slug: row.slug, name: row.name });
   return load(db, row, o);
 }
 
 export async function deleteRecipe(db: Db, dataDir: string, householdId: string, slug: string) {
   const extra: string[] = [];
+  let deleted = { slug, name: "" };
   const imageId = await db.transaction(async (tx) => {
     const existing = await findRow(tx, householdId, slug);
+    deleted = { slug: existing.slug, name: existing.name };
     const tlImgs = (await tx.select({ id: timelineEvents.imageId }).from(timelineEvents).where(eq(timelineEvents.recipeId, existing.id)))
       .map((r) => r.id)
       .filter((x): x is string => !!x);
@@ -173,6 +179,7 @@ export async function deleteRecipe(db: Db, dataDir: string, householdId: string,
     if (tlImgs.length) await tx.delete(images).where(inArray(images.id, tlImgs));
     return existing.imageId;
   });
+  emitWebhookEvent(db, householdId, "recipe.deleted", deleted);
   if (imageId) await removeImageFiles(dataDir, householdId, imageId);
   for (const id of extra) await removeImageFiles(dataDir, householdId, id);
 }

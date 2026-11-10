@@ -1,0 +1,214 @@
+import { createHmac } from "node:crypto";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { createApp } from "../../app.js";
+import { openDb } from "../../db/index.js";
+import { webhookDeliveries } from "../../db/schema/index.js";
+import { createFlagsService } from "../features/service.js";
+import { createFetcher, type Fetcher } from "../import-url/fetch.js";
+import { createDispatcher, digestDue, KEEP_DELIVERIES, MAX_FAILURES, RETRY_DELAYS_MS, sign } from "./service.js";
+
+const H = { "content-type": "application/json", "x-requested-with": "meally" };
+const GOOD = { name: "Hook", url: "https://example.com/hook", events: ["recipe.created", "mealplan.today"], tz: "Asia/Tokyo", dailyAt: "07:00" };
+const RECIPE = { name: "Soup", ingredients: [{ raw: "1 cup milk" }], steps: [{ text: "Stir" }] };
+
+afterEach(() => vi.useRealTimers());
+
+async function mk(status: number | "throw" = 200) {
+  const o = openDb(":memory:");
+  const env = { MEALLY_SIGNUP_MODE: "open" };
+  const flags = createFlagsService(o.db, env);
+  const sent: Array<{ url: string; body: string; headers: Record<string, string> }> = [];
+  const state = { status };
+  const fetcher: Fetcher = async (url, opts) => {
+    sent.push({ url, body: opts.body!, headers: opts.headers! });
+    if (state.status === "throw") throw new Error("boom");
+    return { body: Buffer.alloc(0), contentType: "", finalUrl: url, status: state.status as number };
+  };
+  const app = createApp({ db: o.db, flags, env, scryptLogN: 10, fetcher });
+  await o.ready;
+  await flags.setOverride("api-tokens", true);
+  await flags.setOverride("webhooks", true);
+  const su = async (p: string, email: string, extra: object = {}) => {
+    const r = await app.request(`/api/v1/auth/${p}`, {
+      method: "POST",
+      headers: H,
+      body: JSON.stringify({ email, name: "n", password: "correct horse", ...extra }),
+    });
+    return r.headers.get("set-cookie")!.split(";")[0]!;
+  };
+  const A = await su("setup", "a@example.com");
+  const B = await su("register", "b@example.com");
+  const call = (c: string, method: string, url: string, body?: unknown) =>
+    app.request(`/api/v1${url}`, { method, headers: { ...H, cookie: c }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const json = async (r: Response) => (await r.json()) as any;
+  const create = async (body: object = GOOD) => json(await call(A, "POST", "/webhooks", body));
+  return { app, o, flags, A, B, call, json, create, sent, state, su, fetcher };
+}
+
+describe("signing", () => {
+  it("matches an independent HMAC-SHA256 of the raw body", () => {
+    const body = '{"event":"ping"}';
+    expect(sign("s3cret", body)).toBe(`sha256=${createHmac("sha256", "s3cret").update(body).digest("hex")}`);
+  });
+});
+
+describe("webhook routes", () => {
+  it("creates with a secret, re-views it as owner, hides it from the list", async () => {
+    const t = await mk();
+    const w = await t.create();
+    expect(w.secret).toMatch(/^whsec_/);
+    expect(w.tz).toBe("Asia/Tokyo");
+    expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`))).secret).toBe(w.secret);
+    expect(JSON.stringify(await t.json(await t.call(t.A, "GET", "/webhooks")))).not.toContain(w.secret);
+    const upd = await t.json(await t.call(t.A, "PUT", `/webhooks/${w.id}`, { ...GOOD, name: "Renamed" }));
+    expect(upd.name).toBe("Renamed");
+    expect((await t.call(t.A, "DELETE", `/webhooks/${w.id}`)).status).toBe(204);
+  });
+
+  it("validates input", async () => {
+    const t = await mk();
+    for (const bad of [{ ...GOOD, url: "nope" }, { ...GOOD, events: [] }, { ...GOOD, tz: "Mars/Base" }, { ...GOOD, dailyAt: "7am" }])
+      expect((await t.call(t.A, "POST", "/webhooks", bad)).status).toBe(400);
+  });
+
+  it("is isolated per household", async () => {
+    const t = await mk();
+    const w = await t.create();
+    const cases: Array<[string, string]> = [["GET", ""], ["PUT", ""], ["DELETE", ""], ["POST", "/test"], ["GET", "/deliveries"]];
+    for (const [m, u] of cases) expect((await t.call(t.B, m, `/webhooks/${w.id}${u}`, m === "PUT" ? GOOD : undefined)).status).toBe(404);
+    expect((await t.json(await t.call(t.B, "GET", "/webhooks"))).items).toEqual([]);
+  });
+
+  it("is owner only", async () => {
+    const t = await mk();
+    const inv = await t.json(await t.call(t.A, "POST", "/household/invites", {}));
+    const M = await t.su("register", "m@example.com", { inviteToken: inv.token });
+    expect((await t.call(M, "GET", "/webhooks")).status).toBe(403);
+    expect((await t.call(M, "POST", "/webhooks", GOOD)).status).toBe(403);
+  });
+
+  it("is hidden when the flag is off", async () => {
+    const t = await mk();
+    await t.flags.setOverride("webhooks", false);
+    expect((await t.call(t.A, "GET", "/webhooks")).status).toBe(404);
+  });
+
+  it("sends a signed ping on test and logs it", async () => {
+    const t = await mk();
+    const w = await t.create();
+    const r = await t.json(await t.call(t.A, "POST", `/webhooks/${w.id}/test`));
+    expect(r.ok).toBe(true);
+    const s = t.sent[0]!;
+    expect(s.headers["X-Meally-Event"]).toBe("ping");
+    expect(s.headers["X-Meally-Delivery"]).toBeTruthy();
+    expect(s.headers["X-Meally-Signature"]).toBe(sign(w.secret, s.body));
+    expect(JSON.parse(s.body)).toMatchObject({ event: "ping", household: { name: expect.any(String) } });
+    expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}/deliveries`))).items).toHaveLength(1);
+    expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`))).lastStatus).toBe(200);
+  });
+});
+
+describe("delivery", () => {
+  it("emits recipe.created from the recipe service to subscribed hooks only", async () => {
+    const t = await mk();
+    await t.create();
+    await t.create({ ...GOOD, name: "Other", events: ["recipe.deleted"] });
+    expect((await t.call(t.A, "POST", "/recipes", RECIPE)).status).toBe(201);
+    await vi.waitFor(() => expect(t.sent).toHaveLength(1));
+    expect(JSON.parse(t.sent[0]!.body)).toMatchObject({ event: "recipe.created", data: { slug: "soup", name: "Soup" } });
+  });
+
+  it("emits nothing when the flag is off", async () => {
+    const t = await mk();
+    await t.create();
+    await t.flags.setOverride("webhooks", false);
+    await t.call(t.A, "POST", "/recipes", RECIPE);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(t.sent).toHaveLength(0);
+  });
+
+  it("retries after 1, 5 and 30 minutes, then stops", async () => {
+    const t = await mk(500);
+    await t.create();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // vi.waitFor would advance fake time, so poll with the real setImmediate.
+    const until = async (n: number) => {
+      for (let i = 0; i < 400 && t.sent.length < n; i++) await new Promise((r) => setImmediate(r));
+      for (let i = 0; i < 40; i++) await new Promise((r) => setImmediate(r)); // let the attempt be recorded
+      expect(t.sent).toHaveLength(n);
+    };
+    await t.call(t.A, "POST", "/recipes", RECIPE);
+    await until(1);
+    for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[i]! - 1);
+      expect(t.sent).toHaveLength(i + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      await until(i + 2);
+    }
+    await vi.advanceTimersByTimeAsync(24 * 3600_000);
+    expect(t.sent).toHaveLength(4);
+    expect(new Set(t.sent.map((s) => s.headers["X-Meally-Delivery"])).size).toBe(4);
+  });
+
+  it("auto-disables after 20 consecutive failures and resets on success", async () => {
+    const t = await mk(500);
+    const w = await t.create();
+    for (let i = 0; i < MAX_FAILURES - 1; i++) await t.call(t.A, "POST", `/webhooks/${w.id}/test`);
+    t.state.status = 200;
+    await t.call(t.A, "POST", `/webhooks/${w.id}/test`);
+    expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`))).failureCount).toBe(0);
+    t.state.status = "throw";
+    for (let i = 0; i < MAX_FAILURES; i++) await t.call(t.A, "POST", `/webhooks/${w.id}/test`);
+    const after = await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`));
+    expect(after.enabled).toBe(false);
+    expect(after.failureCount).toBe(MAX_FAILURES);
+    const re = await t.json(await t.call(t.A, "PUT", `/webhooks/${w.id}`, { ...GOOD, enabled: true }));
+    expect(re.enabled).toBe(true);
+    expect(re.failureCount).toBe(0);
+  });
+
+  it("keeps only the last 50 deliveries", async () => {
+    const t = await mk();
+    const w = await t.create();
+    for (let i = 0; i < KEEP_DELIVERIES + 5; i++) await t.call(t.A, "POST", `/webhooks/${w.id}/test`);
+    const rows = await t.o.db.select().from(webhookDeliveries).where(eq(webhookDeliveries.webhookId, w.id));
+    expect(rows).toHaveLength(KEEP_DELIVERIES);
+  });
+
+  it("refuses private addresses through the real fetcher", async () => {
+    const f = createFetcher({ resolve: async () => ["10.0.0.5"], transport: vi.fn() });
+    await expect(f("http://internal.example/hook", { kind: "post", body: "{}" })).rejects.toMatchObject({ code: "blocked_url" });
+    await expect(createFetcher({ transport: vi.fn() })("http://127.0.0.1/x", { kind: "post", body: "{}" })).rejects.toMatchObject({ code: "blocked_url" });
+  });
+
+  it("posts the body and reports redirects without following them", async () => {
+    const transport = vi.fn(async (_req: unknown) => ({ status: 302, headers: { location: "http://10.0.0.1/" }, body: (async function* () {})(), destroy() {} }));
+    const f = createFetcher({ resolve: async () => ["93.184.216.34"], transport });
+    const r = await f("https://example.com/h", { kind: "post", body: '{"a":1}', headers: { "X-Meally-Event": "ping" } });
+    expect(r.status).toBe(302);
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(transport.mock.calls[0]![0]).toMatchObject({ method: "POST", body: '{"a":1}', headers: { "X-Meally-Event": "ping" } });
+  });
+});
+
+describe("daily digest", () => {
+  it("is due once per local day, from dailyAt, in the hook timezone", () => {
+    const h = { dailyAt: "07:00", tz: "Asia/Tokyo", lastDigestOn: null as string | null };
+    expect(digestDue(new Date("2026-01-09T21:59:00Z"), h).due).toBe(false); // 06:59 JST
+    expect(digestDue(new Date("2026-01-09T22:00:00Z"), h)).toEqual({ due: true, date: "2026-01-10" });
+    expect(digestDue(new Date("2026-01-09T22:30:00Z"), { ...h, lastDigestOn: "2026-01-10" }).due).toBe(false);
+    expect(digestDue(new Date("2026-01-10T01:30:00Z"), h).due).toBe(false); // over 2 h late
+    expect(digestDue(new Date("2026-01-10T22:00:00Z"), { ...h, lastDigestOn: "2026-01-10" }).due).toBe(true);
+  });
+
+  it("sends the digest on tick and not twice", async () => {
+    const t = await mk();
+    await t.create();
+    const d = createDispatcher({ db: t.o.db, fetcher: t.fetcher, flags: t.flags });
+    await d.tick(new Date("2026-01-09T22:05:00Z"));
+    await d.tick(new Date("2026-01-09T22:06:00Z"));
+    expect(t.sent).toHaveLength(1);
+    expect(JSON.parse(t.sent[0]!.body)).toMatchObject({ event: "mealplan.today", data: { date: "2026-01-10", entries: [] } });
+  });
+});

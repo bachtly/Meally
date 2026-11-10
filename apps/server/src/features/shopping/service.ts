@@ -26,6 +26,8 @@ import { shoppingBus } from "./bus.js";
 const notFound = () => new ApiError(404, "not_found", "Not found");
 type ItemRow = typeof shoppingItems.$inferSelect;
 
+import { emitWebhookEvent } from "../webhooks/events.js";
+
 export const DEFAULT_AISLES = [
   "Produce",
   "Bakery",
@@ -641,6 +643,7 @@ export async function patchItem(
   if (p.aisle !== undefined && food)
     await rememberAisle(db, householdId, food, p.aisle);
   await changed(db, householdId, listId);
+  if (p.checked === true && !cur.checked) emitWebhookEvent(db, householdId, "shopping.item_checked", { listId, itemId: id, text: cur.text });
   return toItem(await getItem(db, householdId, listId, id));
 }
 

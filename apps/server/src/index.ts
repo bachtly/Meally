@@ -25,6 +25,6 @@ startBackupScheduler({
   enabled: async () => (await flags.getFeatures()).backups.enabled,
 });
 
-serve({ fetch: createApp({ webDist, db, flags }).fetch, port: config.PORT }, (info) => {
+serve({ fetch: createApp({ webDist, db, flags, webhookScheduler: true }).fetch, port: config.PORT }, (info) => {
   console.log(`Meally listening on :${info.port}`);
 });

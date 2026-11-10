@@ -25,7 +25,7 @@ The first visit shows a setup page that creates the first admin and household.
 ## Importing recipes from URLs
 
 Imports only fetch public http(s) pages on ports 80 and 443; private, loopback, link-local and metadata addresses are refused.
-`MEALLY_IMPORT_ALLOW_PRIVATE=true` removes those checks (any address and port). Use it only on a home lab where users are trusted.
+`MEALLY_ALLOW_PRIVATE_URLS=true` removes those checks (any address and port) for recipe import and webhooks. The old name `MEALLY_IMPORT_ALLOW_PRIVATE` still works. Use it only on a home lab where users are trusted.
 
 ## Backups
 

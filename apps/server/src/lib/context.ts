@@ -2,6 +2,7 @@ import type { SessionUser, SignupMode } from "@meally/shared";
 import type { Db } from "../db/index.js";
 import type { FlagsService } from "../features/features/service.js";
 import type { Fetcher } from "../features/import-url/fetch.js";
+import type { Dispatcher } from "../features/webhooks/service.js";
 import type { RateLimiter } from "./rate-limit.js";
 
 export interface AuthSettings {
@@ -26,6 +27,7 @@ export type AppEnv = {
     flags: FlagsService;
     auth: AuthSettings;
     fetcher: Fetcher;
+    webhooks: Dispatcher;
     importLimiter: RateLimiter;
     shareLimiter: RateLimiter;
     tokenLimiter: RateLimiter;

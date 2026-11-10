@@ -6,6 +6,7 @@ import { ThemeToggle } from "../../ui";
 import { ExportBackupsSection } from "../backups/ExportBackupsSection";
 import { HouseholdSection } from "./HouseholdSection";
 import { TokensSection } from "../tokens/TokensSection";
+import { WebhooksSection } from "../webhooks/WebhooksSection";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -56,6 +57,11 @@ export function SettingsPage() {
       <Feature on="api-tokens">
         <Section title="API tokens">
           <TokensSection />
+        </Section>
+      </Feature>
+      <Feature on="webhooks">
+        <Section title="Webhooks">
+          <WebhooksSection />
         </Section>
       </Feature>
       <Section title="Appearance">
