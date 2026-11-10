@@ -14,6 +14,7 @@ export interface AuthSettings {
   scryptLogN: number;
   loginLimiter: RateLimiter;
   registerLimiter: RateLimiter;
+  inviteLimiter: RateLimiter;
 }
 
 /** Hono variables set by app-level middleware. */

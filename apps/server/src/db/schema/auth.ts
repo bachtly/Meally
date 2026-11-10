@@ -15,8 +15,31 @@ export const users = sqliteTable("users", {
   householdId: text("household_id")
     .notNull()
     .references(() => households.id),
+  /** A user belongs to exactly one household (users.household_id); this is their role inside it. */
+  householdRole: text("household_role", { enum: ["owner", "member"] }).notNull().default("owner"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+/** Invite links. `tokenHash` is the sha256 of the one-time token, which is shown only at creation. */
+export const invites = sqliteTable(
+  "invites",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    email: text("email"),
+    role: text("role", { enum: ["owner", "member"] }).notNull().default("member"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("invites_household_idx").on(t.householdId)],
+);
 
 /** `id` is the sha256 of the cookie token; the raw token is never stored. */
 export const sessions = sqliteTable(

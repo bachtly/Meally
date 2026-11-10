@@ -6,6 +6,9 @@ export function MorePage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">More</h1>
+      <Link to="/settings" className="text-accent underline">
+        Settings
+      </Link>
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Appearance</h2>
         <ThemeToggle />

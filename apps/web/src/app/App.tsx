@@ -12,6 +12,8 @@ import { RecipeImportPage } from "../features/import-url/ImportPage";
 import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
 import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
 import { PlanPage } from "../features/meal-plan/PlanPage";
+import { SettingsPage } from "../features/households/SettingsPage";
+import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,7 @@ export const appRoutes = createRoutesFromElements(
   <>
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route
         element={
@@ -68,6 +71,15 @@ export const appRoutes = createRoutesFromElements(
           }
         />
         <Route path="/more" element={<MorePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/invite/:token"
+          element={
+            <FeatureRoute on="households">
+              <AcceptInvitePage />
+            </FeatureRoute>
+          }
+        />
         {import.meta.env.DEV && <Route path="/ui" element={<Gallery />} />}
       </Route>
   </>,

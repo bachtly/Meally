@@ -19,7 +19,7 @@ export function clearSessionCookie(c: Context<AppEnv>) {
 }
 
 export function toSessionUser(u: SessionUser): SessionUser {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, householdId: u.householdId };
+  return { id: u.id, email: u.email, name: u.name, role: u.role, householdId: u.householdId, householdRole: u.householdRole };
 }
 
 /** Requires a valid session cookie; sets `user` and `householdId`. */

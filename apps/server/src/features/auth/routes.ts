@@ -10,6 +10,7 @@ import {
   signupModes,
   z,
   type AuthStatus,
+  type InviteLookup,
   type MeResponse,
   type SignupMode,
 } from "@meally/shared";
@@ -18,6 +19,7 @@ import { households, instanceSettings, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
+import { consumeInvite, findValidInvite } from "../households/service.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
@@ -64,12 +66,14 @@ function limit(c: Context<AppEnv>, kind: "login" | "register") {
 async function createAccount(
   c: Context<AppEnv>,
   input: { email: string; name: string; password: string },
-  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean },
+  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean; inviteToken?: string },
 ) {
   const db = c.get("db");
   const passwordHash = await hashPassword(input.password, c.get("auth").scryptLogN);
   const now = new Date();
-  const householdId = randomUUID();
+  let householdId: string = randomUUID();
+  let householdRole: "owner" | "member" = "owner";
+  let householdName = opts.householdName;
   const userId = randomUUID();
   // The write transaction holds the single connection, so the empty check and insert cannot interleave.
   await db.transaction(async (tx) => {
@@ -79,15 +83,30 @@ async function createAccount(
     if ((await tx.select().from(users).where(eq(users.email, input.email)).limit(1)).length > 0) {
       throw new ApiError(409, "email_taken", "An account with this email already exists");
     }
-    await tx.insert(households).values({ id: householdId, name: opts.householdName, createdAt: now });
-    await tx
-      .insert(users)
-      .values({ id: userId, email: input.email, name: input.name, passwordHash, role: opts.role, householdId, createdAt: now });
+    if (opts.inviteToken) {
+      const joined = await consumeInvite(tx, opts.inviteToken, input.email);
+      householdId = joined.householdId;
+      householdRole = joined.role;
+      const [h] = await tx.select().from(households).where(eq(households.id, householdId)).limit(1);
+      householdName = h!.name;
+    } else {
+      await tx.insert(households).values({ id: householdId, name: householdName, createdAt: now });
+    }
+    await tx.insert(users).values({
+      id: userId,
+      email: input.email,
+      name: input.name,
+      passwordHash,
+      role: opts.role,
+      householdId,
+      householdRole,
+      createdAt: now,
+    });
   });
   setSessionCookie(c, await createSession(db, userId, c.req.header("user-agent")));
   const res: MeResponse = {
-    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId },
-    household: { id: householdId, name: opts.householdName },
+    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId, householdRole },
+    household: { id: householdId, name: householdName },
   };
   return c.json(res, 201);
 }
@@ -120,9 +139,27 @@ export const authRoutes = new Hono<AppEnv>()
     if (await needsSetup(db)) throw new ApiError(409, "setup_required", "Complete first-run setup first");
     const mode = await resolveSignupMode(db, c.get("auth").lockedSignupMode);
     if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
-    if (mode === "invite") throw new ApiError(403, "invite_required", "An invitation is required to sign up");
     const input = await body(c, registerSchema);
-    return createAccount(c, input, { role: "member", householdName: `${input.name}'s household` });
+    // A valid invite token works in every mode except closed; invite mode requires one.
+    // Invites belong to the households feature, so with the flag off the token is ignored.
+    const useInvite = !!input.inviteToken && (await c.get("flags").getFeatures()).households.enabled;
+    if (mode === "invite" && !useInvite) throw new ApiError(403, "invite_required", "An invitation is required to sign up");
+    return createAccount(c, input, {
+      role: "member",
+      householdName: `${input.name}'s household`,
+      inviteToken: useInvite ? input.inviteToken : undefined,
+    });
+  })
+  .get("/invite/:token", async (c) => {
+    const r = c.get("auth").inviteLimiter.hit(clientIp(c));
+    if (!r.ok) {
+      c.header("Retry-After", String(r.retryAfterSec));
+      throw new ApiError(429, "rate_limited", "Too many attempts. Try again later.");
+    }
+    const on = (await c.get("flags").getFeatures()).households.enabled;
+    const found = on ? await findValidInvite(c.get("db"), c.req.param("token")) : null;
+    const res: InviteLookup = { householdName: found?.householdName ?? "", valid: !!found };
+    return c.json(res);
   })
   .post("/login", async (c) => {
     limit(c, "login");

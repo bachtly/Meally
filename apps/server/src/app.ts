@@ -16,6 +16,7 @@ import { createFetcher, type Fetcher } from "./features/import-url/fetch.js";
 import { importRoutes } from "./features/import-url/routes.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
+import { householdRoutes } from "./features/households/routes.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 
@@ -52,6 +53,7 @@ export function createApp(opts: AppOptions = {}) {
     scryptLogN: opts.scryptLogN ?? 17,
     loginLimiter: createRateLimiter({ max: 10, windowMs: 15 * 60_000 }),
     registerLimiter: createRateLimiter({ max: 20, windowMs: 60 * 60_000 }),
+    inviteLimiter: createRateLimiter({ max: 30, windowMs: 15 * 60_000 }),
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
@@ -76,6 +78,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/organizers", organizerRoutes);
   api.route("/meal-plan", mealPlanRoutes);
   api.route("/shopping", shoppingRoutes);
+  api.route("/household", householdRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
   api.route("/images", imageRoutes);

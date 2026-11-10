@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router";
-import { loginSchema, registerSchema, setupSchema, type MeResponse } from "@meally/shared";
+import { useQuery } from "@tanstack/react-query";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
+import { loginSchema, registerSchema, setupSchema, type InviteLookup, type MeResponse } from "@meally/shared";
 import type { ZodType } from "zod";
-import { ApiRequestError, postJson } from "../../lib/api";
+import { api, ApiRequestError, postJson } from "../../lib/api";
 import { Button, Field, Input, Skeleton } from "../../ui";
 import { useAuthStatus, useSession } from "./useSession";
 
@@ -26,10 +27,11 @@ interface FormProps {
   submitLabel: string;
   fields: { name: string; label: string; type: string; autoComplete: string; hint?: string }[];
   footer?: ReactNode;
+  extra?: Record<string, string>;
 }
 
 /** Validates with the shared zod schema, posts, stores the session and redirects. */
-function AuthForm({ schema, endpoint, submitLabel, fields, footer }: FormProps) {
+function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra }: FormProps) {
   const { setSession } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,7 +41,7 @@ function AuthForm({ schema, endpoint, submitLabel, fields, footer }: FormProps) 
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+    const data = { ...Object.fromEntries(new FormData(e.currentTarget)), ...extra } as Record<string, string>;
     const parsed = schema.safeParse(data);
     setFormError("");
     if (!parsed.success) {
@@ -126,17 +128,41 @@ export function SignInPage() {
 export function SignUpPage() {
   const status = useAuthStatus();
   const { me } = useSession();
-  if (me) return <Navigate to="/" replace />;
+  const token = useSearchParams()[0].get("invite") ?? "";
+  const invite = useQuery({
+    queryKey: ["invite", token],
+    queryFn: () => api<InviteLookup>(`/auth/invite/${encodeURIComponent(token)}`),
+    enabled: !!token,
+    retry: false,
+  });
+  if (me) return <Navigate to={token ? `/invite/${encodeURIComponent(token)}` : "/"} replace />;
   if (status.data && (status.data.needsSetup || status.data.signupMode === "closed")) {
     return <Navigate to="/signin" replace />;
   }
+  const validInvite = invite.data?.valid ? invite.data : null;
   return (
-    <AuthCard title="Create your account">
-      {status.isLoading ? (
+    <AuthCard title={validInvite ? `Join ${validInvite.householdName}` : "Create your account"}>
+      {status.isLoading || (token && invite.isLoading) ? (
         <Skeleton className="h-48 w-full" />
+      ) : validInvite ? (
+        <AuthForm
+          schema={registerSchema}
+          endpoint="/auth/register"
+          submitLabel="Create account and join"
+          fields={[name, email, newPassword]}
+          extra={{ inviteToken: token }}
+          footer={
+            <p className="text-center text-sm text-muted">
+              Have an account?{" "}
+              <Link to="/signin" state={{ from: `/invite/${token}` }} className="font-medium text-accent underline">
+                Sign in to join
+              </Link>
+            </p>
+          }
+        />
       ) : status.data?.signupMode === "invite" ? (
         <p className="text-sm text-muted">
-          Sign-up is by invitation only. Ask a household admin for an invite link, or{" "}
+          {token ? "This invite link is invalid or has expired. " : ""}Sign-up is by invitation only. Ask a household admin for an invite link, or{" "}
           <Link to="/signin" className="font-medium text-accent underline">
             sign in
           </Link>
