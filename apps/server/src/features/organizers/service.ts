@@ -188,9 +188,10 @@ export async function mergeOrganizers(db: Db, type: OrganizerType, householdId: 
   await db.transaction(async (tx) => {
     const from = await find(tx, type, householdId, slug);
     const to = await find(tx, type, householdId, into);
-    await tx.run(
-      sql`INSERT OR IGNORE INTO ${link} (recipe_id, ${sql.raw(sqlCol)})
-          SELECT recipe_id, ${to.id} FROM ${link} WHERE ${link[col]} = ${from.id}`,
+    await tx.execute(
+      sql`INSERT INTO ${link} (recipe_id, ${sql.raw(sqlCol)})
+          SELECT recipe_id, ${to.id} FROM ${link} WHERE ${link[col]} = ${from.id}
+          ON CONFLICT DO NOTHING`,
     );
     await tx.delete(table).where(and(eq(table.id, from.id), eq(table.householdId, householdId)));
   });

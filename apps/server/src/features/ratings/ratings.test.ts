@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { openDb } from "../../db/index.js";
+import { openTestDb } from "../../db/testing.js";
 
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 
 async function mk(env: Record<string, string> = {}) {
-  const { db, ready } = openDb(":memory:");
+  const { db, ready } = openTestDb();
   await ready;
   const app = createApp({ db, env: { MEALLY_SIGNUP_MODE: "invite", ...env }, scryptLogN: 10 });
   const call = async (cookie: string | undefined, method: string, path: string, data?: unknown) => {

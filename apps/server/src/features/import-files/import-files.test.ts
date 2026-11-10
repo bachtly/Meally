@@ -6,7 +6,7 @@ import { strToU8, zipSync } from "fflate";
 import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { openDb } from "../../db/index.js";
+import { openTestDb } from "../../db/testing.js";
 import type { Fetcher } from "../import-url/fetch.js";
 import { looseDuration } from "./importers.js";
 import { openZip, safeEntryName } from "./zip.js";
@@ -17,7 +17,7 @@ const H = { "content-type": "application/json", "x-requested-with": "meally" };
 const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#33cc33" } }).png().toBuffer();
 
 async function mk(env: Record<string, string> = {}, fetcher?: Fetcher) {
-  const o = openDb(":memory:");
+  const o = openTestDb();
   const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir, ...(fetcher ? { fetcher } : {}) });
   await o.ready;
   const su = async (p: string, email: string) => {

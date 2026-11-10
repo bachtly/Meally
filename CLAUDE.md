@@ -29,7 +29,9 @@ Read `docs/design/03-architecture.md` before writing code.
 - `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. All four must pass before you push. CI runs the
   same four.
 - `npm run db:generate -w apps/server` after changing anything in `apps/server/src/db/schema/`. Commit the generated
-  migration.
+  migration. The database is Postgres (PGlite or `DATABASE_URL`); migrations are plain SQL, and `0001_recipe_search`
+  is hand-written (the `search_vector` column is not in the Drizzle schema). Tests use `openTestDb()` from
+  `src/db/testing.ts`; set `DATABASE_URL` to run them on a real Postgres.
 
 ## UI rules
 

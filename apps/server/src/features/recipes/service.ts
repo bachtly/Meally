@@ -3,7 +3,7 @@ import type { ImageStore } from "../../ports/index.js";
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Nutrition, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
 import { isNutritionEmpty } from "@meally/shared";
-import type { Db } from "../../db/index.js";
+import { ms, type Db } from "../../db/index.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { getMe, householdRating } from "../ratings/service.js";
@@ -43,13 +43,15 @@ async function uniqueSlug(tx: Tx, householdId: string, name: string): Promise<st
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
-/** The search index is written here, in the same transaction as the recipe, rather than by triggers. */
+/** The search vector (name A, description B, ingredients C) is written here, in the same transaction as the recipe. */
 async function reindex(tx: Tx, householdId: string, id: string, data: RecipeData) {
-  await tx.run(sql`DELETE FROM recipes_fts WHERE recipe_id = ${id}`);
-  const ingredients = data.ingredients.map((i) => [i.raw, i.food].filter(Boolean).join(" ")).join("\n");
-  await tx.run(
-    sql`INSERT INTO recipes_fts (recipe_id, household_id, name, description, ingredients)
-        VALUES (${id}, ${householdId}, ${data.name}, ${data.description ?? ""}, ${ingredients})`,
+  const ingredients = data.ingredients.map((i) => [i.raw, i.food].filter(Boolean).join(" ")).join(" ");
+  await tx.execute(
+    sql`UPDATE recipes SET search_vector =
+          setweight(to_tsvector('simple', ${data.name}), 'A') ||
+          setweight(to_tsvector('simple', ${data.description ?? ""}), 'B') ||
+          setweight(to_tsvector('simple', ${ingredients}), 'C')
+        WHERE id = ${id} AND household_id = ${householdId}`,
   );
 }
 
@@ -184,7 +186,6 @@ export async function deleteRecipe(db: Db, store: ImageStore, householdId: strin
       .map((r) => r.id)
       .filter((x): x is string => !!x);
     extra.push(...tlImgs);
-    await tx.run(sql`DELETE FROM recipes_fts WHERE recipe_id = ${existing.id}`);
     await tx.delete(recipes).where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)));
     if (existing.imageId) await tx.delete(images).where(eq(images.id, existing.imageId));
     if (tlImgs.length) await tx.delete(images).where(inArray(images.id, tlImgs));
@@ -195,10 +196,18 @@ export async function deleteRecipe(db: Db, store: ImageStore, householdId: strin
   for (const id of extra) await store.delete(householdId, id);
 }
 
-/** Turns free text into an FTS5 prefix query: every word must match as a prefix. */
-export function ftsQuery(q: string): string | null {
-  const words = q.match(/[\p{L}\p{N}]+/gu) ?? [];
-  return words.length ? words.map((w) => `"${w}"*`).join(" ") : null;
+/**
+ * Free text to a tsquery: words are matched exactly (websearch syntax: quotes, -, or), except the last
+ * word, which matches as a prefix when the text ends on it (type-ahead). Null when there is nothing to search.
+ */
+export function searchQuery(q: string): SQL | null {
+  if (!/[\p{L}\p{N}]/u.test(q)) return null;
+  const m = q.match(/^(.*?)([\p{L}\p{N}]+)$/su);
+  // No prefix after a minus (exclusion) or inside an unclosed quote: let websearch parse it whole.
+  if (!m || m[1]!.endsWith("-") || (m[1]!.match(/"/g)?.length ?? 0) % 2 === 1) return sql`websearch_to_tsquery('simple', ${q})`;
+  const head = m[1]!.trim();
+  const prefix = sql`to_tsquery('simple', ${`${m[2]!}:*`})`;
+  return head ? sql`(websearch_to_tsquery('simple', ${head}) && ${prefix})` : prefix;
 }
 
 export const encode = (v: string | number, id: string) => Buffer.from(JSON.stringify([v, id])).toString("base64url");
@@ -233,11 +242,9 @@ export async function listRecipes(
   const conds: SQL[] = [eq(recipes.householdId, householdId)];
   if (opts.ids) conds.push(inArray(recipes.id, opts.ids));
   if (opts.q) {
-    const match = ftsQuery(opts.q);
+    const match = searchQuery(opts.q);
     if (match === null) return { items: [], nextCursor: null };
-    conds.push(
-      sql`${recipes.id} IN (SELECT recipe_id FROM recipes_fts WHERE recipes_fts MATCH ${match} AND household_id = ${householdId})`,
-    );
+    conds.push(sql`"recipes"."search_vector" @@ ${match}`);
   }
   // OR within a type, AND across types. Ignored when the flag is off.
   if (opts.org) {
@@ -252,7 +259,7 @@ export async function listRecipes(
   // Keyset pagination on (sort key, id). updated/created/rating are highest or newest first; name is A to Z.
   const sort = (opts.sort === "rating" && !rt) || (opts.sort === "last-made" && !opts.timeline) ? "updated" : opts.sort;
   const tl = !!opts.timeline;
-  const lastMadeSql = sql`(SELECT max(created_at) FROM timeline_events te WHERE te.recipe_id = ${recipes.id} AND te.kind = 'made')`;
+  const lastMadeSql = sql`(SELECT (extract(epoch from max(created_at)) * 1000)::double precision FROM timeline_events te WHERE te.recipe_id = ${recipes.id} AND te.kind = 'made')`;
   const madeCountSql = sql`(SELECT count(*) FROM timeline_events te WHERE te.recipe_id = ${recipes.id} AND te.kind = 'made')`;
   const key =
     sort === "last-made" && tl
@@ -260,10 +267,10 @@ export async function listRecipes(
       : sort === "name"
       ? sql`lower(${recipes.name})`
       : sort === "created"
-        ? recipes.createdAt
+        ? ms(recipes.createdAt)
         : sort === "rating"
           ? sql`coalesce(${recipeUserData.rating}, 0)`
-          : recipes.updatedAt;
+          : ms(recipes.updatedAt);
   const ascending = sort === "name";
   if (opts.cursor) {
     const [v, id] = decode(opts.cursor);

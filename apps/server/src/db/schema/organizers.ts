@@ -1,9 +1,9 @@
-import { index, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, pgTable, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 import { households } from "./auth.js";
 import { recipes } from "./recipes.js";
 
 function organizer(table: string) {
-  return sqliteTable(
+  return pgTable(
     table,
     {
       id: text("id").primaryKey(),
@@ -21,7 +21,7 @@ export const tags = organizer("tags");
 export const categories = organizer("categories");
 export const tools = organizer("tools");
 
-export const recipeTags = sqliteTable(
+export const recipeTags = pgTable(
   "recipe_tags",
   {
     recipeId: text("recipe_id")
@@ -34,7 +34,7 @@ export const recipeTags = sqliteTable(
   (t) => [primaryKey({ columns: [t.recipeId, t.tagId] }), index("recipe_tags_tag_id_idx").on(t.tagId)],
 );
 
-export const recipeCategories = sqliteTable(
+export const recipeCategories = pgTable(
   "recipe_categories",
   {
     recipeId: text("recipe_id")
@@ -47,7 +47,7 @@ export const recipeCategories = sqliteTable(
   (t) => [primaryKey({ columns: [t.recipeId, t.categoryId] }), index("recipe_categories_category_id_idx").on(t.categoryId)],
 );
 
-export const recipeTools = sqliteTable(
+export const recipeTools = pgTable(
   "recipe_tools",
   {
     recipeId: text("recipe_id")

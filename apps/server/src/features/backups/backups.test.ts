@@ -6,6 +6,8 @@ import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
 import { openDb } from "../../db/index.js";
+import { recipes } from "../../db/schema/index.js";
+import { openTestDb } from "../../db/testing.js";
 import { restore } from "../../restore.js";
 import { isLocked, lockPath } from "../../lib/lock.js";
 import { backupSettings, createBackup, listBackups, pruneBackups, validBackupName } from "./service.js";
@@ -23,7 +25,7 @@ const png = await sharp({ create: { width: 8, height: 8, channels: 3, background
 
 async function mk(env: Record<string, string> = {}) {
   const dataDir = tmp();
-  const o = openDb(":memory:");
+  const o = openTestDb({ pglite: true });
   const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir });
   await o.ready;
   const su = async (p: string, email: string) => {
@@ -170,12 +172,12 @@ describe("backup API", () => {
     const dl = await t.req(t.A, `/admin/backups/${name}`);
     expect(dl.status).toBe(200);
     const files = await t.zipOf(dl);
-    expect(Object.keys(files).sort()).toEqual(["manifest.json", "meally.db"]);
+    expect(Object.keys(files).sort()).toEqual(["manifest.json", "pgdata.tar.gz"]);
     const manifest = JSON.parse(strFromU8(files["manifest.json"]!));
     expect(manifest).toMatchObject({ format: 1, appVersion: "0.0.0" });
-    expect(manifest.schemaMigrations).toBeGreaterThan(5);
-    expect(files["meally.db"]!.length).toBeGreaterThan(4096);
-    expect(strFromU8(files["meally.db"]!.slice(0, 15))).toBe("SQLite format 3");
+    expect(manifest.schemaMigrations).toBeGreaterThanOrEqual(2);
+    expect(files["pgdata.tar.gz"]!.length).toBeGreaterThan(4096);
+    expect([...files["pgdata.tar.gz"]!.slice(0, 2)]).toEqual([0x1f, 0x8b]); // gzip
 
     expect((await t.req(t.A, "/admin/backups/..%2Fmeally.db")).status).toBe(404);
     expect((await t.req(t.A, "/admin/backups/nope.zip")).status).toBe(404);
@@ -224,22 +226,23 @@ describe("restore CLI", () => {
     const zipFile = path.join(t.dataDir, "backups", name);
 
     const target = tmp();
-    fs.writeFileSync(path.join(target, "meally.db"), "old data");
+    fs.mkdirSync(path.join(target, "pgdata"));
+    fs.writeFileSync(path.join(target, "pgdata", "old.txt"), "old data");
     fs.mkdirSync(path.join(target, "images"));
     fs.writeFileSync(path.join(target, "images", "old.webp"), "x");
     const res = await restore(zipFile, target);
-    expect(fs.readFileSync(path.join(res.movedTo, "meally.db"), "utf8")).toBe("old data");
+    expect(fs.readFileSync(path.join(res.movedTo, "pgdata", "old.txt"), "utf8")).toBe("old data");
     expect(fs.existsSync(path.join(res.movedTo, "images", "old.webp"))).toBe(true);
-    expect(fs.readFileSync(path.join(target, "meally.db")).subarray(0, 15).toString()).toBe("SQLite format 3");
+    expect(fs.existsSync(path.join(target, "pgdata", "PG_VERSION"))).toBe(true);
     expect(fs.existsSync(path.join(target, "images", "old.webp"))).toBe(false);
     expect(fs.readdirSync(path.join(target, "images")).length).toBe(1); // the household dir
 
     // The restored database opens and holds the recipe.
-    const o = openDb(path.join(target, "meally.db"));
+    const o = openDb(path.join(target, "pgdata"));
     await o.ready;
-    const rows = await o.client.execute("SELECT name FROM recipes");
-    expect(rows.rows.map((x) => x.name)).toEqual(["Bread"]);
-    o.client.close();
+    const rows = await o.db.select({ name: recipes.name }).from(recipes);
+    expect(rows.map((x) => x.name)).toEqual(["Bread"]);
+    await o.close();
   });
 
   it("refuses while the server lock is held by a live process, unless forced", async () => {
@@ -265,12 +268,12 @@ describe("restore CLI", () => {
 
     const { zipSync, strToU8 } = await import("fflate");
     const noManifest = path.join(tmp(), "a.zip");
-    fs.writeFileSync(noManifest, zipSync({ "meally.db": strToU8("x") }));
+    fs.writeFileSync(noManifest, zipSync({ "pgdata.tar.gz": strToU8("x") }));
     await expect(restore(noManifest, tmp())).rejects.toThrow(/manifest/);
 
     const evil = path.join(tmp(), "b.zip");
     const m = JSON.stringify({ format: 1, appVersion: "0", schemaMigrations: 1, createdAt: "x" });
-    fs.writeFileSync(evil, zipSync({ "manifest.json": strToU8(m), "meally.db": strToU8("x"), "images/../../evil": strToU8("x") }));
+    fs.writeFileSync(evil, zipSync({ "manifest.json": strToU8(m), "pgdata.tar.gz": strToU8("x"), "images/../../evil": strToU8("x") }));
     const target = tmp();
     await expect(restore(evil, target, { knownMigrations: 5 })).rejects.toThrow(/unsafe|invalid relative path/);
     expect(fs.readdirSync(target)).toEqual([]); // nothing moved before validation

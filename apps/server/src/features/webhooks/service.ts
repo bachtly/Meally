@@ -124,7 +124,7 @@ export async function listDeliveries(db: Db, householdId: string, id: string): P
     .select()
     .from(webhookDeliveries)
     .where(eq(webhookDeliveries.webhookId, id))
-    .orderBy(desc(webhookDeliveries.createdAt), sql`rowid DESC`)
+    .orderBy(desc(webhookDeliveries.createdAt), desc(webhookDeliveries.id))
     .limit(KEEP_DELIVERIES);
   return rows.map((d) => ({
     id: d.id,
@@ -204,8 +204,8 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
       durationMs: res.durationMs,
       createdAt: at,
     });
-    await db.run(sql`DELETE FROM webhook_deliveries WHERE webhook_id = ${hook.id} AND id NOT IN (
-      SELECT id FROM webhook_deliveries WHERE webhook_id = ${hook.id} ORDER BY created_at DESC, rowid DESC LIMIT ${KEEP_DELIVERIES})`);
+    await db.execute(sql`DELETE FROM webhook_deliveries WHERE webhook_id = ${hook.id} AND id NOT IN (
+      SELECT id FROM webhook_deliveries WHERE webhook_id = ${hook.id} ORDER BY created_at DESC, id DESC LIMIT ${KEEP_DELIVERIES})`);
     const [cur] = await db.select({ failureCount: webhooks.failureCount }).from(webhooks).where(eq(webhooks.id, hook.id)).limit(1);
     if (!cur) return;
     const failures = res.ok ? 0 : cur.failureCount + 1;

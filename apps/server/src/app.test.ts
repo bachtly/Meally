@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp, version } from "./app.js";
-import { createDb } from "./db/index.js";
+import { createTestDb } from "./db/testing.js";
 import { appMeta } from "./db/schema/index.js";
 
 describe("api", () => {
@@ -19,7 +19,7 @@ describe("api", () => {
 
 describe("db", () => {
   it("applies migrations", async () => {
-    const { db } = await createDb(":memory:");
+    const { db } = await createTestDb();
     await db.insert(appMeta).values({ key: "k", value: "v" });
     expect(await db.select().from(appMeta)).toEqual([{ key: "k", value: "v" }]);
   });

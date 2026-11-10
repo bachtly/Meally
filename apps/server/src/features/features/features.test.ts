@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { createDb } from "../../db/index.js";
+import { createTestDb } from "../../db/testing.js";
 import type { AppEnv } from "../../lib/context.js";
 import { requireFeature } from "./middleware.js";
 import { createFlagsService } from "./service.js";
 
 async function setup(env: Record<string, string> = {}) {
-  const { db } = await createDb(":memory:");
+  const { db } = await createTestDb();
   const flags = createFlagsService(db, env);
   return { flags, app: createApp({ db, flags }) };
 }

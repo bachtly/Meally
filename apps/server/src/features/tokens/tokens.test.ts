@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { openDb } from "../../db/index.js";
+import { openTestDb } from "../../db/testing.js";
 import { apiTokens } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { createFlagsService } from "../features/service.js";
@@ -9,7 +9,7 @@ import { hashToken } from "./service.js";
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 
 async function mk(env: Record<string, string> = {}, tokenLimit?: number) {
-  const o = openDb(":memory:");
+  const o = openTestDb();
   const flags = createFlagsService(o.db, { MEALLY_SIGNUP_MODE: "open", ...env });
   const app = createApp({ db: o.db, flags, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, tokenLimit });
   await o.ready;

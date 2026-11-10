@@ -1,12 +1,12 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-export const households = sqliteTable("households", {
+export const households = pgTable("households", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
@@ -17,11 +17,11 @@ export const users = sqliteTable("users", {
     .references(() => households.id),
   /** A user belongs to exactly one household (users.household_id); this is their role inside it. */
   householdRole: text("household_role", { enum: ["owner", "member"] }).notNull().default("owner"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
 /** Invite links. `tokenHash` is the sha256 of the one-time token, which is shown only at creation. */
-export const invites = sqliteTable(
+export const invites = pgTable(
   "invites",
   {
     id: text("id").primaryKey(),
@@ -34,29 +34,29 @@ export const invites = sqliteTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-    usedAt: integer("used_at", { mode: "timestamp_ms" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [index("invites_household_idx").on(t.householdId)],
 );
 
 /** `id` is the sha256 of the cookie token; the raw token is never stored. */
-export const sessions = sqliteTable(
+export const sessions = pgTable(
   "sessions",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     userAgent: text("user_agent"),
   },
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
-export const instanceSettings = sqliteTable("instance_settings", {
+export const instanceSettings = pgTable("instance_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });

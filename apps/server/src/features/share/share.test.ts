@@ -2,10 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
+import { isNull } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
 import { hashToken } from "./service.js";
-import { openDb } from "../../db/index.js";
+import { openTestDb } from "../../db/testing.js";
 import { shareLinks } from "../../db/schema/index.js";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meally-share-"));
@@ -13,7 +14,7 @@ afterAll(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 
 async function mk(env: Record<string, string> = {}) {
-  const o = openDb(":memory:");
+  const o = openTestDb();
   const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir });
   await o.ready;
   const su = async (p: string, email: string) => {
@@ -73,7 +74,7 @@ describe("share links", () => {
     expect((await pub(`/recipes/${token}`)).status).toBe(404);
     expect((await json(await call(A, "GET", `/recipes/${slug}/shares`))).items).toEqual([]);
     const t2 = await share(slug, { expiresInDays: 1 });
-    await o.client.execute("UPDATE share_links SET expires_at = 1000 WHERE revoked_at IS NULL");
+    await o.db.update(shareLinks).set({ expiresAt: new Date(1000) }).where(isNull(shareLinks.revokedAt));
     expect((await pub(`/recipes/${t2}`)).status).toBe(404);
     expect((await pub(`/recipes/nonsense`)).status).toBe(404);
   });
@@ -109,11 +110,12 @@ describe("share links", () => {
     const { A, call, pub, recipe, share } = await mk();
     const slug = await recipe("Soup");
     const token = await share(slug);
+    expect((await pub(`/recipes/${token}`)).status).toBe(200);
+    // A second mk() reuses the shared test database (emptied), so the flag-on check had to come first.
     const off = await mk({ MEALLY_FEATURE_SHARE_LINKS: "off" });
     expect((await off.pub(`/recipes/${token}`)).status).toBe(404);
     const s2 = await off.recipe("Soup");
     expect((await off.call(off.A, "POST", `/recipes/${s2}/shares`, {})).status).toBe(404);
-    expect((await pub(`/recipes/${token}`)).status).toBe(200);
     void A; void call;
   });
 });

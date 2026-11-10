@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { eq } from "drizzle-orm";
 import type { RecipeInput } from "@meally/shared";
 import { parseIngredient, recipeInputSchema } from "@meally/shared";
 import { hashPassword } from "./features/auth/password.js";
 import { createRecipe } from "./features/recipes/service.js";
-import { createDb } from "./db/index.js";
+import { createDb, dbTarget } from "./db/index.js";
 import { households, users } from "./db/schema/index.js";
 import { config } from "./lib/config.js";
 
@@ -122,8 +121,8 @@ export async function seed(db: Awaited<ReturnType<typeof createDb>>["db"]) {
 }
 
 if (process.argv[1] && /seed\.[tj]s$/.test(process.argv[1])) {
-  const { db, client } = await createDb(path.join(config.DATA_DIR, "meally.db"));
+  const { db, close } = await createDb(dbTarget(config));
   const { created } = await seed(db);
   console.log(created ? `Seeded ${DEMO_EMAIL} / ${DEMO_PASSWORD} with ${SAMPLE_RECIPES.length} recipes` : "Demo user already exists; nothing to do");
-  client.close();
+  await close();
 }

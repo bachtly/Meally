@@ -1,8 +1,8 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { households, users } from "./auth.js";
 import { recipes } from "./recipes.js";
 
-export const mealPlanEntries = sqliteTable(
+export const mealPlanEntries = pgTable(
   "meal_plan_entries",
   {
     id: text("id").primaryKey(),
@@ -16,12 +16,12 @@ export const mealPlanEntries = sqliteTable(
     note: text("note"),
     position: integer("position").notNull().default(0),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [index("meal_plan_entries_household_date_idx").on(t.householdId, t.date), index("meal_plan_entries_recipe_idx").on(t.recipeId)],
 );
 
-export const mealPlanRules = sqliteTable(
+export const mealPlanRules = pgTable(
   "meal_plan_rules",
   {
     id: text("id").primaryKey(),
@@ -33,21 +33,21 @@ export const mealPlanRules = sqliteTable(
     /** 0 = Sunday .. 6 = Saturday, or null for every day. */
     dayOfWeek: integer("day_of_week"),
     /** JSON string arrays of organiser slugs. */
-    tagSlugs: text("tag_slugs").notNull().default("[]"),
-    categorySlugs: text("category_slugs").notNull().default("[]"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    tagSlugs: jsonb("tag_slugs").$type<string[]>().notNull().default([]),
+    categorySlugs: jsonb("category_slugs").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [index("meal_plan_rules_household_idx").on(t.householdId)],
 );
 
-export const householdFeedTokens = sqliteTable(
+export const householdFeedTokens = pgTable(
   "household_feed_tokens",
   {
     householdId: text("household_id")
       .primaryKey()
       .references(() => households.id, { onDelete: "cascade" }),
     token: text("token").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [uniqueIndex("household_feed_tokens_token_uq").on(t.token)],
 );

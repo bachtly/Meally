@@ -1,131 +1,19 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1794315658241,
-      "tag": "0000_aberrant_kylun",
+      "version": "7",
+      "when": 1794353848989,
+      "tag": "0000_clean_redwing",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "6",
-      "when": 1794315987184,
-      "tag": "0001_clear_boomerang",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1794316580900,
-      "tag": "0002_public_prism",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1794329462561,
-      "tag": "0003_recipes",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1794329464137,
-      "tag": "0004_recipes_fts",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1794330549482,
-      "tag": "0005_funny_blue_shield",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1794331044124,
-      "tag": "0006_charming_la_nuit",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1794331372185,
-      "tag": "0007_misty_morlun",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1794332269303,
-      "tag": "0008_first_may_parker",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1794337034501,
-      "tag": "0009_reflective_vindicator",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1794337743905,
-      "tag": "0010_yielding_karma",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1794338076648,
-      "tag": "0011_striped_redwing",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "6",
-      "when": 1794338770436,
-      "tag": "0012_redundant_roulette",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "6",
-      "when": 1794338821032,
-      "tag": "0013_fixed_shotgun",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "6",
-      "when": 1794339556626,
-      "tag": "0014_material_sauron",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "6",
-      "when": 1794343719249,
-      "tag": "0015_little_shatterstar",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "6",
-      "when": 1794344448784,
-      "tag": "0016_short_nighthawk",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "6",
-      "when": 1794346371628,
-      "tag": "0017_left_centennial",
+      "version": "7",
+      "when": 1794353855453,
+      "tag": "0001_recipe_search",
       "breakpoints": true
     }
   ]

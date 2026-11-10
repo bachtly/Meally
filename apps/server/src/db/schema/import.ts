@@ -1,7 +1,7 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { households, users } from "./auth.js";
 
-export const importJobs = sqliteTable(
+export const importJobs = pgTable(
   "import_jobs",
   {
     id: text("id").primaryKey(),
@@ -17,9 +17,9 @@ export const importJobs = sqliteTable(
     skipped: integer("skipped").notNull().default(0),
     /** Real failure count; `errors` itself is capped at 100 entries. */
     failed: integer("failed").notNull().default(0),
-    errors: text("errors", { mode: "json" }).$type<Array<{ item: string; message: string }>>().notNull().default([]),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    errors: jsonb("errors").$type<Array<{ item: string; message: string }>>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true, mode: "date" }),
   },
   (t) => [index("import_jobs_household_idx").on(t.householdId, t.createdAt)],
 );

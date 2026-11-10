@@ -1,7 +1,8 @@
 # Self-hosting Meally
 
-Meally is one Node process that serves the API and the web app, with a SQLite database and an image folder in a single
-data directory. There is nothing else to run.
+Meally is one Node process that serves the API and the web app, with an embedded Postgres (PGlite) database and an image
+folder in a single data directory. There is nothing else to run. If you prefer, point it at your own Postgres with
+`DATABASE_URL` (see [Using an external Postgres](#using-an-external-postgres)).
 
 Contents: [Quick start](#quick-start) · [Docker Compose](#docker-compose) · [Reverse proxy](#reverse-proxy-and-base_url) ·
 [Public instance checklist](#public-instance-checklist) · [Environment variables](#environment-variables) ·
@@ -50,6 +51,35 @@ volumes:
 ```
 
 Run `docker compose up -d`. The healthcheck uses Node because the image has no `curl`.
+
+### Using an external Postgres
+
+By default the database is embedded PGlite, stored in `$DATA_DIR/pgdata`. To use a real Postgres 14+ server instead
+(including Supabase's pooled connection string), set `DATABASE_URL`. Migrations run at start. For the bundled optional
+Postgres, add this service and enable its profile with `docker compose --profile postgres up -d`:
+
+```yaml
+services:
+  meally:
+    environment:
+      DATABASE_URL: postgres://meally:change-me@postgres:5432/meally   # set this to switch drivers
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: meally
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: meally
+    volumes:
+      - meally-pg:/var/lib/postgresql/data
+volumes:
+  meally-pg:
+```
+
+With `DATABASE_URL` set the in-app instance backups are switched off (the `backups` flag is forced off, which also
+hides the household export). Back up the database with `pg_dump` and keep copies of `$DATA_DIR/images`.
+Switching an existing install between PGlite and Postgres is not supported (there is no data migration).
 
 ## Reverse proxy and BASE_URL
 
@@ -146,7 +176,8 @@ Fixed windows, per client address, kept in memory and reset on restart:
 |---|---|---|
 | `NODE_ENV` | `development` (`production` in the image) | `production` serves the built web app from the server. |
 | `PORT` | `8080` | Port the server listens on. |
-| `DATA_DIR` | `./data` (`/data` in the image) | Database, images and backups. A lock file stops two servers sharing it. |
+| `DATA_DIR` | `./data` (`/data` in the image) | Embedded database (`pgdata/`), images and backups. A lock file stops two servers sharing it. |
+| `DATABASE_URL` | unset | Use an external Postgres (`postgres://...`) instead of embedded PGlite. Disables in-app backups. |
 | `BASE_URL` | `http://localhost:8080` | Public address. Used for share and invite links, the CSRF origin check, and `Secure` cookies when `https://`. |
 | `WEB_DIST` | built-in path | Folder of the built web app. Rarely needed. |
 | `MEALLY_SIGNUP_MODE` | `invite` | `open`, `invite` or `closed`. When set, admins cannot change it in the app. |
@@ -198,7 +229,8 @@ instance use the built-in backups.
 
 - **Household export.** Any member can download their household's recipes from Settings.
 - **Instance backups.** Admins create and download them from Settings. A backup is a zip in `$DATA_DIR/backups/`
-  holding a consistent database snapshot, the images and a `manifest.json`.
+  holding a consistent snapshot of the PGlite data directory (`pgdata.tar.gz`), the images and a `manifest.json`. Not
+  available with `DATABASE_URL`; use `pg_dump` there.
 - **Schedule.** `MEALLY_BACKUP_CRON_HOURS` (default 24, `0` is off) and `MEALLY_BACKUP_KEEP` (default 7). The first
   backup runs shortly after start if the newest is older than the interval.
 - **Off-site.** Backups sit on the same disk as the data. Copy them elsewhere too (3 copies, 2 media, 1 off-site).
@@ -220,7 +252,7 @@ docker run --rm -v meally-data:/data -v "$PWD":/backup ghcr.io/bachtly/meally:la
 ```
 
 The restore refuses to run while `$DATA_DIR/meally.lock` names a running process (`--force` overrides). It moves the
-current database and images to `$DATA_DIR/pre-restore-<timestamp>/`, unpacks the backup, and refuses a backup made by a
+current `pgdata` and images to `$DATA_DIR/pre-restore-<timestamp>/`, unpacks the backup, and refuses a backup made by a
 newer version than the one you run. Start Meally again afterwards.
 
 ## AI (optional)

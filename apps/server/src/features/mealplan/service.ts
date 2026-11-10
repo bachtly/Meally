@@ -124,8 +124,8 @@ const toRule = (r: typeof mealPlanRules.$inferSelect): MealPlanRule => ({
   id: r.id,
   mealType: r.mealType as MealPlanRule["mealType"],
   dayOfWeek: r.dayOfWeek,
-  tags: JSON.parse(r.tagSlugs) as string[],
-  categories: JSON.parse(r.categorySlugs) as string[],
+  tags: r.tagSlugs,
+  categories: r.categorySlugs,
 });
 
 export async function listRules(db: Db, householdId: string): Promise<MealPlanRule[]> {
@@ -140,8 +140,8 @@ export async function createRule(db: Db, householdId: string, input: MealPlanRul
     householdId,
     mealType: input.mealType,
     dayOfWeek: input.dayOfWeek,
-    tagSlugs: JSON.stringify(input.tags),
-    categorySlugs: JSON.stringify(input.categories),
+    tagSlugs: input.tags,
+    categorySlugs: input.categories,
     createdAt: new Date(),
   });
   return { id, ...input };
@@ -150,7 +150,7 @@ export async function createRule(db: Db, householdId: string, input: MealPlanRul
 export async function updateRule(db: Db, householdId: string, id: string, input: MealPlanRuleInput): Promise<MealPlanRule> {
   const res = await db
     .update(mealPlanRules)
-    .set({ mealType: input.mealType, dayOfWeek: input.dayOfWeek, tagSlugs: JSON.stringify(input.tags), categorySlugs: JSON.stringify(input.categories) })
+    .set({ mealType: input.mealType, dayOfWeek: input.dayOfWeek, tagSlugs: input.tags, categorySlugs: input.categories })
     .where(and(eq(mealPlanRules.id, id), eq(mealPlanRules.householdId, householdId)))
     .returning({ id: mealPlanRules.id });
   if (!res.length) throw notFound();

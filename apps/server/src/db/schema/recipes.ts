@@ -1,18 +1,18 @@
 import type { Nutrition } from "@meally/shared";
-import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { households, users } from "./auth.js";
 import { foods } from "./foods.js";
 
 /** Stored image metadata; the files live under $DATA_DIR/images/<householdId>/. */
-export const images = sqliteTable("images", {
+export const images = pgTable("images", {
   id: text("id").primaryKey(),
   householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
-export const recipes = sqliteTable(
+export const recipes = pgTable(
   "recipes",
   {
     id: text("id").primaryKey(),
@@ -23,17 +23,17 @@ export const recipes = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     yieldText: text("yield_text"),
-    servings: real("servings"),
+    servings: doublePrecision("servings"),
     prepMinutes: integer("prep_minutes"),
     cookMinutes: integer("cook_minutes"),
     totalMinutes: integer("total_minutes"),
     sourceUrl: text("source_url"),
     notes: text("notes"),
-    nutrition: text("nutrition", { mode: "json" }).$type<Nutrition>(),
+    nutrition: jsonb("nutrition").$type<Nutrition>(),
     imageId: text("image_id").references(() => images.id, { onDelete: "set null" }),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [
     uniqueIndex("recipes_household_slug_uq").on(t.householdId, t.slug),
@@ -41,16 +41,16 @@ export const recipes = sqliteTable(
   ],
 );
 
-export const recipeIngredients = sqliteTable(
+export const recipeIngredients = pgTable(
   "recipe_ingredients",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     recipeId: text("recipe_id")
       .notNull()
       .references(() => recipes.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     section: text("section"),
-    quantity: real("quantity"),
+    quantity: doublePrecision("quantity"),
     unit: text("unit"),
     food: text("food"),
     /** Set only while the foods-units flag is on. */
@@ -62,10 +62,10 @@ export const recipeIngredients = sqliteTable(
   (t) => [index("recipe_ingredients_recipe_idx").on(t.recipeId, t.position)],
 );
 
-export const recipeSteps = sqliteTable(
+export const recipeSteps = pgTable(
   "recipe_steps",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     recipeId: text("recipe_id")
       .notNull()
       .references(() => recipes.id, { onDelete: "cascade" }),
@@ -77,7 +77,7 @@ export const recipeSteps = sqliteTable(
 );
 
 /** Per-user favourite and rating for a recipe (ratings flag). Household averages are computed from these rows. */
-export const recipeUserData = sqliteTable(
+export const recipeUserData = pgTable(
   "recipe_user_data",
   {
     userId: text("user_id")
@@ -86,10 +86,10 @@ export const recipeUserData = sqliteTable(
     recipeId: text("recipe_id")
       .notNull()
       .references(() => recipes.id, { onDelete: "cascade" }),
-    favourite: integer("favourite", { mode: "boolean" }).notNull().default(false),
+    favourite: boolean("favourite").notNull().default(false),
     rating: integer("rating"),
-    lastMadeAt: integer("last_made_at", { mode: "timestamp_ms" }),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    lastMadeAt: timestamp("last_made_at", { withTimezone: true, mode: "date" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.recipeId] }), index("recipe_user_data_recipe_idx").on(t.recipeId)],
 );

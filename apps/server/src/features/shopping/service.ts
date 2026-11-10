@@ -83,7 +83,7 @@ const toItem = (r: ItemRow): ShoppingItem => ({
   aisle: r.aisle,
   checked: r.checked,
   position: r.position,
-  recipeRefs: JSON.parse(r.recipeRefs) as ShoppingRecipeRef[],
+  recipeRefs: r.recipeRefs as ShoppingRecipeRef[],
   updatedAt: r.updatedAt.toISOString(),
 });
 
@@ -286,8 +286,8 @@ async function counts(
   const rows = await db
     .select({
       listId: shoppingItems.listId,
-      total: sql<number>`count(*)`,
-      checked: sql<number>`coalesce(sum(${shoppingItems.checked}), 0)`,
+      total: sql<number>`count(*)::int`,
+      checked: sql<number>`(count(*) filter (where ${shoppingItems.checked}))::int`,
     })
     .from(shoppingItems)
     .where(eq(shoppingItems.householdId, householdId))
@@ -390,7 +390,7 @@ async function loadRows(db: Db, householdId: string, listId: string) {
         eq(shoppingItems.householdId, householdId),
       ),
     )
-    .orderBy(asc(shoppingItems.position), sql`rowid`);
+    .orderBy(asc(shoppingItems.position), asc(shoppingItems.id));
 }
 const loadItems = async (db: Db, householdId: string, listId: string) =>
   (await loadRows(db, householdId, listId)).map(toItem);
@@ -437,13 +437,13 @@ async function addIncoming(
           { quantity: inc.quantity, unit: inc.unit },
         );
         if (!m) continue;
-        const refs = JSON.parse(r.recipeRefs) as ShoppingRecipeRef[];
+        const refs = r.recipeRefs as ShoppingRecipeRef[];
         if (inc.ref && !refs.some((x) => x.slug === inc.ref!.slug))
           refs.push(inc.ref);
         r.quantity = m.quantity;
         r.unit = m.unit;
         r.text = itemText(m.quantity, m.unit, r.food, r.note, r.text);
-        r.recipeRefs = JSON.stringify(refs);
+        r.recipeRefs = refs;
         r.updatedAt = now;
         touched.add(r.id);
         merged = true;
@@ -463,7 +463,7 @@ async function addIncoming(
       aisle: await rememberedAisle(db, householdId, inc.food),
       checked: false,
       position: nextPos++,
-      recipeRefs: JSON.stringify(inc.ref ? [inc.ref] : []),
+      recipeRefs: inc.ref ? [inc.ref] : [],
       updatedAt: now,
     };
     rows.push(row);

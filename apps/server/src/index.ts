@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createApp, version } from "./app.js";
 import { config } from "./lib/config.js";
-import { createDb } from "./db/index.js";
+import { createDb, dbTarget } from "./db/index.js";
 import { createFlagsService } from "./features/features/service.js";
 import { backupSettings, startBackupScheduler } from "./features/backups/service.js";
 import { createNodePlatform } from "./adapters/node/index.js";
@@ -11,13 +11,15 @@ import { acquireLock } from "./lib/lock.js";
 
 acquireLock(config.DATA_DIR);
 
-const { db } = await createDb(path.join(config.DATA_DIR, "meally.db"));
+const { db } = await createDb(dbTarget(config));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist =
   config.NODE_ENV === "production" ? (process.env.WEB_DIST ?? path.resolve(here, "../../web/dist")) : undefined;
 
-const flags = createFlagsService(db, process.env);
+// In-app backups snapshot the embedded database only; with DATABASE_URL use pg_dump instead.
+const env = config.DATABASE_URL ? { ...process.env, MEALLY_FEATURE_BACKUPS: "false" } : process.env;
+const flags = createFlagsService(db, env);
 const platform = createNodePlatform({ dataDir: config.DATA_DIR });
 startBackupScheduler({
   db,

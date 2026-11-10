@@ -2,8 +2,8 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../app.js";
-import { openDb } from "../../db/index.js";
-import { webhookDeliveries } from "../../db/schema/index.js";
+import { openTestDb } from "../../db/testing.js";
+import { webhookDeliveries, webhooks } from "../../db/schema/index.js";
 import { createFlagsService } from "../features/service.js";
 import { createFetcher, type Fetcher } from "../import-url/fetch.js";
 import { verifyWebhook } from "./verify-helper.js";
@@ -16,7 +16,7 @@ const RECIPE = { name: "Soup", ingredients: [{ raw: "1 cup milk" }], steps: [{ t
 afterEach(() => vi.useRealTimers());
 
 async function mk(status: number | "throw" = 200) {
-  const o = openDb(":memory:");
+  const o = openTestDb();
   const env = { MEALLY_SIGNUP_MODE: "open" };
   const flags = createFlagsService(o.db, env);
   const sent: Array<{ url: string; body: string; headers: Record<string, string> }> = [];
@@ -155,8 +155,11 @@ describe("delivery", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     // vi.waitFor would advance fake time, so poll with the real setImmediate.
     const until = async (n: number) => {
-      for (let i = 0; i < 400 && t.sent.length < n; i++) await new Promise((r) => setImmediate(r));
-      for (let i = 0; i < 40; i++) await new Promise((r) => setImmediate(r)); // let the attempt be recorded
+      const spin = async (ms: number, stop: () => boolean) => {
+        for (const end = Date.now() + ms; Date.now() < end && !stop(); ) await new Promise((r) => setImmediate(r));
+      };
+      await spin(10_000, () => t.sent.length >= n);
+      await spin(150, () => false); // let the attempt be recorded (a real Postgres round trip takes longer than a tick)
       expect(t.sent).toHaveLength(n);
     };
     await t.call(t.A, "POST", "/recipes", RECIPE);
@@ -250,7 +253,7 @@ describe("https only", () => {
     expect(() => assertWebhookUrl("https://a.example/x", false)).not.toThrow();
   });
   it("allows http with MEALLY_ALLOW_PRIVATE_URLS and still delivers", async () => {
-    const o = openDb(":memory:");
+    const o = openTestDb();
     const env = { MEALLY_SIGNUP_MODE: "open", MEALLY_ALLOW_PRIVATE_URLS: "true" };
     const flags = createFlagsService(o.db, env);
     const sent: string[] = [];
@@ -271,7 +274,7 @@ describe("https only", () => {
   it("refuses to deliver to a stored http URL when not allowed", async () => {
     const t = await mk();
     const w = await t.create();
-    await t.o.client.execute({ sql: "UPDATE webhooks SET url = ? WHERE id = ?", args: ["http://hook.lan/x", w.id] });
+    await t.o.db.update(webhooks).set({ url: "http://hook.lan/x" }).where(eq(webhooks.id, w.id));
     const r = await t.json(await t.call(t.A, "POST", `/webhooks/${w.id}/test`));
     expect(r.ok).toBe(false);
     expect(r.error).toContain("https://");

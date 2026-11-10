@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import type { Scheduler } from "../../ports/index.js";
 import path from "node:path";
-import { sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import { migrationCount } from "../../db/index.js";
+import { appliedMigrations, dumperFor } from "../../db/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { writeZipFile } from "./zipwriter.js";
 
@@ -12,6 +11,8 @@ export interface Manifest {
   format: number;
   appVersion: string;
   schemaMigrations: number;
+  /** What `pgdata.tar.gz` holds: a gzip tar of the PGlite data directory. */
+  database?: "pglite";
   createdAt: string;
 }
 
@@ -79,17 +80,19 @@ export async function createBackup(db: Db, dataDir: string, version: string, kee
   if (running) throw new ApiError(409, "backup_running", "A backup is already running");
   running = true;
   const tmp = path.join(dataDir, "tmp");
-  const snapshot = path.join(tmp, `snapshot-${process.pid}-${Date.now()}.db`);
+  const snapshot = path.join(tmp, `snapshot-${process.pid}-${Date.now()}.tar.gz`);
   try {
     await fs.promises.mkdir(tmp, { recursive: true });
     await fs.promises.mkdir(backupDir(dataDir), { recursive: true });
-    // VACUUM INTO writes a consistent, defragmented copy without blocking readers or needing the WAL.
-    await db.run(sql.raw(`VACUUM INTO '${snapshot.replaceAll("'", "''")}'`));
-    const rows = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM __drizzle_migrations`).catch(() => [{ n: migrationCount() }]);
+    const dump = dumperFor(db);
+    if (!dump) throw new ApiError(503, "backups_unavailable", "In-app backups need the embedded database; use pg_dump with DATABASE_URL");
+    // PGlite's dump of its data directory after a CHECKPOINT: a consistent snapshot.
+    await fs.promises.writeFile(snapshot, await dump());
     const manifest: Manifest = {
       format: MANIFEST_FORMAT,
       appVersion: version,
-      schemaMigrations: Number(rows[0]?.n ?? migrationCount()),
+      schemaMigrations: await appliedMigrations(db),
+      database: "pglite",
       createdAt: now.toISOString(),
     };
     const stamp = now.toISOString().replace(/[-:]/g, "").replace(".", "");
@@ -98,7 +101,7 @@ export async function createBackup(db: Db, dataDir: string, version: string, kee
     const partial = `${final}.partial`;
     await writeZipFile(partial, async (z) => {
       z.addBuffer("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2)));
-      await z.addFile("meally.db", snapshot);
+      await z.addFile("pgdata.tar.gz", snapshot);
       await z.addDir("images", path.join(dataDir, "images"));
     });
     await fs.promises.rename(partial, final);

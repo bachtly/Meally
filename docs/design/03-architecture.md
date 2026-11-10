@@ -6,12 +6,12 @@ The research behind each decision is in [01-research.md](01-research.md).
 
 ```
 apps/web        React 19 + Vite SPA (TypeScript, Tailwind CSS v4, TanStack Query, React Router)
-apps/server     Hono on Node 24, Drizzle ORM, SQLite (libsql); serves /api and the built web app
+apps/server     Hono on Node 24, Drizzle ORM, Postgres (embedded PGlite by default, or `DATABASE_URL`); serves /api and the built web app
 packages/shared zod schemas, API types, feature-flag registry, ingredient parser, unit conversion
 ```
 
-One Docker image runs the server, and the server also serves the built SPA. All data is under `/data`: `meally.db`
-plus `images/`.
+One Docker image runs the server, and the server also serves the built SPA. All data is under `/data`: `pgdata/`
+(embedded Postgres) plus `images/`. With `DATABASE_URL` the database lives in your own Postgres.
 
 ## Decisions
 
@@ -19,7 +19,7 @@ plus `images/`.
 |---|---|---|
 | A1 | TypeScript monorepo with npm workspaces | One language end to end. Types and zod schemas are shared between client and server. npm comes with Node, so there's nothing extra to install. |
 | A2 | Hono server on Node | Small, fast, built on web standards, with typed routes. It has middleware for cookies, CORS and secure headers. |
-| A3 | SQLite through Drizzle on the libsql driver (`@libsql/client`), migrations with drizzle-kit | Nothing extra to run (G5). libsql ships prebuilt binaries for Windows, macOS and Linux, so `npm install` needs no C++ toolchain (better-sqlite3 has none for Node 24 on Windows). WAL mode copes with concurrent users. FTS5 gives search (libsql supports it). Drizzle also supports Postgres if we add it later. |
+| A3 | Postgres through Drizzle, migrations with drizzle-kit. Default driver is embedded PGlite (`@electric-sql/pglite`, WASM, persisted in `$DATA_DIR/pgdata`); with `DATABASE_URL` it uses postgres-js (`prepare: false`, so poolers work) | Nothing extra to run (G5), and one dialect everywhere so a hosted deployment (Supabase) uses the same schema and queries. Search is a `tsvector` column with a GIN index, maintained by the recipes service. |
 | A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. API tokens (F22) use the same table design. |
 | A5 | React 19 + Vite + TanStack Query + React Router | A mainstream stack that's fast to build. Query handles cache, retries and optimistic updates. |
 | A6 | Tailwind CSS v4 with our own components on Radix primitives (shadcn-style, written in this repo) | Modern look with accessible dialogs, menus and popovers, and no heavy UI kit. |
@@ -31,6 +31,14 @@ plus `images/`.
 
 - A3: the SQLite driver changed from better-sqlite3 to libsql. Reason: better-sqlite3 has no prebuilt binary for Node 24 on
   Windows, so install failed without a C++ toolchain. The driver is async, so every db call is awaited.
+
+## Changed decisions (Postgres)
+
+- A3 (again): SQLite/libsql was replaced by Postgres everywhere (PR 2 of the Supabase design). FTS5 became a `tsvector`
+  column queried with `websearch_to_tsquery('simple', ...)` plus a prefix match on the last word. Booleans, JSON and
+  timestamps use native `boolean`, `jsonb` and `timestamptz`. There is no SQLite data migration. In-app backups snapshot
+  PGlite's data directory and are off with `DATABASE_URL` (use `pg_dump`). Tests run on in-memory PGlite, and CI also
+  runs them against a Postgres 16 service.
 
 ## Feature flags
 

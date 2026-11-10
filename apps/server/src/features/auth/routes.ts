@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { getConnInfo } from "@hono/node-server/conninfo";
@@ -74,8 +74,9 @@ async function createAccount(
   let householdRole: "owner" | "member" = "owner";
   let householdName = opts.householdName;
   const userId = randomUUID();
-  // The write transaction holds the single connection, so the empty check and insert cannot interleave.
   await db.transaction(async (tx) => {
+    // Serialise sign-ups so the "first user" and unique-email checks cannot interleave across connections.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(727001)`);
     if (opts.requireEmpty && !(await needsSetup(tx))) {
       throw new ApiError(409, "setup_done", "Setup has already been completed");
     }

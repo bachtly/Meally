@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shared";
-import type { Db } from "../../db/index.js";
+import { ms, type Db } from "../../db/index.js";
 import { images, recipes, recipeUserData, timelineEvents, users } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";
@@ -47,7 +47,8 @@ export async function listTimeline(
   if (opts.recipeId) conds.push(eq(timelineEvents.recipeId, opts.recipeId));
   if (opts.cursor) {
     const [v, id] = decode(opts.cursor);
-    conds.push(sql`(${timelineEvents.createdAt} < ${v} OR (${timelineEvents.createdAt} = ${v} AND ${timelineEvents.id} < ${id}))`);
+    const t = ms(timelineEvents.createdAt);
+    conds.push(sql`(${t} < ${v} OR (${t} = ${v} AND ${timelineEvents.id} < ${id}))`);
   }
   const rows = await select(db)
     .where(and(...conds))

@@ -1,25 +1,25 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import { households } from "./auth.js";
 
 const hh = () =>
   text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" });
-const ts = (n: string) => integer(n, { mode: "timestamp_ms" }).notNull();
+const ts = (n: string) => timestamp(n, { withTimezone: true, mode: "date" }).notNull();
 
-export const aisleLabels = sqliteTable(
+export const aisleLabels = pgTable(
   "aisle_labels",
   { id: text("id").primaryKey(), householdId: hh(), name: text("name").notNull(), position: integer("position").notNull(), color: text("color") },
   (t) => [index("aisle_labels_household_idx").on(t.householdId, t.position)],
 );
 
-export const shoppingLists = sqliteTable(
+export const shoppingLists = pgTable(
   "shopping_lists",
   { id: text("id").primaryKey(), householdId: hh(), name: text("name").notNull(), createdAt: ts("created_at"), updatedAt: ts("updated_at") },
   (t) => [index("shopping_lists_household_idx").on(t.householdId)],
 );
 
-export const shoppingItems = sqliteTable(
+export const shoppingItems = pgTable(
   "shopping_items",
   {
     id: text("id").primaryKey(),
@@ -28,22 +28,22 @@ export const shoppingItems = sqliteTable(
       .references(() => shoppingLists.id, { onDelete: "cascade" }),
     householdId: hh(),
     text: text("text").notNull(),
-    quantity: real("quantity"),
+    quantity: doublePrecision("quantity"),
     unit: text("unit"),
     food: text("food"),
     note: text("note"),
     aisle: text("aisle").references(() => aisleLabels.id, { onDelete: "set null" }),
-    checked: integer("checked", { mode: "boolean" }).notNull().default(false),
+    checked: boolean("checked").notNull().default(false),
     position: integer("position").notNull().default(0),
     /** JSON array of {slug, name}: the recipes that contributed. */
-    recipeRefs: text("recipe_refs").notNull().default("[]"),
+    recipeRefs: jsonb("recipe_refs").$type<Array<{ slug: string; name: string }>>().notNull().default([]),
     updatedAt: ts("updated_at"),
   },
   (t) => [index("shopping_items_list_idx").on(t.listId, t.position)],
 );
 
 /** Remembers which aisle a food goes in; `food` is the normalised name. */
-export const foodAisles = sqliteTable(
+export const foodAisles = pgTable(
   "food_aisles",
   {
     householdId: hh(),

@@ -7,6 +7,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import yauzl from "yauzl";
+import { PGlite } from "@electric-sql/pglite";
 import { migrationCount } from "./db/index.js";
 import { safeEntryName } from "./features/import-files/zip.js";
 import { MANIFEST_FORMAT, type Manifest } from "./features/backups/service.js";
@@ -58,21 +59,27 @@ export async function restore(zipFile: string, dataDir: string, opts: { force?: 
     if (typeof manifest.schemaMigrations !== "number" || manifest.schemaMigrations > known) {
       throw new Error(`This backup needs a newer Meally (schema ${String(manifest.schemaMigrations)}, this build knows ${known}). Upgrade first.`);
     }
-    if (!named.some((x) => x.name === "meally.db")) throw new Error("Not a Meally backup: meally.db is missing");
+    if (!named.some((x) => x.name === "pgdata.tar.gz")) throw new Error("Not a Meally backup: pgdata.tar.gz is missing");
 
     const stamp = new Date().toISOString().replace(/[-:.]/g, "");
     const movedTo = path.join(dataDir, `pre-restore-${stamp}`);
     await fs.promises.mkdir(movedTo, { recursive: true });
-    for (const n of ["meally.db", "meally.db-wal", "meally.db-shm", "images"]) {
+    for (const n of ["pgdata", "images"]) {
       const src = path.join(dataDir, n);
       if (fs.existsSync(src)) await fs.promises.rename(src, path.join(movedTo, n));
     }
     for (const { e, name } of named) {
-      if (name !== "meally.db" && !name.startsWith("images/")) continue;
-      const dest = path.join(dataDir, name);
+      if (name !== "pgdata.tar.gz" && !name.startsWith("images/")) continue;
+      const dest = path.join(dataDir, name === "pgdata.tar.gz" ? "pgdata-restore.tar.gz" : name);
       await fs.promises.mkdir(path.dirname(dest), { recursive: true });
       await pipeline(await stream(zip, e), fs.createWriteStream(dest));
     }
+    // Unpack the PGlite snapshot into a fresh pgdata directory.
+    const tarball = path.join(dataDir, "pgdata-restore.tar.gz");
+    const pg = new PGlite(path.join(dataDir, "pgdata"), { loadDataDir: new Blob([new Uint8Array(await fs.promises.readFile(tarball))]) });
+    await pg.waitReady;
+    await pg.close();
+    await fs.promises.rm(tarball, { force: true });
     return { movedTo, manifest };
   } finally {
     zip.close();

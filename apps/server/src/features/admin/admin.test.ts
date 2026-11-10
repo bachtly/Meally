@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { openDb } from "../../db/index.js";
+import { openTestDb } from "../../db/testing.js";
 
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 
 async function mk(env: Record<string, string> = {}, withB = true) {
-  const o = openDb(":memory:");
+  const o = openTestDb();
   const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir: "./.nonexistent-admin-test" });
   await o.ready;
   const su = async (p: string, email: string, password = "correct horse") => {
@@ -113,7 +113,7 @@ describe("admin", () => {
     const t = await mk();
     const i = await t.json(await t.req(t.A, "/info"));
     expect(i).toMatchObject({ version: "0.0.0", counts: { users: 2, households: 2, recipes: 0 }, backupSchedule: { hours: 24, keep: 7 } });
-    expect(i.migrations).toBeGreaterThan(5);
+    expect(i.migrations).toBeGreaterThanOrEqual(2);
     expect(i.nodeVersion).toMatch(/^v/);
   });
 });

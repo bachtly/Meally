@@ -1,8 +1,8 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { households, users } from "./auth.js";
 
 /** Personal API tokens. Only the SHA-256 of the token is stored; `prefix` is for display. */
-export const apiTokens = sqliteTable(
+export const apiTokens = pgTable(
   "api_tokens",
   {
     id: text("id").primaryKey(),
@@ -16,10 +16,10 @@ export const apiTokens = sqliteTable(
     tokenHash: text("token_hash").notNull(),
     prefix: text("prefix").notNull(),
     scopes: text("scopes", { enum: ["read", "write"] }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: "date" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
   },
   (t) => [uniqueIndex("api_tokens_hash_uq").on(t.tokenHash), index("api_tokens_user_idx").on(t.userId)],
 );

@@ -101,6 +101,8 @@ describe("search and pagination", () => {
     expect(await q("sal")).toEqual(["green-salad"]);
     expect(await q("rice tamarind")).toEqual(["pad-thai"]);
     expect(await q("nothing-here")).toEqual([]);
+    expect(await q("rice -lettuce")).toEqual(["pad-thai"]); // websearch syntax: exclusion
+    expect(await q('"rice noodles" tam')).toEqual(["pad-thai"]); // phrase, then prefix on the last word
     expect(await q('"*()')).toEqual([]);
     await call(A, "PUT", "/recipes/pad-thai", { name: "Pad Thai", ingredients: [ing("tofu")] });
     expect(await q("tamarind")).toEqual([]);

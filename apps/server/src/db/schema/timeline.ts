@@ -1,9 +1,9 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { households, users } from "./auth.js";
 import { images, recipes } from "./recipes.js";
 
 /** Cooking journal: "made it" logs, comments and notes on a recipe. */
-export const timelineEvents = sqliteTable(
+export const timelineEvents = pgTable(
   "timeline_events",
   {
     id: text("id").primaryKey(),
@@ -18,8 +18,8 @@ export const timelineEvents = sqliteTable(
     text: text("text"),
     imageId: text("image_id").references(() => images.id, { onDelete: "set null" }),
     rating: integer("rating"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    editedAt: integer("edited_at", { mode: "timestamp_ms" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    editedAt: timestamp("edited_at", { withTimezone: true, mode: "date" }),
   },
   (t) => [
     index("timeline_recipe_idx").on(t.recipeId, t.createdAt),

@@ -5,6 +5,7 @@ import { and, count, eq, ne, or, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { FEATURES, featureEnvVar, isFeatureKey, signupModes, userRoles, z } from "@meally/shared";
 import { version } from "../../app.js";
+import { appliedMigrations } from "../../db/index.js";
 import { households, instanceSettings, recipes, sessions, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
@@ -94,7 +95,7 @@ adminRoutes.get("/users", async (c) => {
       householdId: users.householdId,
       householdName: households.name,
       createdAt: users.createdAt,
-      lastExpiry: sql<number | null>`(SELECT max(${sessions.expiresAt}) FROM ${sessions} WHERE ${sessions.userId} = ${users.id})`,
+      lastExpiry: sql<Date | null>`(SELECT max(${sessions.expiresAt}) FROM ${sessions} WHERE ${sessions.userId} = ${users.id})`.mapWith(sessions.expiresAt),
     })
     .from(users)
     .innerJoin(households, eq(households.id, users.householdId))
@@ -108,7 +109,7 @@ adminRoutes.get("/users", async (c) => {
       ...u,
       createdAt: createdAt.getTime(),
       // Session expiry slides forward on use, so it approximates the last visit.
-      lastSeenAt: lastExpiry ? Number(lastExpiry) - SESSION_TTL_MS : null,
+      lastSeenAt: lastExpiry ? lastExpiry.getTime() - SESSION_TTL_MS : null,
     })),
   });
 });
@@ -182,8 +183,8 @@ adminRoutes.get("/info", async (c) => {
   const db = c.get("db");
   const dataDir = c.get("dataDir");
   const n = async (t: typeof users | typeof households | typeof recipes) => (await db.select({ n: count() }).from(t))[0]?.n ?? 0;
-  const mig = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM __drizzle_migrations`).catch(() => [{ n: 0 }]);
-  const dbBytes = (await fs.promises.stat(path.join(dataDir, "meally.db")).catch(() => null))?.size ?? 0;
+  const mig = await appliedMigrations(db);
+  const dbBytes = await dirSize(path.join(dataDir, "pgdata"));
   return c.json({
     version,
     nodeVersion: process.version,
@@ -191,7 +192,7 @@ adminRoutes.get("/info", async (c) => {
     dbBytes,
     imagesBytes: await dirSize(path.join(dataDir, "images")),
     counts: { users: await n(users), households: await n(households), recipes: await n(recipes) },
-    migrations: Number(mig[0]?.n ?? 0),
+    migrations: mig,
     dataDir: path.resolve(dataDir),
     backupSchedule: backupSettings(c.get("env")),
   });
