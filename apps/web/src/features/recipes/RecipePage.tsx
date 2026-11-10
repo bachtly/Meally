@@ -1,4 +1,4 @@
-import { Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
+import { CalendarPlus, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ApiRequestError } from "../../lib/api";
@@ -6,6 +6,9 @@ import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, Dr
 import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
 import { AddToListButton } from "../shopping/AddToListButton";
+import { useFeature } from "../features/FeaturesProvider";
+import { AddSheet } from "../meal-plan/AddSheet";
+import { localToday } from "../meal-plan/dates";
 import { useChecks } from "./useChecks";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
@@ -29,6 +32,8 @@ export function RecipePage() {
   const navigate = useNavigate();
   const { checks, toggle, reset, any } = useChecks(slug);
   const [confirm, setConfirm] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
+  const planOn = useFeature("meal-plan");
 
   if (query.isPending) {
     return (
@@ -102,6 +107,12 @@ export function RecipePage() {
                     Edit
                   </Link>
                 </DropdownMenuItem>
+                {planOn && (
+                  <DropdownMenuItem onSelect={() => setPlanOpen(true)}>
+                    <CalendarPlus className="size-4" aria-hidden />
+                    Add to plan
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={() => setConfirm(true)}>
                   <Trash2 className="size-4" aria-hidden />
                   Delete
@@ -244,6 +255,7 @@ export function RecipePage() {
           </Button>
         </div>
       </Dialog>
+      {planOn && <AddSheet open={planOpen} onOpenChange={setPlanOpen} date={localToday()} recipe={{ id: r.id, name: r.name }} />}
     </article>
   );
 }

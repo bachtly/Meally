@@ -11,7 +11,8 @@ import { RecipeEditPage, RecipeNewPage } from "../features/recipes/RecipeEditor"
 import { RecipeImportPage } from "../features/import-url/ImportPage";
 import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
 import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
-import { MorePage, PlanPage } from "./pages/Placeholders";
+import { PlanPage } from "../features/meal-plan/PlanPage";
+import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
 let router: ReturnType<typeof createBrowserRouter> | undefined;
