@@ -7,3 +7,5 @@ export * from "./ingredients/parse.js";
 export * from "./ingredients/format.js";
 export * from "./units/units.js";
 export * from "./schemas/mealplan.js";
+export * from "./units/convert.js";
+export * from "./schemas/shopping.js";
