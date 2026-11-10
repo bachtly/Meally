@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import type { RecipeInput } from "@meally/shared";
-import { recipeInputSchema } from "@meally/shared";
+import { parseIngredient, recipeInputSchema } from "@meally/shared";
 import { hashPassword } from "./features/auth/password.js";
 import { createRecipe } from "./features/recipes/service.js";
 import { createDb } from "./db/index.js";
@@ -12,7 +12,10 @@ import { config } from "./lib/config.js";
 export const DEMO_EMAIL = "demo@meally.local";
 export const DEMO_PASSWORD = "demo-password";
 
-const ing = (raw: string, section?: string) => ({ raw, section });
+const ing = (raw: string, section?: string) => {
+  const { quantity, unit, food, note } = parseIngredient(raw);
+  return { raw, section, quantity, unit, food, note };
+};
 const step = (text: string, section?: string) => ({ text, section });
 
 export const SAMPLE_RECIPES: RecipeInput[] = [

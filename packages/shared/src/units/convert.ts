@@ -8,7 +8,7 @@ export interface Amount {
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Units a total may be re-expressed in, smallest first. Others (pint, fl oz, cl, dl, mg) are never chosen. */
-const FRIENDLY: Record<string, string[]> = {
+export const FRIENDLY: Record<string, string[]> = {
   "volume/metric": ["ml", "l"],
   "volume/us": ["tsp", "tbsp", "cup", "quart", "gallon"],
   "mass/metric": ["g", "kg"],

@@ -1,6 +1,8 @@
 import { CalendarPlus, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { adjustIngredient, type UnitChoice } from "@meally/shared";
+import { ServingsStepper, UnitsToggle } from "./ScalingControls";
 import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { useDeleteRecipe, useRecipe } from "./api";
@@ -34,6 +36,18 @@ export function RecipePage() {
   const [confirm, setConfirm] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const planOn = useFeature("meal-plan");
+  const scalingOn = useFeature("scaling");
+  const [params, setParams] = useSearchParams();
+  const setParam = (key: string, value: string | null) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        if (value == null) n.delete(key);
+        else n.set(key, value);
+        return n;
+      },
+      { replace: true },
+    );
 
   if (query.isPending) {
     return (
@@ -62,6 +76,13 @@ export function RecipePage() {
 
   const r = query.data;
   const host = hostname(r.sourceUrl);
+  const original = r.servings;
+  const wanted = Number(params.get("servings"));
+  const servings = scalingOn && original != null && Number.isInteger(wanted) && wanted >= 1 && wanted <= 999 ? wanted : original;
+  const unitParam = params.get("units");
+  const units: UnitChoice = scalingOn && (unitParam === "metric" || unitParam === "us") ? unitParam : "original";
+  const factor = original != null && servings != null ? servings / original : 1;
+  const shown = r.ingredients.map((ing) => (scalingOn ? adjustIngredient(ing, factor, units) : ing));
   const onDelete = () =>
     del.mutate(slug, {
       onSuccess: () => {
@@ -146,8 +167,16 @@ export function RecipePage() {
             </Meta>
           )}
         </dl>
+        {scalingOn && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+            {original != null && servings != null && (
+              <ServingsStepper value={servings} original={original} onChange={(n) => setParam("servings", n === original ? null : String(n))} />
+            )}
+            <UnitsToggle value={units} onChange={(u) => setParam("units", u === "original" ? null : u)} />
+          </div>
+        )}
         <div className="mt-4">
-          <AddToListButton slug={r.slug} servings={r.servings} />
+          <AddToListButton key={servings} slug={r.slug} servings={servings} />
         </div>
       </header>
 
@@ -183,7 +212,17 @@ export function RecipePage() {
                         checked={checks.ingredients.includes(i)}
                         onChange={() => toggle("ingredients", i)}
                       />
-                      <span className={checks.ingredients.includes(i) ? "text-muted line-through" : undefined}>{ing.raw}</span>
+                      <span
+                        className={
+                          checks.ingredients.includes(i)
+                            ? "text-muted line-through"
+                            : shown[i]!.raw !== ing.raw
+                              ? "rounded bg-sunken px-1 font-medium"
+                              : undefined
+                        }
+                      >
+                        {shown[i]!.raw}
+                      </span>
                     </label>
                   </li>
                 </Fragment>
@@ -193,9 +232,10 @@ export function RecipePage() {
         </section>
 
         <section aria-labelledby="steps-h">
-          <h2 id="steps-h" className="mb-3 text-xl font-semibold">
+          <h2 id="steps-h" className="mb-1 text-xl font-semibold">
             Steps
           </h2>
+          {scalingOn && (factor !== 1 || units !== "original") && <p className="mb-3 text-sm text-muted">Quantities in steps aren't scaled.</p>}
           {r.steps.length === 0 ? (
             <p className="text-muted">No steps listed.</p>
           ) : (
