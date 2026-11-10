@@ -1,4 +1,4 @@
-import { BookMarked, CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Share2, Trash2, Users } from "lucide-react";
+import { BookMarked, CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, Printer, RotateCcw, Share2, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
@@ -47,6 +47,7 @@ export function RecipePage() {
   const [bookOpen, setBookOpen] = useState(false);
   const cookbooksOn = useFeature("cookbooks");
   const planOn = useFeature("meal-plan");
+  const printOn = useFeature("print");
   const scalingOn = useFeature("scaling");
   const timelineOn = useFeature("timeline");
   const [params, setParams] = useSearchParams();
@@ -93,6 +94,7 @@ export function RecipePage() {
   const servings = scalingOn && original != null && Number.isInteger(wanted) && wanted >= 1 && wanted <= 999 ? wanted : original;
   const unitParam = params.get("units");
   const units: UnitChoice = scalingOn && (unitParam === "metric" || unitParam === "us") ? unitParam : "original";
+  const rescaled = scalingOn && original != null && servings != null && servings !== original;
   const factor = original != null && servings != null ? servings / original : 1;
   const shown = r.ingredients.map((ing) => (scalingOn ? adjustIngredient(ing, factor, units) : ing));
   const onDelete = () =>
@@ -113,7 +115,7 @@ export function RecipePage() {
           srcSet={imageSrcSet(r.imageUrl, [800, 1600])}
           sizes="(min-width: 1024px) 64rem, 100vw"
           alt=""
-          className="mb-4 aspect-[16/9] max-h-96 w-full rounded-lg object-cover"
+          className="mb-4 aspect-[16/9] max-h-96 w-full rounded-lg object-cover print:max-h-60"
         />
       )}
       <header className="mb-6">
@@ -122,7 +124,7 @@ export function RecipePage() {
             <h1 className="text-3xl font-semibold leading-tight">{r.name}</h1>
             {r.me && <HeartButton slug={r.slug} name={r.name} favourite={r.me.favourite} className="-mt-1" />}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1 print:hidden">
             <Link
               to={`/recipes/${r.slug}/edit`}
               className="hidden min-h-11 items-center gap-2 rounded-md px-3 font-medium hover:bg-sunken lg:inline-flex"
@@ -149,6 +151,14 @@ export function RecipePage() {
                     Add to plan
                   </DropdownMenuItem>
                 )}
+                {printOn && (
+                  <DropdownMenuItem asChild>
+                    <Link to={`/recipes/${r.slug}/print${params.toString() ? `?${params}` : ""}`}>
+                      <Printer className="size-4" aria-hidden />
+                      Print
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 {shareOn && (
                   <DropdownMenuItem onSelect={() => setShareOpen(true)}>
                     <Share2 className="size-4" aria-hidden />
@@ -169,7 +179,7 @@ export function RecipePage() {
             </DropdownMenu>
           </div>
         </div>
-        {r.me && <StarRating slug={r.slug} rating={r.me.rating} household={r.householdRating} />}
+        {r.me && <div className="print:hidden"><StarRating slug={r.slug} rating={r.me.rating} household={r.householdRating} /></div>}
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}
         <RecipeChips categories={r.categories} tags={r.tags} tools={r.tools} />
         <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -184,7 +194,8 @@ export function RecipePage() {
           {(r.servings != null || r.yieldText) && (
             <Meta label="Servings">
               <Users className="mr-1 inline size-4" aria-hidden />
-              {r.yieldText ?? r.servings}
+              {rescaled ? servings : (r.yieldText ?? r.servings)}
+              {rescaled && <span className="font-normal text-muted"> (of {original})</span>}
             </Meta>
           )}
           {r.sourceUrl && host && (
@@ -197,14 +208,14 @@ export function RecipePage() {
           )}
         </dl>
         {scalingOn && (
-          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 print:hidden">
             {original != null && servings != null && (
               <ServingsStepper value={servings} original={original} onChange={(n) => setParam("servings", n === original ? null : String(n))} />
             )}
             <UnitsToggle value={units} onChange={(u) => setParam("units", u === "original" ? null : u)} />
           </div>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2 print:hidden">
           {r.steps.length > 0 && (
             <Feature on="cook-mode">
               <Link
@@ -220,14 +231,14 @@ export function RecipePage() {
         </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-        <section aria-labelledby="ingredients-h" className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto">
+      <div className="grid gap-8 print:block lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <section aria-labelledby="ingredients-h" className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto print:static print:max-h-none print:overflow-visible">
           <div className="mb-3 flex items-center justify-between">
             <h2 id="ingredients-h" className="text-xl font-semibold">
               Ingredients
             </h2>
             {any && (
-              <Button variant="ghost" size="sm" onClick={reset}>
+              <Button variant="ghost" size="sm" onClick={reset} className="print:hidden">
                 <RotateCcw className="size-4" aria-hidden />
                 Reset
               </Button>
@@ -248,7 +259,7 @@ export function RecipePage() {
                     <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2">
                       <input
                         type="checkbox"
-                        className="mt-0.5 size-5 shrink-0"
+                        className="mt-0.5 size-5 shrink-0 print:hidden"
                         checked={checks.ingredients.includes(i)}
                         onChange={() => toggle("ingredients", i)}
                       />
@@ -291,7 +302,7 @@ export function RecipePage() {
                     <label className="flex cursor-pointer items-start gap-3 py-3">
                       <input
                         type="checkbox"
-                        className="mt-1 size-5 shrink-0"
+                        className="mt-1 size-5 shrink-0 print:hidden"
                         checked={checks.steps.includes(i)}
                         onChange={() => toggle("steps", i)}
                         aria-label={`Step ${i + 1}`}
@@ -320,7 +331,11 @@ export function RecipePage() {
         </section>
       )}
 
-      {timelineOn && <Timeline slug={r.slug} />}
+      {timelineOn && (
+        <div className="print:hidden">
+          <Timeline slug={r.slug} />
+        </div>
+      )}
 
       <Dialog
         open={confirm}

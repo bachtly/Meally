@@ -1,5 +1,6 @@
 import { formatQuantity } from "../ingredients/format.js";
 import { FRIENDLY } from "./convert.js";
+import { pluralise } from "../text/pluralise.js";
 import { unitByKey, type UnitDef } from "./units.js";
 
 /** The fields of an ingredient that scaling and conversion read. Recipe and parsed ingredients both fit. */
@@ -41,6 +42,12 @@ function tidy(n: number, unit: string): number {
     case "l":
     case "kg":
       return round(n, 2);
+    case "oz": {
+      const step = n < 4 ? 0.25 : n < 8 ? 0.5 : 1;
+      return Math.max(0.25, Math.round(n / step) * step);
+    }
+    case "lb":
+      return Math.max(0.25, Math.round(n * 4) / 4);
     default:
       return snap(n);
   }
@@ -76,7 +83,8 @@ function rescale(ing: ScalableIngredient, factor: number, system: UnitChoice) {
   const baseMax = qMax == null ? null : qMax * def.factor;
   const unit = pickUnit(set, baseMax ?? base);
   const f = unitByKey(unit)!.factor;
-  const conv = (b: number) => (crossing ? tidy(b / f, unit) : round(b / f));
+  const coarse = unit === "oz" || unit === "lb";
+  const conv = (b: number) => (crossing || coarse ? tidy(b / f, unit) : round(b / f));
   return { quantity: conv(base), quantityMax: baseMax == null ? null : conv(baseMax), unit };
 }
 
@@ -100,7 +108,9 @@ export function formatIngredient(ing: ScalableIngredient): string {
   if (hi != null) qty += `–${fmtNumber(hi, ing.unit)}`;
   const parts = [qty];
   if (ing.unit) parts.push(label(ing.unit, hi ?? ing.quantity));
-  parts.push(ing.food);
+  const top = hi ?? ing.quantity;
+  const countable = !ing.unit || unitByKey(ing.unit)?.kind === "count";
+  parts.push(top > 1 && countable ? pluralise(ing.food) : ing.food);
   const line = parts.join(" ");
   return ing.note ? `${line}, ${ing.note}` : line;
 }

@@ -14,3 +14,4 @@ export * from "./text/durations.js";
 export * from "./schemas/share.js";
 export * from "./schemas/cookbooks.js";
 export * from "./schemas/timeline.js";
+export * from "./text/pluralise.js";

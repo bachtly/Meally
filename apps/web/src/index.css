@@ -16,3 +16,8 @@
   background: oklch(0.3 0.05 var(--h));
   color: oklch(0.88 0.09 var(--h));
 }
+
+/* Ctrl+P on any page: black on white. The recipe page hides its own controls with print:hidden. */
+@media print {
+  html, body { background: #fff !important; color: #000 !important; }
+}

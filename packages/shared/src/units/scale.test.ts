@@ -30,7 +30,7 @@ describe("scaleIngredient", () => {
     [ing(2, "clove", "garlic"), 2, "4 cloves garlic"],
     [ing(2, "clove", "garlic"), 0.5, "1 clove garlic"],
     [ing(1, "can", "tomatoes"), 3, "3 cans tomatoes"],
-    [ing(1, null, "onion"), 3, "3 onion"],
+    [ing(1, null, "onion"), 3, "3 onions"],
     [ing(2, "pint", "cream"), 2, "4 pints cream"],
     [ing(2, "tbsp", "butter", { note: "melted" }), 2, "¼ cup butter, melted"],
   ])("%j x%s", (i, f, out) => expect(scaleIngredient(i, f).raw).toBe(out));
@@ -69,7 +69,7 @@ describe("convertIngredient", () => {
     [ing(120, "ml", "cream"), "us", "½ cup cream"],
     [ing(100, "g", "flour"), "us", "3½ oz flour"],
     [ing(1, "kg", "flour"), "us", "2¼ lb flour"],
-    [ing(500, "g", "rice"), "us", "1⅛ lb rice"],
+    [ing(500, "g", "rice"), "us", "1 lb rice"],
     [ing(1, "cup", "milk"), "us", "1 cup milk"],
     [ing(500, "g", "rice"), "metric", "500 g rice"],
     [ing(1000, "g", "rice"), "metric", "1 kg rice"],
@@ -94,7 +94,7 @@ describe("convertIngredient", () => {
 describe("adjustIngredient", () => {
   it("scales then converts in one step", () => {
     expect(adjustIngredient(ing(1, "cup", "milk"), 6, "metric").raw).toBe("1.42 l milk");
-    expect(adjustIngredient(ing(100, "g", "flour"), 3, "us").raw).toBe("10⅝ oz flour");
+    expect(adjustIngredient(ing(100, "g", "flour"), 3, "us").raw).toBe("11 oz flour");
   });
 });
 
@@ -106,4 +106,27 @@ describe("formatIngredient", () => {
   it("uses decimals for metric units", () => {
     expect(formatIngredient(ing(2.5, "ml", "vanilla"))).toBe("2.5 ml vanilla");
   });
+});
+
+describe("display polish", () => {
+  it.each([
+    [ing(1, null, "onion"), 2, "2 onions"],
+    [ing(2, null, "onions"), 2, "4 onions"],
+    [ing(1, null, "onion"), 1.5, "1½ onions"],
+    [ing(1, "clove", "garlic"), 3, "3 cloves garlic"],
+    [ing(1, "cup", "flour"), 2, "2 cups flour"],
+  ])("pluralises %j x%s", (i, f, out) => expect(scaleIngredient(i, f).raw).toBe(out));
+
+  it("keeps the stored food untouched", () => {
+    expect(scaleIngredient(ing(1, null, "onion"), 2).food).toBe("onion");
+  });
+
+  it.each([
+    [ing(85, "g", "cheese"), "3 oz cheese"],
+    [ing(120, "g", "cheese"), "4 oz cheese"],
+    [ing(150, "g", "cheese"), "5½ oz cheese"],
+    [ing(250, "g", "cheese"), "9 oz cheese"],
+    [ing(1.1, "kg", "beef"), "2½ lb beef"],
+    [ing(300, "g", "beef"), "11 oz beef"],
+  ])("rounds US mass coarsely %j", (i, out) => expect(convertIngredient(i, "us").raw).toBe(out));
 });

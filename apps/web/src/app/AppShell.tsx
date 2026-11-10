@@ -30,8 +30,8 @@ export function AppShell() {
 
   return (
     <ToastProvider>
-      <div className="min-h-dvh lg:pl-60">
-        <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 lg:flex">
+      <div className="min-h-dvh lg:pl-60 print:pl-0">
+        <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 lg:flex">
           <div className="px-3 text-xl font-semibold text-accent">Meally</div>
           <nav aria-label="Sidebar" className="flex flex-col gap-1">
             {items.map(({ to, label, icon: Icon }) => (
@@ -52,7 +52,7 @@ export function AppShell() {
           </nav>
         </aside>
 
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
+        <header className="print:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
           <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
           <HeaderSearch ref={searchRef} />
           <div className="flex items-center gap-1">
@@ -83,11 +83,11 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 lg:pb-10" aria-busy={isLoading || undefined}>
+        <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
           <Outlet />
         </main>
 
-        <nav aria-label="Tab bar" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <nav aria-label="Tab bar" className="print:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised pb-[env(safe-area-inset-bottom)] lg:hidden">
           <ul className="flex">
             {items.filter((i) => !i.desktopOnly).map(({ to, label, icon: Icon }) => (
               <li key={to} className="flex-1">

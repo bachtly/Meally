@@ -18,6 +18,7 @@ import { CookbookPage } from "../features/cookbooks/CookbookPage";
 import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
 import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
+import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { PublicRecipePage } from "../features/share/PublicRecipePage";
 import { ActivityPage } from "../features/timeline/ActivityPage";
@@ -46,6 +47,14 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="cook-mode">
               <CookPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/recipes/:slug/print"
+          element={
+            <FeatureRoute on="print">
+              <PrintPage />
             </FeatureRoute>
           }
         />
