@@ -5,6 +5,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
   BASE_URL: z.string().default("http://localhost:8080"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  MEALLY_BACKUP_CRON_HOURS: z.coerce.number().min(0).default(24),
+  MEALLY_BACKUP_KEEP: z.coerce.number().int().min(1).default(7),
 });
 
 export type Config = z.infer<typeof schema>;

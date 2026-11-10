@@ -2,6 +2,7 @@ import { organizerRoutes } from "./features/organizers/routes.js";
 import { mealPlanRoutes } from "./features/mealplan/routes.js";
 import { shoppingRoutes } from "./features/shopping/routes.js";
 import { timelineRoutes } from "./features/timeline/routes.js";
+import { backupRoutes, exportRoutes } from "./features/backups/routes.js";
 import { cookbookRoutes } from "./features/cookbooks/routes.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -72,6 +73,7 @@ export function createApp(opts: AppOptions = {}) {
     await owned?.ready;
     c.set("db", db);
     c.set("dataDir", dataDir);
+    c.set("env", env);
     c.set("flags", flags);
     c.set("auth", auth);
     c.set("fetcher", fetcher);
@@ -85,6 +87,8 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/public", publicRoutes);
   api.route("/", shareRoutes);
   api.route("/", timelineRoutes);
+  api.route("/", exportRoutes);
+  api.route("/admin/backups", backupRoutes);
   api.route("/recipes", recipeRoutes);
   api.route("/organizers", organizerRoutes);
   api.route("/meal-plan", mealPlanRoutes);

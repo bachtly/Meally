@@ -41,3 +41,9 @@ function migrationsFolder() {
   const candidates = [path.join(here, "migrations"), path.join(here, "db/migrations")];
   return candidates.find((p) => fs.existsSync(p)) ?? candidates[0]!;
 }
+
+/** Number of migrations this build ships; a backup made by a newer build has a higher count. */
+export function migrationCount(): number {
+  const journal = JSON.parse(fs.readFileSync(path.join(migrationsFolder(), "meta/_journal.json"), "utf8")) as { entries: unknown[] };
+  return journal.entries.length;
+}

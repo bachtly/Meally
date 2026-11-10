@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Feature } from "../features/Feature";
 import { useSession } from "../auth/useSession";
 import { ThemeToggle } from "../../ui";
+import { ExportBackupsSection } from "../backups/ExportBackupsSection";
 import { HouseholdSection } from "./HouseholdSection";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -44,6 +45,11 @@ export function SettingsPage() {
           <Link to="/settings/import" className="text-accent underline">
             Import from Paprika, Mealie, RecipeSage and more
           </Link>
+        </Section>
+      </Feature>
+      <Feature on="backups">
+        <Section title="Export & backups">
+          <ExportBackupsSection />
         </Section>
       </Feature>
       <Section title="Appearance">

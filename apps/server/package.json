@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "seed": "tsx src/seed.ts",
+    "restore": "tsx src/restore.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

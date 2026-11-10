@@ -22,6 +22,7 @@ export type AppEnv = {
   Variables: {
     db: Db;
     dataDir: string;
+    env: Record<string, string | undefined>;
     flags: FlagsService;
     auth: AuthSettings;
     fetcher: Fetcher;
