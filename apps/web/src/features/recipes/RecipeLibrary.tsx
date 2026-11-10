@@ -1,8 +1,9 @@
-import { ArrowDownUp, BookOpen, SearchX } from "lucide-react";
+import { ArrowDownUp, BookOpen, ChevronDown, SearchX } from "lucide-react";
 import type { CSSProperties } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
 import { Feature } from "../features/Feature";
+import { useFeature } from "../features/FeaturesProvider";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
 import { useRecipes, type RecipeSort } from "./api";
 import { formatMinutes, imageSrcSet, warmHue } from "./format";
@@ -47,6 +48,8 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
 
 export function RecipeLibrary() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const canImport = useFeature("import-url");
   const q = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: RecipeSort = SORTS.some((s) => s.value === sortParam) ? (sortParam as RecipeSort) : "updated";
@@ -149,9 +152,24 @@ export function RecipeLibrary() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link to="/recipes/new" className={`${linkButton} min-h-9 bg-accent px-3 text-sm text-accent-contrast hover:bg-accent-hover`}>
-            New recipe
-          </Link>
+          {canImport ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  New recipe
+                  <ChevronDown className="size-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => navigate("/recipes/new")}>Write from scratch</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/recipes/import")}>Import from URL</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/recipes/new" className={`${linkButton} min-h-9 bg-accent px-3 text-sm text-accent-contrast hover:bg-accent-hover`}>
+              New recipe
+            </Link>
+          )}
         </div>
       </div>
       {q.trim() && (

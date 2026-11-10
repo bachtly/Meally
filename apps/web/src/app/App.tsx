@@ -8,7 +8,8 @@ import { Gallery } from "./pages/Gallery";
 import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
 import { RecipePage } from "../features/recipes/RecipePage";
 import { RecipeEditPage, RecipeNewPage } from "../features/recipes/RecipeEditor";
-import { MorePage, PlanPage, RecipeImportPage, ShoppingPage } from "./pages/Placeholders";
+import { RecipeImportPage } from "../features/import-url/ImportPage";
+import { MorePage, PlanPage, ShoppingPage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
 let router: ReturnType<typeof createBrowserRouter> | undefined;

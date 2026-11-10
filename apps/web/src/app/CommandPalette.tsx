@@ -1,12 +1,14 @@
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useFeature } from "../features/features/FeaturesProvider";
 import { useRecipes } from "../features/recipes/api";
 import { useVisibleNav } from "./useVisibleNav";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const items = useVisibleNav();
   const navigate = useNavigate();
+  const canImport = useFeature("import-url");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   useEffect(() => {
@@ -45,6 +47,20 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             </Command.Item>
           ))}
         </Command.Group>
+        {canImport && (
+          <Command.Group heading="Actions" className="text-sm text-muted">
+            <Command.Item
+              value="Import from URL"
+              onSelect={() => {
+                navigate("/recipes/import");
+                onOpenChange(false);
+              }}
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-sm px-3 text-base text-ink data-[selected=true]:bg-sunken"
+            >
+              Import from URL
+            </Command.Item>
+          </Command.Group>
+        )}
         {found.length > 0 && (
           <Command.Group heading="Recipes" className="text-sm text-muted">
             {found.map((r) => (

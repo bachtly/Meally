@@ -3,19 +3,6 @@ import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
 import { EmptyState, ThemeToggle } from "../../ui";
 
-function Soon({ title }: { title: string }) {
-  return (
-    <>
-      <h1 className="mb-4 text-2xl font-semibold">{title}</h1>
-      <p className="mb-4 text-muted">This screen is coming soon.</p>
-      <Link to="/recipes" className="text-accent underline">
-        Back to recipes
-      </Link>
-    </>
-  );
-}
-export const RecipeImportPage = () => <Soon title="Import from URL" />;
-
 export function PlanPage() {
   return (
     <>

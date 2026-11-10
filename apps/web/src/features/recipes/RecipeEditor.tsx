@@ -71,11 +71,12 @@ function PhotoPicker({ current, file, onFile }: { current: string | null; file: 
   );
 }
 
-export function RecipeEditor({ recipe }: { recipe?: Recipe }) {
+/** `initial` pre-fills a new (unsaved) recipe, for example from an import preview. */
+export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: Recipe }) {
   const navigate = useNavigate();
   const toast = useToast();
   const save = useSaveRecipe(recipe?.slug);
-  const [form, setForm] = useState<FormState>(() => initialForm(recipe));
+  const [form, setForm] = useState<FormState>(() => initialForm(recipe ?? initial));
   const [photo, setPhoto] = useState<File | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const baseline = useRef(snapshot(form, false));
