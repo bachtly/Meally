@@ -2,17 +2,19 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import type { Recipe, RecipeInput, RecipeListResponse } from "@meally/shared";
 import { api } from "../../lib/api";
 
-export type RecipeSort = "updated" | "name" | "created";
+export type RecipeSort = "updated" | "name" | "created" | "rating";
 
-export function useRecipes(opts: { q?: string; sort?: RecipeSort; tag?: string[]; category?: string[]; tool?: string[]; limit?: number; enabled?: boolean } = {}) {
-  const { q = "", sort = "updated", tag = [], category = [], tool = [], limit = 24, enabled = true } = opts;
+export function useRecipes(opts: { q?: string; sort?: RecipeSort; tag?: string[]; category?: string[]; tool?: string[]; favourites?: boolean; minRating?: number; limit?: number; enabled?: boolean } = {}) {
+  const { q = "", sort = "updated", tag = [], category = [], tool = [], favourites = false, minRating, limit = 24, enabled = true } = opts;
   return useInfiniteQuery({
-    queryKey: ["recipes", "list", { q, sort, tag, category, tool, limit }],
+    queryKey: ["recipes", "list", { q, sort, tag, category, tool, favourites, minRating, limit }],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ sort, limit: String(limit) });
       if (q.trim()) params.set("q", q.trim());
       for (const [k, v] of [["tag", tag], ["category", category], ["tool", tool]] as const) for (const x of v) params.append(k, x);
+      if (favourites) params.set("favourites", "1");
+      if (minRating) params.set("minRating", String(minRating));
       if (pageParam) params.set("cursor", pageParam);
       return api<RecipeListResponse>(`/recipes?${params}`);
     },

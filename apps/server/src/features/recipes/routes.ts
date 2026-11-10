@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { imageSizes, recipeInputSchema, recipeListQuerySchema, z, type ImageSize } from "@meally/shared";
+import { imageSizes, recipeInputSchema, recipeListQuerySchema, recipeMeInputSchema, z, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
+import { setMe } from "../ratings/service.js";
 import { requireAuth } from "../auth/middleware.js";
 import {
   createRecipe,
@@ -28,6 +29,9 @@ function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
   return parsed.data;
 }
 const orgOn = async (c: Context<AppEnv>) => (await c.get("flags").getFeatures()).organizers.enabled;
+const ratingsOn = async (c: Context<AppEnv>) => (await c.get("flags").getFeatures()).ratings.enabled;
+/** Per-request options for the optional features: organisers and per-user ratings. */
+const opts = async (c: Context<AppEnv>) => ({ org: await orgOn(c), ratings: await ratingsOn(c), userId: c.get("user").id });
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
 
 export const recipeRoutes = new Hono<AppEnv>();
@@ -37,16 +41,22 @@ recipeRoutes
   .get("/", async (c) => {
     const raw = { ...c.req.query(), tag: c.req.queries("tag"), category: c.req.queries("category"), tool: c.req.queries("tool") };
     const query = parse(raw, recipeListQuerySchema);
-    return c.json(await listRecipes(c.get("db"), c.get("householdId"), { ...query, org: await orgOn(c) }));
+    return c.json(await listRecipes(c.get("db"), c.get("householdId"), { ...query, ...(await opts(c)) }));
   })
   .post("/", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data, { org: await orgOn(c) }), 201);
+    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data, await opts(c)), 201);
   })
-  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), { org: await orgOn(c) })))
+  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), await opts(c))))
   .put("/:slug", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data, { org: await orgOn(c) }));
+    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data, await opts(c)));
+  })
+  .put("/:slug/me", async (c) => {
+    if (!(await ratingsOn(c))) throw new ApiError(404, "not_found", "Not found");
+    const patch = parse(await json(c), recipeMeInputSchema);
+    const recipe = await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug")); // 404 across households
+    return c.json(await setMe(c.get("db"), c.get("user").id, recipe.id, patch));
   })
   .delete("/:slug", async (c) => {
     await deleteRecipe(c.get("db"), c.get("dataDir"), c.get("householdId"), c.req.param("slug"));
@@ -76,7 +86,7 @@ recipeRoutes
         if (e instanceof ApiError) throw e;
         throw new ApiError(415, "unsupported_media", "That file is not a readable image");
       }
-      return c.json(await getRecipe(db, householdId, slug, { org: await orgOn(c) }), 201);
+      return c.json(await getRecipe(db, householdId, slug, await opts(c)), 201);
     },
   );
 

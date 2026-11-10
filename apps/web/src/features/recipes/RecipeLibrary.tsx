@@ -1,4 +1,4 @@
-import { ArrowDownUp, BookOpen, ChevronDown, SearchX } from "lucide-react";
+import { ArrowDownUp, BookOpen, ChevronDown, Heart, SearchX, Star } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
@@ -6,6 +6,7 @@ import { Feature } from "../features/Feature";
 import { useFeature } from "../features/FeaturesProvider";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
 import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
+import { HeartButton } from "../ratings/HeartButton";
 import { useRecipes, type RecipeSort } from "./api";
 import { formatMinutes, imageSrcSet, warmHue } from "./format";
 
@@ -13,6 +14,7 @@ const SORTS: { value: RecipeSort; label: string }[] = [
   { value: "updated", label: "Recently updated" },
   { value: "name", label: "Name" },
   { value: "created", label: "Newest" },
+  { value: "rating", label: "Top rated" },
 ];
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
 const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5";
@@ -20,7 +22,7 @@ const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:
 function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
   const time = formatMinutes(recipe.totalMinutes);
   return (
-    <li>
+    <li className="relative">
       <Link to={`/recipes/${recipe.slug}`} className="group block overflow-hidden rounded-lg border border-line bg-raised">
         <div className="aspect-[4/3] bg-sunken">
           {recipe.imageUrl ? (
@@ -40,9 +42,20 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
         </div>
         <div className="p-3">
           <h2 className="line-clamp-2 min-h-[2.5rem] text-base font-medium leading-5 group-hover:underline">{recipe.name}</h2>
-          <p className="mt-1 text-sm text-muted">{time ?? "No time set"}</p>
+          <p className="mt-1 text-sm text-muted">
+            {time ?? "No time set"}
+            {recipe.rating ? (
+              <span className="ml-2 inline-flex items-center gap-0.5" aria-label={`Rated ${recipe.rating} of 5`}>
+                <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />
+                {recipe.rating}
+              </span>
+            ) : null}
+          </p>
         </div>
       </Link>
+      {recipe.favourite !== undefined && (
+        <HeartButton slug={recipe.slug} name={recipe.name} favourite={recipe.favourite} className="absolute right-0 top-0 rounded-bl-lg bg-raised/80 backdrop-blur" />
+      )}
     </li>
   );
 }
@@ -56,10 +69,22 @@ export function RecipeLibrary() {
   const sort: RecipeSort = SORTS.some((s) => s.value === sortParam) ? (sortParam as RecipeSort) : "updated";
   const organizersOn = useFeature("organizers");
   const { filters, count: filterCount } = useOrganizerFilters();
-  const query = useRecipes({ q, sort, ...(organizersOn ? { tag: filters.tags, category: filters.categories, tool: filters.tools } : {}) });
+  const ratingsOn = useFeature("ratings");
+  const favourites = ratingsOn && params.get("favourites") === "1";
+  const query = useRecipes({ q, sort: !ratingsOn && sort === "rating" ? "updated" : sort, ...(favourites ? { favourites } : {}), ...(organizersOn ? { tag: filters.tags, category: filters.categories, tool: filters.tools } : {}) });
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
   const sortLabel = SORTS.find((s) => s.value === sort)!.label;
 
+  const toggleFavourites = () =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (favourites) next.delete("favourites");
+        else next.set("favourites", "1");
+        return next;
+      },
+      { replace: true },
+    );
   const setSort = (value: RecipeSort) =>
     setParams(
       (prev) => {
@@ -89,7 +114,7 @@ export function RecipeLibrary() {
         Check your connection and try again.
       </EmptyState>
     );
-  } else if (items.length === 0 && (q.trim() || (organizersOn && filterCount > 0))) {
+  } else if (items.length === 0 && (q.trim() || favourites || (organizersOn && filterCount > 0))) {
     body = (
       <EmptyState icon={<SearchX className="size-10" />} title="No results">
         {q.trim() ? <>Nothing matches &ldquo;{q}&rdquo;. Try a different word.</> : "No recipes match these filters."}
@@ -148,7 +173,7 @@ export function RecipeLibrary() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {SORTS.map((s) => (
+              {SORTS.filter((s) => ratingsOn || s.value !== "rating").map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setSort(s.value)}>
                   {s.label}
                 </DropdownMenuItem>
@@ -179,6 +204,19 @@ export function RecipeLibrary() {
         <p className="mb-3 text-sm text-muted">
           Showing results for &ldquo;{q}&rdquo;
         </p>
+      )}
+      {ratingsOn && (
+        <div className="mb-3">
+          <button
+            type="button"
+            aria-pressed={favourites}
+            onClick={toggleFavourites}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${favourites ? "border-accent bg-accent text-accent-contrast" : "border-line bg-raised hover:bg-sunken"}`}
+          >
+            <Heart className={`size-4 ${favourites ? "fill-current" : ""}`} aria-hidden />
+            Favourites
+          </button>
+        </div>
       )}
       {organizersOn && <LibraryFilters />}
       {body}

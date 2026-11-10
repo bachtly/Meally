@@ -64,6 +64,13 @@
       "when": 1794332269303,
       "tag": "0008_first_may_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794337034501,
+      "tag": "0009_reflective_vindicator",
+      "breakpoints": true
     }
   ]
 }

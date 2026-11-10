@@ -5,12 +5,13 @@ import { and, asc, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
 import { imageSizes } from "@meally/shared";
 import type { Db } from "../../db/index.js";
-import { images, recipeIngredients, recipes, recipeSteps } from "../../db/schema/index.js";
+import { images, recipeIngredients, recipes, recipeSteps, recipeUserData } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
+import { getMe, householdRating } from "../ratings/service.js";
 import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
 
 /** `org` is true when the organizers flag is on; when off, organiser fields are ignored and omitted. */
-type Org = { org?: boolean };
+type Org = { org?: boolean; userId?: string; ratings?: boolean };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
@@ -77,7 +78,12 @@ async function writeOrganizers(tx: Tx, householdId: string, id: string, data: Re
   if (data.tools) await setRecipeOrganizers(tx, "tools", householdId, id, data.tools);
 }
 
-async function load(db: Pick<Db, "select">, row: Row, org = false): Promise<Recipe> {
+async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Recipe> {
+  const org = o.org;
+  const rate =
+    o.ratings && o.userId
+      ? { me: await getMe(db, o.userId, row.id), householdRating: await householdRating(db, row.householdId, row.id) }
+      : {};
   const extra = org
     ? {
         tags: (await loadRefs(db, "tags", [row.id])).get(row.id) ?? [],
@@ -85,6 +91,7 @@ async function load(db: Pick<Db, "select">, row: Row, org = false): Promise<Reci
         tools: (await loadRefs(db, "tools", [row.id])).get(row.id) ?? [],
       }
     : {};
+  Object.assign(extra, rate);
   const ings = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, row.id)).orderBy(asc(recipeIngredients.position));
   const steps = await db.select().from(recipeSteps).where(eq(recipeSteps.recipeId, row.id)).orderBy(asc(recipeSteps.position));
   return {
@@ -128,11 +135,11 @@ export async function createRecipe(db: Db, householdId: string, userId: string, 
     await reindex(tx, householdId, id, data);
     return row!;
   });
-  return load(db, row, o.org);
+  return load(db, row, o);
 }
 
 export async function getRecipe(db: Db, householdId: string, slug: string, o: Org = {}): Promise<Recipe> {
-  return load(db, await findRow(db, householdId, slug), o.org);
+  return load(db, await findRow(db, householdId, slug), o);
 }
 
 /** Replaces the recipe fields, ingredients and steps in one transaction. The slug never changes. */
@@ -149,7 +156,7 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
     await reindex(tx, householdId, existing.id, data);
     return row!;
   });
-  return load(db, row, o.org);
+  return load(db, row, o);
 }
 
 export async function deleteRecipe(db: Db, dataDir: string, householdId: string, slug: string) {
@@ -186,7 +193,9 @@ export async function listRecipes(
   householdId: string,
   opts: {
     q?: string;
-    sort: "updated" | "name" | "created";
+    sort: "updated" | "name" | "created" | "rating";
+    favourites?: boolean;
+    minRating?: number;
     cursor?: string;
     limit: number;
     tag?: string[];
@@ -208,9 +217,21 @@ export async function listRecipes(
     if (opts.category?.length) conds.push(hasAnyOf("categories", householdId, opts.category, recipes.id));
     if (opts.tool?.length) conds.push(hasAnyOf("tools", householdId, opts.tool, recipes.id));
   }
-  // Keyset pagination on (sort key, id). updated/created are newest first; name is A to Z.
-  const key = opts.sort === "name" ? sql`lower(${recipes.name})` : opts.sort === "created" ? recipes.createdAt : recipes.updatedAt;
-  const ascending = opts.sort === "name";
+  // Ratings are the caller's own; every ratings option is ignored when the flag is off.
+  const rt = !!(opts.ratings && opts.userId);
+  if (rt && opts.favourites) conds.push(eq(recipeUserData.favourite, true));
+  if (rt && opts.minRating) conds.push(sql`${recipeUserData.rating} >= ${opts.minRating}`);
+  // Keyset pagination on (sort key, id). updated/created/rating are highest or newest first; name is A to Z.
+  const sort = opts.sort === "rating" && !rt ? "updated" : opts.sort;
+  const key =
+    sort === "name"
+      ? sql`lower(${recipes.name})`
+      : sort === "created"
+        ? recipes.createdAt
+        : sort === "rating"
+          ? sql`coalesce(${recipeUserData.rating}, 0)`
+          : recipes.updatedAt;
+  const ascending = sort === "name";
   if (opts.cursor) {
     const [v, id] = decode(opts.cursor);
     const op = ascending ? sql`>` : sql`<`;
@@ -218,8 +239,9 @@ export async function listRecipes(
   }
   const dir = ascending ? asc : desc;
   const rows = await db
-    .select({ row: recipes, k: sql<string | number>`${key}`.as("k") })
+    .select({ row: recipes, k: sql<string | number>`${key}`.as("k"), fav: recipeUserData.favourite, rating: recipeUserData.rating })
     .from(recipes)
+    .leftJoin(recipeUserData, and(eq(recipeUserData.recipeId, recipes.id), eq(recipeUserData.userId, opts.userId ?? "")))
     .where(and(...conds))
     .orderBy(dir(key), dir(recipes.id))
     .limit(opts.limit + 1);
@@ -228,7 +250,7 @@ export async function listRecipes(
   const ids = page.map(({ row }) => row.id);
   const tagMap = opts.org ? await loadRefs(db, "tags", ids) : null;
   const catMap = opts.org ? await loadRefs(db, "categories", ids) : null;
-  const items: RecipeSummary[] = page.map(({ row }) => ({
+  const items: RecipeSummary[] = page.map(({ row, fav, rating }) => ({
     id: row.id,
     slug: row.slug,
     name: row.name,
@@ -236,6 +258,7 @@ export async function listRecipes(
     totalMinutes: row.totalMinutes,
     servings: row.servings,
     updatedAt: row.updatedAt.getTime(),
+    ...(rt ? { favourite: fav ?? false, rating: rating ?? null } : {}),
     ...(tagMap && catMap ? { tags: tagMap.get(row.id) ?? [], categories: catMap.get(row.id) ?? [] } : {}),
   }));
   return { items, nextCursor: rows.length > opts.limit && last ? encode(last.k, last.row.id) : null };

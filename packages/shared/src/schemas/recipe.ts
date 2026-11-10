@@ -70,6 +70,9 @@ export const recipeSchema = recipeInputSchema.extend({
   tags: z.array(organizerRefSchema).optional(),
   categories: z.array(organizerRefSchema).optional(),
   tools: z.array(organizerRefSchema).optional(),
+  /** Present only when the `ratings` flag is on. */
+  me: z.object({ favourite: z.boolean(), rating: z.number().int().min(1).max(5).nullable() }).optional(),
+  householdRating: z.object({ average: z.number().nullable(), count: z.number().int() }).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -84,6 +87,9 @@ export const recipeSummarySchema = z.object({
   servings: z.number().nullable(),
   tags: z.array(organizerRefSchema).optional(),
   categories: z.array(organizerRefSchema).optional(),
+  /** The caller's own favourite and rating; present only when the `ratings` flag is on. */
+  favourite: z.boolean().optional(),
+  rating: z.number().nullable().optional(),
   updatedAt: z.number(),
 });
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
@@ -93,7 +99,7 @@ const slugList = z
   .optional()
   .transform((v) => (v === undefined ? [] : (Array.isArray(v) ? v : [v]).map((x) => x.trim()).filter(Boolean).slice(0, 20)));
 
-export const recipeSorts = ["updated", "name", "created"] as const;
+export const recipeSorts = ["updated", "name", "created", "rating"] as const;
 export const recipeListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   sort: z.enum(recipeSorts).default("updated"),
@@ -101,6 +107,9 @@ export const recipeListQuerySchema = z.object({
   tag: slugList,
   category: slugList,
   tool: slugList,
+  /** `favourites=1` keeps only the caller's favourites; `minRating` keeps their own ratings of at least n. Both need `ratings`. */
+  favourites: z.enum(["1", "true"]).optional().transform((v) => v !== undefined),
+  minRating: z.coerce.number().int().min(1).max(5).optional(),
   cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(24),
 });
@@ -108,3 +117,8 @@ export type RecipeListResponse = { items: RecipeSummary[]; nextCursor: string | 
 
 export const imageSizes = [320, 800, 1600] as const;
 export type ImageSize = (typeof imageSizes)[number];
+
+/** `PUT /recipes/:slug/me`: omitted fields are left as they are; `rating: null` clears the rating. */
+export const recipeMeInputSchema = z
+  .object({ favourite: z.boolean().optional(), rating: z.number().int().min(1).max(5).nullable().optional() })
+  .refine((v) => v.favourite !== undefined || v.rating !== undefined, "Send favourite and/or rating");

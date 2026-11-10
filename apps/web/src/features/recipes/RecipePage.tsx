@@ -9,6 +9,8 @@ import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
 import { AddToListButton } from "../shopping/AddToListButton";
 import { useFeature } from "../features/FeaturesProvider";
+import { HeartButton } from "../ratings/HeartButton";
+import { StarRating } from "../ratings/StarRating";
 import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
 import { Feature } from "../features/Feature";
@@ -108,7 +110,10 @@ export function RecipePage() {
       )}
       <header className="mb-6">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-3xl font-semibold leading-tight">{r.name}</h1>
+          <div className="flex min-w-0 items-start gap-1">
+            <h1 className="text-3xl font-semibold leading-tight">{r.name}</h1>
+            {r.me && <HeartButton slug={r.slug} name={r.name} favourite={r.me.favourite} className="-mt-1" />}
+          </div>
           <div className="flex shrink-0 items-center gap-1">
             <Link
               to={`/recipes/${r.slug}/edit`}
@@ -144,6 +149,7 @@ export function RecipePage() {
             </DropdownMenu>
           </div>
         </div>
+        {r.me && <StarRating slug={r.slug} rating={r.me.rating} household={r.householdRating} />}
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}
         <RecipeChips categories={r.categories} tags={r.tags} tools={r.tools} />
         <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">

@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { households, users } from "./auth.js";
 
 /** Stored image metadata; the files live under $DATA_DIR/images/<householdId>/. */
@@ -69,4 +69,22 @@ export const recipeSteps = sqliteTable(
     text: text("text").notNull(),
   },
   (t) => [index("recipe_steps_recipe_idx").on(t.recipeId, t.position)],
+);
+
+/** Per-user favourite and rating for a recipe (ratings flag). Household averages are computed from these rows. */
+export const recipeUserData = sqliteTable(
+  "recipe_user_data",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    recipeId: text("recipe_id")
+      .notNull()
+      .references(() => recipes.id, { onDelete: "cascade" }),
+    favourite: integer("favourite", { mode: "boolean" }).notNull().default(false),
+    rating: integer("rating"),
+    lastMadeAt: integer("last_made_at", { mode: "timestamp_ms" }),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.recipeId] }), index("recipe_user_data_recipe_idx").on(t.recipeId)],
 );
