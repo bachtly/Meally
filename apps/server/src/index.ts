@@ -5,7 +5,7 @@ import { createApp } from "./app.js";
 import { config } from "./lib/config.js";
 import { createDb } from "./db/index.js";
 
-const { db } = createDb(path.join(config.DATA_DIR, "meally.db"));
+const { db } = await createDb(path.join(config.DATA_DIR, "meally.db"));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist =

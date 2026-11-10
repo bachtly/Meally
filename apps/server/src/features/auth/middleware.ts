@@ -25,7 +25,7 @@ export function toSessionUser(u: SessionUser): SessionUser {
 /** Requires a valid session cookie; sets `user` and `householdId`. */
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const token = getCookie(c, SESSION_COOKIE);
-  const session = token ? resolveSession(c.get("db"), token) : null;
+  const session = token ? await resolveSession(c.get("db"), token) : null;
   if (!token || !session) {
     if (token) clearSessionCookie(c);
     throw new ApiError(401, "unauthenticated", "Sign in to continue");

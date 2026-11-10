@@ -18,9 +18,9 @@ describe("api", () => {
 });
 
 describe("db", () => {
-  it("applies migrations", () => {
-    const { db } = createDb(":memory:");
-    db.insert(appMeta).values({ key: "k", value: "v" }).run();
-    expect(db.select().from(appMeta).all()).toEqual([{ key: "k", value: "v" }]);
+  it("applies migrations", async () => {
+    const { db } = await createDb(":memory:");
+    await db.insert(appMeta).values({ key: "k", value: "v" });
+    expect(await db.select().from(appMeta)).toEqual([{ key: "k", value: "v" }]);
   });
 });

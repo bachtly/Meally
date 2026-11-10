@@ -6,7 +6,7 @@ The research behind each decision is in [01-research.md](01-research.md).
 
 ```
 apps/web        React 19 + Vite SPA (TypeScript, Tailwind CSS v4, TanStack Query, React Router)
-apps/server     Hono on Node 24, Drizzle ORM, SQLite (better-sqlite3); serves /api and the built web app
+apps/server     Hono on Node 24, Drizzle ORM, SQLite (libsql); serves /api and the built web app
 packages/shared zod schemas, API types, feature-flag registry, ingredient parser, unit conversion
 ```
 
@@ -19,13 +19,18 @@ plus `images/`.
 |---|---|---|
 | A1 | TypeScript monorepo with npm workspaces | One language end to end. Types and zod schemas are shared between client and server. npm comes with Node, so there's nothing extra to install. |
 | A2 | Hono server on Node | Small, fast, built on web standards, with typed routes. It has middleware for cookies, CORS and secure headers. |
-| A3 | SQLite through Drizzle, migrations with drizzle-kit | Nothing extra to run (G5). WAL mode copes with concurrent users. FTS5 gives search. Drizzle also supports Postgres if we add it later. |
+| A3 | SQLite through Drizzle on the libsql driver (`@libsql/client`), migrations with drizzle-kit | Nothing extra to run (G5). libsql ships prebuilt binaries for Windows, macOS and Linux, so `npm install` needs no C++ toolchain (better-sqlite3 has none for Node 24 on Windows). WAL mode copes with concurrent users. FTS5 gives search (libsql supports it). Drizzle also supports Postgres if we add it later. |
 | A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. API tokens (F22) use the same table design. |
 | A5 | React 19 + Vite + TanStack Query + React Router | A mainstream stack that's fast to build. Query handles cache, retries and optimistic updates. |
 | A6 | Tailwind CSS v4 with our own components on Radix primitives (shadcn-style, written in this repo) | Modern look with accessible dialogs, menus and popovers, and no heavy UI kit. |
 | A7 | Design tokens as CSS variables (OKLCH), light and dark themes, `prefers-color-scheme` with a manual override | Consistent theming and AA contrast. |
 | A8 | Vitest for unit and API tests, Testing Library for components, Playwright for a few end-to-end flows | Fast and familiar. |
 | A9 | Images stored on disk and resized with `sharp` to WebP at 3 sizes | Lighter than storing blobs in the DB. Cards load quickly. |
+
+## Changed decisions
+
+- A3: the SQLite driver changed from better-sqlite3 to libsql. Reason: better-sqlite3 has no prebuilt binary for Node 24 on
+  Windows, so install failed without a C++ toolchain. The driver is async, so every db call is awaited.
 
 ## Feature flags
 

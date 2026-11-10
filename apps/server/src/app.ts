@@ -3,7 +3,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { appName, signupModes, type SignupMode } from "@meally/shared";
-import { createDb, type Db } from "./db/index.js";
+import { openDb, type Db } from "./db/index.js";
 import { createFlagsService, type FlagsService } from "./features/features/service.js";
 import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
@@ -27,7 +27,8 @@ export interface AppOptions {
 }
 
 export function createApp(opts: AppOptions = {}) {
-  const db = opts.db ?? createDb(":memory:").db;
+  const owned = opts.db ? null : openDb(":memory:");
+  const db = opts.db ?? owned!.db;
   const flags = opts.flags ?? createFlagsService(db, opts.env ?? process.env);
   const env = opts.env ?? process.env;
   const baseUrl = parseBaseUrl(env.BASE_URL);
@@ -45,6 +46,7 @@ export function createApp(opts: AppOptions = {}) {
 
   const api = new Hono<AppEnv>();
   api.use("*", async (c, next) => {
+    await owned?.ready;
     c.set("db", db);
     c.set("flags", flags);
     c.set("auth", auth);
