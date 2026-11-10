@@ -43,6 +43,13 @@
       "when": 1794330549482,
       "tag": "0005_funny_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794331044124,
+      "tag": "0006_charming_la_nuit",
+      "breakpoints": true
     }
   ]
 }

@@ -6,3 +6,4 @@ export * from "./schemas/recipe.js";
 export * from "./ingredients/parse.js";
 export * from "./ingredients/format.js";
 export * from "./units/units.js";
+export * from "./schemas/mealplan.js";
