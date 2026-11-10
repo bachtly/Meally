@@ -6,6 +6,8 @@ import type { Db } from "../../db/index.js";
 import { importJobs, recipes } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { cleanNames } from "../organizers/service.js";
+import { setMe } from "../ratings/service.js";
+import type { Fetcher } from "../import-url/fetch.js";
 import { createRecipe, setRecipeImage } from "../recipes/service.js";
 import type { Plan } from "./importers.js";
 
@@ -67,6 +69,12 @@ interface Ctx {
   userId: string;
   org: boolean;
   nutrition: boolean;
+  /** Ratings flag: file ratings become the importing user's rating; otherwise they go to notes. */
+  ratings?: boolean;
+  /** SSRF-safe fetcher for remote image URLs found in files. */
+  fetcher?: Fetcher;
+  /** Total time for downloading images in one job (ms). */
+  imageBudgetMs?: number;
   jobId: string;
   file: string;
   plan: Plan;
@@ -87,8 +95,11 @@ async function exists(db: Db, householdId: string, name: string, sourceUrl: stri
   return !!row;
 }
 
+export const IMAGE_BUDGET_MS = 120_000;
+
 export async function runJob(ctx: Ctx) {
   const { db, jobId, plan } = ctx;
+  let imageTimeLeft = ctx.imageBudgetMs ?? IMAGE_BUDGET_MS;
   const where = eq(importJobs.id, jobId);
   let total = plan.items.length;
   let imported = 0;
@@ -107,7 +118,11 @@ export async function runJob(ctx: Ctx) {
         const loaded = await item.load();
         if (!loaded.length) fail(item.label, "No recipe found");
         total += Math.max(0, loaded.length - 1);
-        for (const { extracted, image } of loaded) {
+        for (const { extracted, image, rating } of loaded) {
+          if (rating && !ctx.ratings) {
+            const line = `Rating in source: ${rating}/5`;
+            extracted.recipe.notes = [extracted.recipe.notes, line].filter(Boolean).join("\n\n");
+          }
           const parsed = recipeInputSchema.safeParse(extracted.recipe);
           if (!parsed.success) {
             fail(item.label, parsed.error.issues[0]?.message ?? "Invalid recipe");
@@ -124,13 +139,21 @@ export async function runJob(ctx: Ctx) {
           }
           const recipe = await createRecipe(db, ctx.householdId, ctx.userId, input, { org: ctx.org, nutrition: ctx.nutrition });
           imported++;
-          if (image?.length) {
-            // A bad photo never fails the recipe.
-            try {
-              await setRecipeImage(db, ctx.dataDir, ctx.householdId, recipe.slug, image);
-            } catch {
-              /* keep the recipe without a photo */
+          if (rating && ctx.ratings) await setMe(db, ctx.userId, recipe.id, { rating }).catch(() => {});
+          // A bad or slow photo never fails the recipe. At most one image per recipe.
+          try {
+            let bytes = image?.length ? image : null;
+            if (!bytes && extracted.imageUrl && ctx.fetcher && imageTimeLeft > 0) {
+              const t0 = Date.now();
+              try {
+                bytes = (await ctx.fetcher(extracted.imageUrl, { kind: "image" })).body;
+              } finally {
+                imageTimeLeft -= Date.now() - t0;
+              }
             }
+            if (bytes?.length) await setRecipeImage(db, ctx.dataDir, ctx.householdId, recipe.slug, bytes);
+          } catch {
+            /* keep the recipe without a photo */
           }
         }
       } catch (e) {

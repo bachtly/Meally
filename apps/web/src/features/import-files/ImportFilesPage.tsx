@@ -8,11 +8,16 @@ import { isFinished, uploadImport, useImportJob, useImportJobs, type ImportJob }
 
 const FORMAT_LABEL: Record<ImportJob["format"], string> = {
   jsonld: "Recipe JSON (schema.org)",
-  paprika: "Paprika",
-  mealie: "Mealie",
+  recipesage: "RecipeSage",
+  paprika: "Paprika (experimental)",
+  mealie: "Mealie (experimental)",
   zip: "Zip of recipe pages",
 };
 const MAX_MB = 200;
+
+function Experimental() {
+  return <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">Experimental</span>;
+}
 
 function Bar({ value, label }: { value: number; label: string }) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
@@ -161,18 +166,20 @@ export function ImportFilesPage() {
         <h2 id="supported" className="text-lg font-semibold">
           What you can import
         </h2>
-        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
-          <li>
-            <strong>Paprika:</strong> choose Export in Paprika, then upload the .paprikarecipes file. Photos come along.
+        <ul className="flex flex-col gap-2 text-sm">
+          <li className="rounded-md border-2 border-accent bg-raised p-3">
+            <strong>RecipeSage</strong> <span className="text-xs text-muted">(recommended)</span>
+            <br />
+            In RecipeSage: Settings → Export Recipe Data → JSON-LD, then upload the .json file. Labels, notes, ratings and photos are kept.
           </li>
-          <li>
-            <strong>Mealie:</strong> upload the zip from a Mealie export. Tags, categories and photos are kept.
+          <li className="px-3">
+            <strong>Paprika</strong> <Experimental />: choose Export in Paprika, then upload the .paprikarecipes file. Photos come along.
           </li>
-          <li>
-            <strong>RecipeSage and other JSON:</strong> upload a .json file that holds one recipe or a list of them (schema.org format).
+          <li className="px-3">
+            <strong>Mealie</strong> <Experimental />: upload the zip from a Mealie export. Tags, categories and photos are kept.
           </li>
-          <li>
-            <strong>A zip of pages:</strong> a zip of saved .html pages or .json files. Meally reads the recipe from each one.
+          <li className="px-3">
+            <strong>Other JSON or a zip of pages:</strong> a .json file with schema.org recipes, or a zip of saved .html pages or .json files.
           </li>
         </ul>
         <p className="text-sm text-muted">Recipes already in your library with the same name and source link are skipped.</p>

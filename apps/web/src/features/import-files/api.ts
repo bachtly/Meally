@@ -3,7 +3,7 @@ import { api, ApiRequestError } from "../../lib/api";
 
 export interface ImportJob {
   id: string;
-  format: "jsonld" | "paprika" | "mealie" | "zip";
+  format: "jsonld" | "recipesage" | "paprika" | "mealie" | "zip";
   filename: string | null;
   status: "queued" | "running" | "done" | "failed";
   total: number;

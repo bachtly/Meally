@@ -16,14 +16,17 @@ import {
   recipeFromNode,
   type ExtractedRecipe,
 } from "../import-url/extract.js";
+import { isRecipeSageFile, recipeSageNodes, recipeSageRecipe } from "./recipesage.js";
 import { openZip, type ZipArchive, type ZipItem } from "./zip.js";
 
-export type Format = "jsonld" | "paprika" | "mealie" | "zip";
+export type Format = "jsonld" | "recipesage" | "paprika" | "mealie" | "zip";
 
 export interface Loaded {
   extracted: ExtractedRecipe;
   /** Raw image bytes from the file, if any. */
   image?: Buffer | null;
+  /** 1 to 5, from the file. Applied as the importing user's rating, or kept in notes. */
+  rating?: number | null;
 }
 /** One unit of work: a file, an entry, or a recipe node. It may yield zero, one or many recipes. */
 export interface PlanItem {
@@ -65,6 +68,18 @@ function jsonLdItems(data: unknown, label: string): PlanItem[] {
     load: async () => {
       const r = recipeFromNode(node, nodeSourceUrl(node));
       return r ? [{ extracted: r }] : [];
+    },
+  }));
+}
+
+function recipeSageItems(data: unknown, label: string): PlanItem[] {
+  return recipeSageNodes(data).map((node, i) => ({
+    label: `${label}${i ? ` #${i + 1}` : ""}`,
+    load: async () => {
+      const r = recipeSageRecipe(node, looseDuration);
+      if (!r) return [];
+      r.extracted.imageUrl = r.imageUrl;
+      return [{ extracted: r.extracted, rating: r.rating, image: r.imageData }];
     },
   }));
 }
@@ -244,6 +259,10 @@ export async function planImport(file: string, filename: string): Promise<Plan> 
       data = parseJson(buf);
     } catch {
       throw new ApiError(415, "unsupported_format", "That file is not a supported recipe export");
+    }
+    if (isRecipeSageFile(data)) {
+      const rs = recipeSageItems(data, filename);
+      if (rs.length) return { format: "recipesage", items: rs, close() {} };
     }
     const items = jsonLdItems(data, filename);
     if (!items.length) throw new ApiError(422, "no_recipe_found", "No schema.org recipes were found in that file");

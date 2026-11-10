@@ -179,7 +179,7 @@ when a feature it depends on is off.
 | `cookbooks` | on | Saved filtered collections of recipes. | `organizers` |
 | `households` | on | Members, roles and invites. | |
 | `share-links` | on | Public read-only links to a recipe. | |
-| `import-files` | on | Import from other apps and files. | |
+| `import-files` | on | Import from files. RecipeSage JSON-LD is supported; Paprika and Mealie are experimental. | |
 | `backups` | on | Export recipes; back up and restore the instance. | |
 | `timeline` | on | Record when you cooked a recipe, with notes and photos. | |
 | `nutrition` | **off** | Nutrition facts per serving. | |

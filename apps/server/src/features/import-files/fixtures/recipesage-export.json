@@ -1,0 +1,132 @@
+{
+  "recipes": [
+    {
+      "@context": "http://schema.org",
+      "@type": "Recipe",
+      "identifier": "a1",
+      "datePublished": "2024-03-01T10:00:00.000Z",
+      "description": "A bright salad.",
+      "image": [
+        "https://img.example.test/lemon-barley.jpg",
+        "https://img.example.test/second.jpg"
+      ],
+      "name": "Lemon Barley Salad",
+      "prepTime": "PT15M",
+      "totalTime": "PT1H5M",
+      "recipeIngredient": [
+        "[Salad]",
+        "1 cup pearl barley",
+        "2 tbsp olive oil",
+        "[Dressing]",
+        "1 lemon, juiced",
+        "1 tsp honey"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToSection",
+          "name": "Cook the barley"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Simmer barley for 30 minutes."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Drain and cool."
+        },
+        {
+          "@type": "HowToSection",
+          "name": "Dress it"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Whisk lemon and honey, then toss."
+        }
+      ],
+      "recipeYield": "4 servings",
+      "recipeCategory": [
+        "Salads",
+        "Make ahead"
+      ],
+      "creditText": "Aunt Pim",
+      "isBasedOn": "https://blog.example.test/lemon-barley",
+      "comment": [
+        {
+          "@type": "Comment",
+          "name": "Author Notes",
+          "text": "Better the next day."
+        }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4",
+        "bestRating": "5"
+      }
+    },
+    {
+      "@context": "http://schema.org",
+      "@type": "Recipe",
+      "identifier": "b2",
+      "datePublished": "2024-03-01T10:00:00.000Z",
+      "image": [
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+      ],
+      "name": "Plain Toast",
+      "prepTime": "5 minutes",
+      "totalTime": "10 mins",
+      "recipeIngredient": [
+        "2 slices bread",
+        "butter"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Toast the bread."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Butter it."
+        }
+      ],
+      "recipeYield": "2",
+      "recipeCategory": [],
+      "creditText": "Grandma",
+      "isBasedOn": "",
+      "comment": [
+        {
+          "@type": "Comment",
+          "name": "Author Notes",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "@context": "http://schema.org",
+      "@type": "Recipe",
+      "identifier": "c3",
+      "datePublished": "2024-03-01T10:00:00.000Z",
+      "image": [],
+      "name": "Pantry Soup",
+      "recipeIngredient": [
+        "1 can tomatoes",
+        "1 cup stock"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Heat everything."
+        }
+      ],
+      "recipeYield": "",
+      "recipeCategory": [
+        "Soup"
+      ],
+      "isBasedOn": "https://blog.example.test/pantry-soup",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "3",
+        "bestRating": "5"
+      }
+    }
+  ]
+}

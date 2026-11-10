@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
 import { openDb } from "../../db/index.js";
+import type { Fetcher } from "../import-url/fetch.js";
 import { looseDuration } from "./importers.js";
 import { openZip, safeEntryName } from "./zip.js";
 
@@ -15,9 +16,9 @@ afterAll(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#33cc33" } }).png().toBuffer();
 
-async function mk(env: Record<string, string> = {}) {
+async function mk(env: Record<string, string> = {}, fetcher?: Fetcher) {
   const o = openDb(":memory:");
-  const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir });
+  const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir, ...(fetcher ? { fetcher } : {}) });
   await o.ready;
   const su = async (p: string, email: string) => {
     const r = await app.request(`/api/v1/auth/${p}`, { method: "POST", headers: H, body: JSON.stringify({ email, name: "n", password: "correct horse" }) });
@@ -229,5 +230,68 @@ describe("import files", () => {
     expect(looseDuration("PT1H")).toBe(60);
     expect(looseDuration("45 minutes")).toBe(45);
     expect(looseDuration("soon")).toBeNull();
+  });
+
+  describe("RecipeSage export", () => {
+    const fixture = fs.readFileSync(path.join(import.meta.dirname, "fixtures", "recipesage-export.json"), "utf8");
+    const fetcher = (): Fetcher & { calls: string[] } => {
+      const calls: string[] = [];
+      const f = (async (url: string) => {
+        calls.push(url);
+        if (url.includes("second")) throw new Error("must not be fetched");
+        return { body: png, contentType: "image/png", finalUrl: url };
+      }) as unknown as Fetcher & { calls: string[] };
+      f.calls = calls;
+      return f;
+    };
+
+    it("detects the format and maps fields, labels, notes, rating, sections and images", async () => {
+      const f = fetcher();
+      const { run, get, json, recipes, A } = await mk({}, f);
+      const j = await run(fixture, "recipesage.json");
+      expect(j).toMatchObject({ format: "recipesage", status: "done", total: 3, imported: 3, failed: 0 });
+      const by = Object.fromEntries((await recipes()).map((r) => [r.name, r]));
+      const d = await json(await get(A, `/recipes/${by["Lemon Barley Salad"].slug}`));
+      expect(d).toMatchObject({ servings: 4, prepMinutes: 15, totalMinutes: 65, sourceUrl: "https://blog.example.test/lemon-barley" });
+      expect(d.me.rating).toBe(4);
+      expect(d.tags.map((t: any) => t.name).sort()).toEqual(["Make ahead", "Salads"]);
+      expect(d.notes).toBe("Better the next day.\n\nSource: Aunt Pim");
+      expect(d.ingredients.map((i: any) => [i.section, i.food])).toEqual([
+        ["Salad", "pearl barley"],
+        ["Salad", "olive oil"],
+        ["Dressing", "lemon"],
+        ["Dressing", "honey"],
+      ]);
+      expect(d.steps.map((s: any) => s.section)).toEqual(["Cook the barley", "Cook the barley", "Dress it"]);
+      expect(d.imageUrl).toBeTruthy();
+      // Only the first image URL is fetched.
+      expect(f.calls).toEqual(["https://img.example.test/lemon-barley.jpg"]);
+      // Free-text times, inline data-URI image, credit without a link.
+      const toast = await json(await get(A, `/recipes/${by["Plain Toast"].slug}`));
+      expect(toast).toMatchObject({ prepMinutes: 5, totalMinutes: 10, notes: "Source: Grandma" });
+      expect(toast.imageUrl).toBeTruthy();
+      expect(toast.tags).toEqual([]);
+    });
+
+    it("keeps the recipe when an image download fails, and skips duplicates on re-import", async () => {
+      const bad: Fetcher = async () => {
+        throw new Error("down");
+      };
+      const { run, recipes } = await mk({}, bad);
+      const j = await run(fixture, "recipesage.json");
+      expect(j).toMatchObject({ imported: 3, failed: 0 });
+      const again = await run(fixture, "recipesage.json");
+      expect(again).toMatchObject({ imported: 0, skipped: 3 });
+      expect(await recipes()).toHaveLength(3);
+    });
+
+    it("puts the rating in notes when the ratings flag is off", async () => {
+      const { run, get, json, recipes, A } = await mk({ MEALLY_FEATURE_RATINGS: "off" }, fetcher());
+      await run(fixture, "recipesage.json");
+      const r = (await recipes()).find((x) => x.name === "Pantry Soup");
+      const d = await json(await get(A, `/recipes/${r.slug}`));
+      expect(d.notes).toBe("Rating in source: 3/5");
+      expect(d.me?.rating ?? null).toBeNull();
+    });
   });
 });
