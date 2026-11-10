@@ -3,6 +3,7 @@ import { mealPlanRoutes } from "./features/mealplan/routes.js";
 import { shoppingRoutes } from "./features/shopping/routes.js";
 import { timelineRoutes } from "./features/timeline/routes.js";
 import { backupRoutes, exportRoutes } from "./features/backups/routes.js";
+import { adminRoutes } from "./features/admin/routes.js";
 import { cookbookRoutes } from "./features/cookbooks/routes.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -94,6 +95,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/", timelineRoutes);
   api.route("/", exportRoutes);
   api.route("/admin/backups", backupRoutes);
+  api.route("/admin", adminRoutes);
   api.route("/recipes", recipeRoutes);
   api.route("/organizers", organizerRoutes);
   api.route("/meal-plan", mealPlanRoutes);

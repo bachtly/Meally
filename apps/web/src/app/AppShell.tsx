@@ -1,4 +1,4 @@
-import { LogOut, Search, User } from "lucide-react";
+import { LogOut, Search, Shield, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { useFeaturesState } from "../features/features/FeaturesProvider";
@@ -70,6 +70,12 @@ export function AppShell() {
                   <p className="font-medium">{user?.name}</p>
                   <p className="text-sm text-muted">{user?.email}</p>
                 </div>
+                {user?.role === "admin" && (
+                  <DropdownMenuItem onSelect={() => navigate("/admin")}>
+                    <Shield className="size-4" aria-hidden />
+                    Admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => {
                     void signOut().then(() => navigate("/signin", { replace: true }));

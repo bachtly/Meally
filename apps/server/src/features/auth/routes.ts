@@ -23,7 +23,7 @@ import { consumeInvite, findValidInvite } from "../households/service.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
-const SIGNUP_KEY = "signup_mode";
+export const SIGNUP_KEY = "signup_mode";
 export const DEFAULT_SIGNUP_MODE: SignupMode = "invite";
 
 export async function resolveSignupMode(db: Db, locked: SignupMode | null): Promise<SignupMode> {

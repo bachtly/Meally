@@ -22,6 +22,7 @@ import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { PublicRecipePage } from "../features/share/PublicRecipePage";
 import { ActivityPage } from "../features/timeline/ActivityPage";
+import { AdminPage } from "../features/admin/AdminPage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -137,6 +138,7 @@ export const appRoutes = createRoutesFromElements(
         />
         <Route path="/more" element={<MorePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route
           path="/settings/import"
           element={

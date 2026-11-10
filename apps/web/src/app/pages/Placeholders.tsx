@@ -1,15 +1,22 @@
+import { useSession } from "../../features/auth/useSession";
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
 import { Feature } from "../../features/features/Feature";
 import { ThemeToggle } from "../../ui";
 
 export function MorePage() {
+  const { user } = useSession();
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">More</h1>
       <Link to="/settings" className="text-accent underline">
         Settings
       </Link>
+      {user?.role === "admin" && (
+        <Link to="/admin" className="text-accent underline">
+          Admin
+        </Link>
+      )}
       <Feature on="cookbooks">
         <Link to="/cookbooks" className="text-accent underline">
           Cookbooks
