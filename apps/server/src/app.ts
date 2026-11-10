@@ -8,6 +8,7 @@ import { createFlagsService, type FlagsService } from "./features/features/servi
 import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
 import { authRoutes } from "./features/auth/routes.js";
+import { ingredientRoutes } from "./features/ingredients/routes.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
@@ -61,6 +62,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/auth", authRoutes);
   api.route("/features", featureRoutes);
   api.route("/recipes", recipeRoutes);
+  api.route("/ingredients", ingredientRoutes);
   api.route("/images", imageRoutes);
   api.get("/health", (c) => c.json({ ok: true, version, name: appName }));
   app.route("/api/v1", api);
