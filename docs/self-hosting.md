@@ -155,6 +155,7 @@ Fixed windows, per client address, kept in memory and reset on restart:
 | `MEALLY_IMPORT_ALLOW_PRIVATE` | `false` | Old name of `MEALLY_ALLOW_PRIVATE_URLS`; still works. |
 | `MEALLY_BACKUP_CRON_HOURS` | `24` | Hours between automatic backups. `0` turns them off. |
 | `MEALLY_BACKUP_KEEP` | `7` | How many backups to keep. |
+| `MEALLY_AI_PROVIDER`, `MEALLY_AI_API_KEY`, `MEALLY_AI_MODEL`, `MEALLY_AI_BASE_URL` | unset | Optional AI helpers. See [AI (optional)](#ai-optional). |
 | `MEALLY_FEATURE_<KEY>` | unset | `on` or `off` fixes a feature flag. See [Feature flags](#feature-flags). |
 
 ## Feature flags

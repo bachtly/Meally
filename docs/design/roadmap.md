@@ -34,5 +34,6 @@ following [the template](features/_template.md).
 | 27 | feat: nutrition | F20 | Open (#33) |
 | 28 | feat: PWA and offline | F24 | Open (#32) |
 | 29 | feat: admin console (users, flags, settings) | F26 | Open (#30) |
-| 30 | feat: AI helpers | F25 | In progress |
-| 31 | test: end-to-end flows, self-hosting guide | | This PR |
+| 30 | feat: AI helpers | F25 | Open (#34) |
+| 31 | test: end-to-end flows, self-hosting guide | | This PR (#36) |
+| — | fix: polish meal plan, shopping aisles, cook entry point | | Open (#35) |
