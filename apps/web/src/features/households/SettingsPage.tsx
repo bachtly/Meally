@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import type { ReactNode } from "react";
 import { Feature } from "../features/Feature";
 import { useSession } from "../auth/useSession";
@@ -29,6 +30,13 @@ export function SettingsPage() {
       <Feature on="households">
         <Section title="Household">
           <HouseholdSection />
+        </Section>
+      </Feature>
+      <Feature on="organizers">
+        <Section title="Organisers">
+          <Link to="/organizers" className="text-accent underline">
+            Manage tags, categories and tools
+          </Link>
         </Section>
       </Feature>
       <Section title="Appearance">

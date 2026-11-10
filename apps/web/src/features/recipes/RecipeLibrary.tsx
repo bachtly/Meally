@@ -5,6 +5,7 @@ import type { RecipeSummary } from "@meally/shared";
 import { Feature } from "../features/Feature";
 import { useFeature } from "../features/FeaturesProvider";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
+import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
 import { useRecipes, type RecipeSort } from "./api";
 import { formatMinutes, imageSrcSet, warmHue } from "./format";
 
@@ -53,7 +54,9 @@ export function RecipeLibrary() {
   const q = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: RecipeSort = SORTS.some((s) => s.value === sortParam) ? (sortParam as RecipeSort) : "updated";
-  const query = useRecipes({ q, sort });
+  const organizersOn = useFeature("organizers");
+  const { filters, count: filterCount } = useOrganizerFilters();
+  const query = useRecipes({ q, sort, ...(organizersOn ? { tag: filters.tags, category: filters.categories, tool: filters.tools } : {}) });
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
   const sortLabel = SORTS.find((s) => s.value === sort)!.label;
 
@@ -86,10 +89,10 @@ export function RecipeLibrary() {
         Check your connection and try again.
       </EmptyState>
     );
-  } else if (items.length === 0 && q.trim()) {
+  } else if (items.length === 0 && (q.trim() || (organizersOn && filterCount > 0))) {
     body = (
       <EmptyState icon={<SearchX className="size-10" />} title="No results">
-        Nothing matches &ldquo;{q}&rdquo;. Try a different word.
+        {q.trim() ? <>Nothing matches &ldquo;{q}&rdquo;. Try a different word.</> : "No recipes match these filters."}
       </EmptyState>
     );
   } else if (items.length === 0) {
@@ -177,6 +180,7 @@ export function RecipeLibrary() {
           Showing results for &ldquo;{q}&rdquo;
         </p>
       )}
+      {organizersOn && <LibraryFilters />}
       {body}
     </>
   );

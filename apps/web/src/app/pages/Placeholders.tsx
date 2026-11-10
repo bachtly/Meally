@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
+import { Feature } from "../../features/features/Feature";
 import { ThemeToggle } from "../../ui";
 
 export function MorePage() {
@@ -9,6 +10,11 @@ export function MorePage() {
       <Link to="/settings" className="text-accent underline">
         Settings
       </Link>
+      <Feature on="organizers">
+        <Link to="/organizers" className="text-accent underline">
+          Tags, categories and tools
+        </Link>
+      </Feature>
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Appearance</h2>
         <ThemeToggle />

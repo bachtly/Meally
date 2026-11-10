@@ -48,6 +48,9 @@ export interface FormState {
   notes: string;
   ingredients: Row[];
   steps: Row[];
+  tags: string[];
+  categories: string[];
+  tools: string[];
 }
 
 export function initialForm(r?: Recipe): FormState {
@@ -66,6 +69,9 @@ export function initialForm(r?: Recipe): FormState {
     notes: r?.notes ?? "",
     ingredients: rowsFromRecipe((r?.ingredients ?? []).map((i) => ({ section: i.section, text: i.raw }))),
     steps: rowsFromRecipe((r?.steps ?? []).map((s) => ({ section: s.section, text: s.text }))),
+    tags: (r?.tags ?? []).map((o) => o.name),
+    categories: (r?.categories ?? []).map((o) => o.name),
+    tools: (r?.tools ?? []).map((o) => o.name),
   };
 }
 
@@ -88,7 +94,7 @@ function num(v: string, int: boolean): number | null | "bad" {
   return x;
 }
 
-export function buildInput(f: FormState): { input?: RecipeInput; errors: Errors } {
+export function buildInput(f: FormState, withOrganizers = false): { input?: RecipeInput; errors: Errors } {
   const errors: Errors = {};
   const prep = num(f.prep, true);
   const cook = num(f.cook, true);
@@ -138,6 +144,7 @@ export function buildInput(f: FormState): { input?: RecipeInput; errors: Errors 
     notes: f.notes,
     ingredients,
     steps,
+    ...(withOrganizers ? { tags: f.tags, categories: f.categories, tools: f.tools } : {}),
   };
   const parsed = recipeInputSchema.safeParse(input);
   if (!parsed.success) {

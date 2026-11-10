@@ -14,6 +14,7 @@ import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
 import { PlanPage } from "../features/meal-plan/PlanPage";
 import { SettingsPage } from "../features/households/SettingsPage";
 import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
+import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,14 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="shopping-lists">
               <ShoppingListPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/organizers"
+          element={
+            <FeatureRoute on="organizers">
+              <OrganizersPage />
             </FeatureRoute>
           }
         />

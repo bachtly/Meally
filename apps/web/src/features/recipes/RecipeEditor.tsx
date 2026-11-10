@@ -7,6 +7,9 @@ import { Button, Dialog, EmptyState, Field, Input, Skeleton, Textarea, useToast 
 import { useRecipe, useSaveRecipe } from "./api";
 import { buildInput, initialForm, shownTotal, snapshot, type Errors, type FormState } from "./editorModel";
 import { RowsEditor } from "./RowsEditor";
+import { useFeature } from "../features/FeaturesProvider";
+import { useOrganizers } from "../organizers/api";
+import { OrganizerPicker } from "../organizers/OrganizerPicker";
 
 const MAX_IMAGE = 10 * 1024 * 1024;
 
@@ -76,6 +79,10 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
   const navigate = useNavigate();
   const toast = useToast();
   const save = useSaveRecipe(recipe?.slug);
+  const organizersOn = useFeature("organizers");
+  const tagOpts = useOrganizers("tags", organizersOn).data ?? [];
+  const catOpts = useOrganizers("categories", organizersOn).data ?? [];
+  const toolOpts = useOrganizers("tools", organizersOn).data ?? [];
   const [form, setForm] = useState<FormState>(() => initialForm(recipe ?? initial));
   const [photo, setPhoto] = useState<File | null>(null);
   const [errors, setErrors] = useState<Errors>({});
@@ -100,7 +107,7 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
 
   const submit = () => {
     if (save.isPending) return;
-    const { input, errors: errs } = buildInput(form);
+    const { input, errors: errs } = buildInput(form, organizersOn);
     setErrors(errs);
     if (!input) {
       if (errs.name) nameRef.current?.focus();
@@ -176,6 +183,14 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
         </Field>
         <PhotoPicker current={recipe?.imageUrl ?? null} file={photo} onFile={setPhoto} />
       </Section>
+
+      {organizersOn && (
+        <Section title="Organise">
+          <OrganizerPicker label="Categories" options={catOpts.map((o) => o.name)} value={form.categories} onChange={(categories) => patch({ categories })} />
+          <OrganizerPicker label="Tags" options={tagOpts.map((o) => o.name)} value={form.tags} onChange={(tags) => patch({ tags })} />
+          <OrganizerPicker label="Tools" options={toolOpts.map((o) => o.name)} value={form.tools} onChange={(tools) => patch({ tools })} />
+        </Section>
+      )}
 
       <Section title="Time and servings">
         <div className="grid grid-cols-3 gap-3">

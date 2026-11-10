@@ -12,6 +12,7 @@ import { useFeature } from "../features/FeaturesProvider";
 import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
 import { useChecks } from "./useChecks";
+import { RecipeChips } from "../organizers/RecipeChips";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -143,6 +144,7 @@ export function RecipePage() {
           </div>
         </div>
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}
+        <RecipeChips categories={r.categories} tags={r.tags} tools={r.tools} />
         <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           {r.prepMinutes != null && <Meta label="Prep">{formatMinutes(r.prepMinutes)}</Meta>}
           {r.cookMinutes != null && <Meta label="Cook">{formatMinutes(r.cookMinutes)}</Meta>}

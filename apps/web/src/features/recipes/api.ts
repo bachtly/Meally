@@ -4,14 +4,15 @@ import { api } from "../../lib/api";
 
 export type RecipeSort = "updated" | "name" | "created";
 
-export function useRecipes(opts: { q?: string; sort?: RecipeSort; limit?: number; enabled?: boolean } = {}) {
-  const { q = "", sort = "updated", limit = 24, enabled = true } = opts;
+export function useRecipes(opts: { q?: string; sort?: RecipeSort; tag?: string[]; category?: string[]; tool?: string[]; limit?: number; enabled?: boolean } = {}) {
+  const { q = "", sort = "updated", tag = [], category = [], tool = [], limit = 24, enabled = true } = opts;
   return useInfiniteQuery({
-    queryKey: ["recipes", "list", { q, sort, limit }],
+    queryKey: ["recipes", "list", { q, sort, tag, category, tool, limit }],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ sort, limit: String(limit) });
       if (q.trim()) params.set("q", q.trim());
+      for (const [k, v] of [["tag", tag], ["category", category], ["tool", tool]] as const) for (const x of v) params.append(k, x);
       if (pageParam) params.set("cursor", pageParam);
       return api<RecipeListResponse>(`/recipes?${params}`);
     },
