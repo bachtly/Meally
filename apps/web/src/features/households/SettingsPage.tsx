@@ -5,6 +5,7 @@ import { useSession } from "../auth/useSession";
 import { ThemeToggle } from "../../ui";
 import { ExportBackupsSection } from "../backups/ExportBackupsSection";
 import { HouseholdSection } from "./HouseholdSection";
+import { TokensSection } from "../tokens/TokensSection";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -50,6 +51,11 @@ export function SettingsPage() {
       <Feature on="backups">
         <Section title="Export & backups">
           <ExportBackupsSection />
+        </Section>
+      </Feature>
+      <Feature on="api-tokens">
+        <Section title="API tokens">
+          <TokensSection />
         </Section>
       </Feature>
       <Section title="Appearance">

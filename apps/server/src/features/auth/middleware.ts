@@ -4,6 +4,7 @@ import type { SessionUser } from "@meally/shared";
 import { ApiError } from "../../lib/errors.js";
 import type { AppEnv } from "../../lib/context.js";
 import { resolveSession, SESSION_COOKIE, SESSION_TTL_MS } from "./sessions.js";
+import { resolveToken, TOKEN_PREFIX } from "../tokens/service.js";
 
 export function setSessionCookie(c: Context<AppEnv>, token: string) {
   setCookie(c, SESSION_COOKIE, token, {
@@ -22,9 +23,34 @@ export function toSessionUser(u: SessionUser): SessionUser {
   return { id: u.id, email: u.email, name: u.name, role: u.role, householdId: u.householdId, householdRole: u.householdRole };
 }
 
-/** Requires a valid session cookie; sets `user` and `householdId`. */
+/**
+ * Requires a valid session cookie or `Authorization: Bearer mly_...`; sets `user`, `householdId` and `authVia`.
+ * A request that carries both is rejected: the CSRF check keys on the cookie, so letting a bearer
+ * override it would make the credential in use ambiguous. Bearer-only requests have no cookie and so no CSRF risk.
+ */
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE);
+  const cookie = getCookie(c, SESSION_COOKIE);
+  const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
+  if (bearer?.startsWith(TOKEN_PREFIX)) {
+    if (cookie) throw new ApiError(400, "mixed_auth", "Send either a session cookie or an API token, not both");
+    const enabled = (await c.get("flags").getFeatures())["api-tokens"].enabled;
+    const found = enabled ? await resolveToken(c.get("db"), bearer) : null;
+    if (!found) throw new ApiError(401, "invalid_token", "The API token is invalid, revoked or expired");
+    const hit = c.get("tokenLimiter").hit(found.id);
+    if (!hit.ok) {
+      c.header("Retry-After", String(hit.retryAfterSec));
+      throw new ApiError(429, "rate_limited", "Too many requests for this token. Try again later.");
+    }
+    const m = c.req.method;
+    if (found.scope === "read" && m !== "GET" && m !== "HEAD") {
+      throw new ApiError(403, "insufficient_scope", "This token is read-only");
+    }
+    c.set("user", toSessionUser(found.user));
+    c.set("householdId", found.user.householdId);
+    c.set("authVia", "token");
+    return next();
+  }
+  const token = cookie;
   const session = token ? await resolveSession(c.get("db"), token) : null;
   if (!token || !session) {
     if (token) clearSessionCookie(c);
@@ -33,6 +59,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (session.refreshed) setSessionCookie(c, token);
   c.set("user", toSessionUser(session.user));
   c.set("householdId", session.user.householdId);
+  c.set("authVia", "session");
   await next();
 };
 

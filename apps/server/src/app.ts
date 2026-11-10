@@ -24,6 +24,7 @@ import { csrfProtection } from "./features/auth/middleware.js";
 import { householdRoutes } from "./features/households/routes.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { publicRoutes, shareRoutes } from "./features/share/routes.js";
+import { tokenRoutes } from "./features/tokens/routes.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 
 export const version = "0.0.0";
@@ -42,6 +43,8 @@ export interface AppOptions {
   dataDir?: string;
   /** SSRF-safe page fetcher; tests replace it. */
   fetcher?: Fetcher;
+  /** Requests per 10 minutes per API token; lowered in tests only. */
+  tokenLimit?: number;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -64,6 +67,7 @@ export function createApp(opts: AppOptions = {}) {
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+  const tokenLimiter = createRateLimiter({ max: opts.tokenLimit ?? 600, windowMs: 10 * 60_000 });
   void (owned?.ready ?? Promise.resolve()).then(() => failStaleJobs(db)).catch(() => {});
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
@@ -79,6 +83,7 @@ export function createApp(opts: AppOptions = {}) {
     c.set("fetcher", fetcher);
     c.set("importLimiter", importLimiter);
     c.set("shareLimiter", shareLimiter);
+    c.set("tokenLimiter", tokenLimiter);
     await next();
   });
   api.use("*", csrfProtection);
@@ -93,6 +98,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/organizers", organizerRoutes);
   api.route("/meal-plan", mealPlanRoutes);
   api.route("/shopping", shoppingRoutes);
+  api.route("/tokens", tokenRoutes);
   api.route("/cookbooks", cookbookRoutes);
   api.route("/household", householdRoutes);
   api.route("/ingredients", ingredientRoutes);
