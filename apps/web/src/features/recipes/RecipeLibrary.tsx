@@ -1,5 +1,7 @@
 import { ArrowDownUp, BookOpen, ChevronDown, Heart, SearchX, Star } from "lucide-react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { BookMarked } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
 import { Feature } from "../features/Feature";
@@ -7,6 +9,7 @@ import { useFeature } from "../features/FeaturesProvider";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
 import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
 import { HeartButton } from "../ratings/HeartButton";
+import { CookbookDialog } from "../cookbooks/CookbookDialog";
 import { useRecipes, type RecipeSort } from "./api";
 import { formatMinutes, imageSrcSet, warmHue } from "./format";
 
@@ -17,9 +20,9 @@ const SORTS: { value: RecipeSort; label: string }[] = [
   { value: "rating", label: "Top rated" },
 ];
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
-const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5";
+export const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5";
 
-function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
+export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: ReactNode }) {
   const time = formatMinutes(recipe.totalMinutes);
   return (
     <li className="relative">
@@ -56,6 +59,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       {recipe.favourite !== undefined && (
         <HeartButton slug={recipe.slug} name={recipe.name} favourite={recipe.favourite} className="absolute right-0 top-0 rounded-bl-lg bg-raised/80 backdrop-blur" />
       )}
+      {extra}
     </li>
   );
 }
@@ -73,6 +77,10 @@ export function RecipeLibrary() {
   const favourites = ratingsOn && params.get("favourites") === "1";
   const query = useRecipes({ q, sort: !ratingsOn && sort === "rating" ? "updated" : sort, ...(favourites ? { favourites } : {}), ...(organizersOn ? { tag: filters.tags, category: filters.categories, tool: filters.tools } : {}) });
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
+  const cookbooksOn = useFeature("cookbooks");
+  const [saving, setSaving] = useState(false);
+  const hasFilters = !!q.trim() || favourites || (organizersOn && filterCount > 0);
+  const minRatingParam = Number(params.get("minRating"));
   const sortLabel = SORTS.find((s) => s.value === sort)!.label;
 
   const toggleFavourites = () =>
@@ -219,6 +227,27 @@ export function RecipeLibrary() {
         </div>
       )}
       {organizersOn && <LibraryFilters />}
+      {cookbooksOn && hasFilters && (
+        <div className="mb-3">
+          <Button variant="secondary" size="sm" onClick={() => setSaving(true)}>
+            <BookMarked className="size-4" aria-hidden />
+            Save as cookbook
+          </Button>
+          <CookbookDialog
+            open={saving}
+            onOpenChange={setSaving}
+            filter={{
+              ...(q.trim() ? { q: q.trim() } : {}),
+              tag: organizersOn ? filters.tags : [],
+              category: organizersOn ? filters.categories : [],
+              tool: organizersOn ? filters.tools : [],
+              favourites,
+              ...(ratingsOn && minRatingParam >= 1 && minRatingParam <= 5 ? { minRating: Math.round(minRatingParam) } : {}),
+            }}
+            onSaved={(c) => navigate(`/cookbooks/${c.slug}`)}
+          />
+        </div>
+      )}
       {body}
     </>
   );

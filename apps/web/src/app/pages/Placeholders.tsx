@@ -10,6 +10,11 @@ export function MorePage() {
       <Link to="/settings" className="text-accent underline">
         Settings
       </Link>
+      <Feature on="cookbooks">
+        <Link to="/cookbooks" className="text-accent underline">
+          Cookbooks
+        </Link>
+      </Feature>
       <Feature on="organizers">
         <Link to="/organizers" className="text-accent underline">
           Tags, categories and tools

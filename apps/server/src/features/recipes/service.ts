@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { and, asc, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
 import { imageSizes } from "@meally/shared";
 import type { Db } from "../../db/index.js";
@@ -201,9 +201,12 @@ export async function listRecipes(
     tag?: string[];
     category?: string[];
     tool?: string[];
+    /** Restrict to these recipe ids (used by manual cookbooks). */
+    ids?: string[];
   } & Org,
 ): Promise<RecipeListResponse> {
   const conds: SQL[] = [eq(recipes.householdId, householdId)];
+  if (opts.ids) conds.push(inArray(recipes.id, opts.ids));
   if (opts.q) {
     const match = ftsQuery(opts.q);
     if (match === null) return { items: [], nextCursor: null };

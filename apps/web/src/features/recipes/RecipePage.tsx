@@ -1,4 +1,4 @@
-import { CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Share2, Trash2, Users } from "lucide-react";
+import { BookMarked, CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Share2, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
@@ -7,6 +7,7 @@ import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
+import { AddToCookbook } from "../cookbooks/AddToCookbook";
 import { AddToListButton } from "../shopping/AddToListButton";
 import { useFeature } from "../features/FeaturesProvider";
 import { HeartButton } from "../ratings/HeartButton";
@@ -42,6 +43,8 @@ export function RecipePage() {
   const [planOpen, setPlanOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const shareOn = useFeature("share-links");
+  const [bookOpen, setBookOpen] = useState(false);
+  const cookbooksOn = useFeature("cookbooks");
   const planOn = useFeature("meal-plan");
   const scalingOn = useFeature("scaling");
   const [params, setParams] = useSearchParams();
@@ -148,6 +151,12 @@ export function RecipePage() {
                   <DropdownMenuItem onSelect={() => setShareOpen(true)}>
                     <Share2 className="size-4" aria-hidden />
                     Share
+                  </DropdownMenuItem>
+                )}
+                {cookbooksOn && (
+                  <DropdownMenuItem onSelect={() => setBookOpen(true)}>
+                    <BookMarked className="size-4" aria-hidden />
+                    Add to cookbook…
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => setConfirm(true)}>
@@ -325,6 +334,7 @@ export function RecipePage() {
         </div>
       </Dialog>
       {shareOn && <ShareDialog slug={r.slug} name={r.name} open={shareOpen} onOpenChange={setShareOpen} />}
+      {cookbooksOn && <AddToCookbook open={bookOpen} onOpenChange={setBookOpen} recipeSlug={r.slug} />}
       {planOn && <AddSheet open={planOpen} onOpenChange={setPlanOpen} date={localToday()} recipe={{ id: r.id, name: r.name }} />}
     </article>
   );

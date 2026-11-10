@@ -14,6 +14,8 @@ import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
 import { PlanPage } from "../features/meal-plan/PlanPage";
 import { SettingsPage } from "../features/households/SettingsPage";
 import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
+import { CookbookPage } from "../features/cookbooks/CookbookPage";
+import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { PublicRecipePage } from "../features/share/PublicRecipePage";
@@ -95,6 +97,22 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="organizers">
               <OrganizersPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/cookbooks"
+          element={
+            <FeatureRoute on="cookbooks">
+              <CookbooksPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/cookbooks/:slug"
+          element={
+            <FeatureRoute on="cookbooks">
+              <CookbookPage />
             </FeatureRoute>
           }
         />
