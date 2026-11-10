@@ -1,0 +1,150 @@
+import { randomUUID } from "node:crypto";
+import { count, eq } from "drizzle-orm";
+import { Hono, type Context } from "hono";
+import { getCookie } from "hono/cookie";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import {
+  loginSchema,
+  registerSchema,
+  setupSchema,
+  signupModes,
+  z,
+  type AuthStatus,
+  type MeResponse,
+  type SignupMode,
+} from "@meally/shared";
+import type { Db } from "../../db/index.js";
+import { households, instanceSettings, users } from "../../db/schema/index.js";
+import type { AppEnv } from "../../lib/context.js";
+import { ApiError } from "../../lib/errors.js";
+import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
+import { hashPassword, verifyPassword } from "./password.js";
+import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
+
+const SIGNUP_KEY = "signup_mode";
+export const DEFAULT_SIGNUP_MODE: SignupMode = "invite";
+
+export function resolveSignupMode(db: Db, locked: SignupMode | null): SignupMode {
+  if (locked) return locked;
+  const row = db.select().from(instanceSettings).where(eq(instanceSettings.key, SIGNUP_KEY)).get();
+  const parsed = z.enum(signupModes).safeParse(row?.value);
+  return parsed.success ? parsed.data : DEFAULT_SIGNUP_MODE;
+}
+
+const needsSetup = (db: Pick<Db, "select">) => (db.select({ n: count() }).from(users).get()?.n ?? 0) === 0;
+
+async function body<S extends z.ZodTypeAny>(c: Context<AppEnv>, schema: S): Promise<z.infer<S>> {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new ApiError(400, "invalid_body", parsed.error.issues[0]?.message ?? "Invalid request");
+  return parsed.data;
+}
+
+function clientIp(c: Context<AppEnv>): string {
+  if (c.get("auth").trustProxy) {
+    const fwd = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+    if (fwd) return fwd;
+  }
+  try {
+    return getConnInfo(c).remote.address ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function limit(c: Context<AppEnv>, kind: "login" | "register") {
+  const a = c.get("auth");
+  const r = (kind === "login" ? a.loginLimiter : a.registerLimiter).hit(clientIp(c));
+  if (!r.ok) {
+    c.header("Retry-After", String(r.retryAfterSec));
+    throw new ApiError(429, "rate_limited", "Too many attempts. Try again later.");
+  }
+}
+
+async function createAccount(
+  c: Context<AppEnv>,
+  input: { email: string; name: string; password: string },
+  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean },
+) {
+  const db = c.get("db");
+  const passwordHash = await hashPassword(input.password, c.get("auth").scryptLogN);
+  const now = new Date();
+  const householdId = randomUUID();
+  const userId = randomUUID();
+  // better-sqlite3 transactions are synchronous, so the empty check and insert cannot interleave.
+  db.transaction((tx) => {
+    if (opts.requireEmpty && !needsSetup(tx)) {
+      throw new ApiError(409, "setup_done", "Setup has already been completed");
+    }
+    if (tx.select().from(users).where(eq(users.email, input.email)).get()) {
+      throw new ApiError(409, "email_taken", "An account with this email already exists");
+    }
+    tx.insert(households).values({ id: householdId, name: opts.householdName, createdAt: now }).run();
+    tx.insert(users)
+      .values({ id: userId, email: input.email, name: input.name, passwordHash, role: opts.role, householdId, createdAt: now })
+      .run();
+  });
+  setSessionCookie(c, createSession(db, userId, c.req.header("user-agent")));
+  const res: MeResponse = {
+    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId },
+    household: { id: householdId, name: opts.householdName },
+  };
+  return c.json(res, 201);
+}
+
+// Computed lazily so unknown emails cost the same as wrong passwords.
+let dummyHash: Promise<string> | undefined;
+
+export const authRoutes = new Hono<AppEnv>()
+  .get("/status", (c) => {
+    const db = c.get("db");
+    const status: AuthStatus = {
+      needsSetup: needsSetup(db),
+      signupMode: resolveSignupMode(db, c.get("auth").lockedSignupMode),
+    };
+    return c.json(status);
+  })
+  .post("/setup", async (c) => {
+    limit(c, "register");
+    const input = await body(c, setupSchema);
+    if (!needsSetup(c.get("db"))) throw new ApiError(409, "setup_done", "Setup has already been completed");
+    return createAccount(c, input, {
+      role: "admin",
+      householdName: input.householdName ?? `${input.name}'s household`,
+      requireEmpty: true,
+    });
+  })
+  .post("/register", async (c) => {
+    limit(c, "register");
+    const db = c.get("db");
+    if (needsSetup(db)) throw new ApiError(409, "setup_required", "Complete first-run setup first");
+    const mode = resolveSignupMode(db, c.get("auth").lockedSignupMode);
+    if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
+    if (mode === "invite") throw new ApiError(403, "invite_required", "An invitation is required to sign up");
+    const input = await body(c, registerSchema);
+    return createAccount(c, input, { role: "member", householdName: `${input.name}'s household` });
+  })
+  .post("/login", async (c) => {
+    limit(c, "login");
+    const input = await body(c, loginSchema);
+    const db = c.get("db");
+    const user = db.select().from(users).where(eq(users.email, input.email)).get();
+    dummyHash ??= hashPassword("meally-dummy", c.get("auth").scryptLogN);
+    const ok = await verifyPassword(input.password, user?.passwordHash ?? (await dummyHash));
+    if (!user || !ok) throw new ApiError(401, "invalid_credentials", "Incorrect email or password");
+    setSessionCookie(c, createSession(db, user.id, c.req.header("user-agent")));
+    const household = db.select().from(households).where(eq(households.id, user.householdId)).get()!;
+    const res: MeResponse = { user: toSessionUser(user), household: { id: household.id, name: household.name } };
+    return c.json(res);
+  })
+  .post("/logout", (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    if (token) deleteSession(c.get("db"), token);
+    clearSessionCookie(c);
+    return c.json({ ok: true });
+  })
+  .get("/me", requireAuth, (c) => {
+    const household = c.get("db").select().from(households).where(eq(households.id, c.get("householdId"))).get()!;
+    const res: MeResponse = { user: c.get("user"), household: { id: household.id, name: household.name } };
+    return c.json(res);
+  });

@@ -1,8 +1,9 @@
-import { Search } from "lucide-react";
+import { LogOut, Search, User } from "lucide-react";
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import { useFeaturesState } from "../features/features/FeaturesProvider";
-import { cn, IconButton, ToastProvider } from "../ui";
+import { useSession } from "../features/auth/useSession";
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, ToastProvider } from "../ui";
 import { CommandPalette } from "./CommandPalette";
 import { useVisibleNav } from "./useVisibleNav";
 
@@ -10,6 +11,8 @@ export function AppShell() {
   const items = useVisibleNav();
   const { isLoading } = useFeaturesState();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { user, signOut } = useSession();
+  const navigate = useNavigate();
 
   return (
     <ToastProvider>
@@ -38,9 +41,32 @@ export function AppShell() {
 
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
           <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
-          <IconButton aria-label="Search and commands" onClick={() => setPaletteOpen(true)}>
-            <Search className="size-5" aria-hidden />
-          </IconButton>
+          <div className="flex items-center gap-1">
+            <IconButton aria-label="Search and commands" onClick={() => setPaletteOpen(true)}>
+              <Search className="size-5" aria-hidden />
+            </IconButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton aria-label="Account menu">
+                  <User className="size-5" aria-hidden />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <div className="px-3 py-2">
+                  <p className="font-medium">{user?.name}</p>
+                  <p className="text-sm text-muted">{user?.email}</p>
+                </div>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void signOut().then(() => navigate("/signin", { replace: true }));
+                  }}
+                >
+                  <LogOut className="size-4" aria-hidden />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 lg:pb-10" aria-busy={isLoading || undefined}>

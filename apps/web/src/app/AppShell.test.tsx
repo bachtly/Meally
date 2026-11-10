@@ -16,9 +16,17 @@ afterEach(() => {
 
 function renderAt(path: string, shopping = true) {
   const info = (enabled: boolean) => ({ enabled, locked: false, source: "default", label: "x", description: "y" });
+  const me = {
+    user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" },
+    household: { id: "h1", name: "Home" },
+  };
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => Response.json({ features: { "meal-plan": info(true), "shopping-lists": info(shopping) } })),
+    vi.fn(async (url: string) =>
+      String(url).includes("/auth/me")
+        ? Response.json(me)
+        : Response.json({ features: { "meal-plan": info(true), "shopping-lists": info(shopping) } }),
+    ),
   );
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
