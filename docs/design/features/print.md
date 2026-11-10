@@ -27,6 +27,14 @@ None.
 
 Print page states: loading skeleton, error, flag off (route falls back to the standard feature-off message).
 
+## Evidence changed
+
+None contradicts a decision. Searches found little for D2 to D5: 11 pt serif, 15 mm margins, two columns over 8
+lines, no QR and the "(of N)" servings text are our own design judgment, not source-backed.
+
 ## Sources
 
-- [S1] Print CSS guidance (page margins, break-inside, hiding chrome), MDN "Printing" and `@page`: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Printing
+Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary only.
+
+- [S1] Printing, MDN (page, first 100k chars): https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Printing . Supports D1: `@media print` rules, hiding chrome, `@page` sets dimensions, orientation and margins. It does not cover `break-inside`.
+- [S2] break-inside, MDN mirror (snippet): https://docs.w3cub.com/css/break-inside . Supports D3: `avoid` value. Mirror, not MDN itself.

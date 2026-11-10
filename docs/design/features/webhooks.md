@@ -10,7 +10,7 @@ secret and send a test ping. Depends on `api-tokens` (the same "scripts talk to 
 
 | ID | Decision | Alternatives | Evidence |
 |---|---|---|---|
-| D1 | HMAC-SHA256 of the raw body, hex, in `X-Meally-Signature: sha256=...`, per-webhook random secret | Stripe-style timestamped `t=,v1=`; no signing | [S1] [S2] |
+| D1 | HMAC-SHA256 of the raw body, hex, in `X-Meally-Signature: sha256=...`, per-webhook random secret | Stripe-style timestamped `t=,v1=`; no signing | [S1] [S2] [S3] |
 | D2 | Retry 3 times (1, 5, 30 min) on an in-process timer; auto-disable after 20 consecutive failures | Durable queue table; unlimited retries | [S2] |
 | D3 | Deliver through the import `createFetcher` (`kind: "post"`): DNS vetted, connect to the vetted IP, no redirects, 10 s timeout | Plain `fetch` | SSRF note below |
 | D4 | One in-process emitter keyed by `db`; services call `emitWebhookEvent` and never fetch | Calls in services | architecture |
@@ -69,7 +69,24 @@ Send test, Deliveries (Sheet), Edit, Delete. Add/Edit Dialog: name, URL, event c
 when `mealplan.today` is checked; the secret is shown with Copy after creation and in Edit. States: loading skeleton,
 empty, error. Feature off: section hidden.
 
+## Evidence changed
+
+Live sources contradict or weaken three decisions. Follow-ups (no code in this PR):
+
+- D1: the OWASP Webhook Security Cheat Sheet recommends signing a timestamp with the body and rejecting stale
+  deliveries (Stripe: `t.body`, 5 min tolerance); GitHub's body-only scheme gives no authenticated timestamp. Ours
+  matches GitHub, so replay is possible. Follow-up: add a signed `X-Meally-Timestamp` (sign `t.body`).
+- D2: OWASP asks for backoff with jitter and a max count (ours has a max, no jitter); Stripe retries for up to 3 days.
+  Three in-memory retries over 36 min is much shorter. Follow-up: add jitter, consider durable retries.
+- D3: OWASP says accept only `https://`; we allow http on port 80 (needed for home labs). Follow-up: https-only by
+  default, http behind `MEALLY_ALLOW_PRIVATE_URLS`. IP pinning and no-redirects match OWASP and Stripe. Ports 80/443
+  only is our own rule; OWASP is silent on ports.
+
 ## Sources
 
-- [S1] GitHub Docs, Validating webhook deliveries, https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
-- [S2] Stripe Docs, Webhooks: verify signatures, https://docs.stripe.com/webhooks#verify-manually
+Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary only.
+
+- [S1] Validating webhook deliveries, GitHub Docs (snippet): https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries . `sha256=<hex>` HMAC header, constant-time compare in examples.
+- [S2] Receive Stripe events in your webhook endpoint, Stripe Docs (page): https://docs.stripe.com/webhooks . Signed `t.payload`, 5 min tolerance, fresh signature per retry, retries up to 3 days, redirects count as failures, dedupe by event id.
+- [S3] Webhook Security Cheat Sheet, OWASP (page): https://cheatsheetseries.owasp.org/cheatsheets/Webhook_Security_Cheat_Sheet.html . HMAC-SHA256, timestamps, constant-time compare, backoff with jitter, https only, validate connected IP, no redirects.
+- [S4] Server-Side Request Forgery Prevention Cheat Sheet, OWASP (snippet): https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html . Resolve once, validate, pin the IP; handle redirects.

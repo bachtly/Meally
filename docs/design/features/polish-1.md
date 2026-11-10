@@ -14,3 +14,13 @@ Small fixes from review screenshots. No new features or flags.
   landed in "No aisle" until sorted by hand. Unknown foods stay unassigned.
 - **Start cooking.** On phones it is a full-width accent pill fixed above the tab bar (with extra bottom padding on
   the page); on desktop it stays inline in the header. Reason: it is the main action for a recipe with steps.
+
+## Evidence changed
+
+None.
+
+## Sources
+
+Searched 2026-11-11 (snippet only). Mostly judgment from review screenshots; one UI decision has support.
+
+- App bars: bottom, Material Design (snippet): https://material.io/components/app-bars-bottom . Supports a primary action at the bottom for thumb reach on phones.

@@ -39,8 +39,17 @@ Share dialog (create with expiry, copy, native share when available, list with r
 Public page `/s/:token` outside the shell and outside auth, with the servings stepper when `scaling` is on, a print
 button, and a "This link no longer works" state.
 
+## Evidence changed
+
+None contradicts a decision. Two gaps: the TAG document does not mention `noindex` (it suggests listing the capability
+path in `robots.txt`, which Google says can stop the `noindex` header being read, so we do not do that), and OWASP says
+tokens are "stored securely" without saying "hashed". D2 (SHA-256 of a 256-bit random token) is our own reasoning.
+
 ## Sources
 
-- [S1] W3C TAG, "Good Practices for Capability URLs" https://www.w3.org/2001/tag/doc/capability-urls/
-- [S2] OWASP Cheat Sheet, Forgot Password / token storage guidance (store hashed, single use, expiry) https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
-- [S3] Google Search Central, "Block Search indexing with noindex" (X-Robots-Tag header) https://developers.google.com/search/docs/crawling-indexing/block-indexing
+Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary only.
+
+- [S1] Good Practices for Capability URLs, W3C TAG (page): https://www.w3.org/2001/tag/doc/capability-urls/ . Supports: 120+ bits of entropy, expiry, owner revocation, several links per resource, Referer leakage mitigations, 404/410 once expired.
+- [S2] Forgot Password Cheat Sheet, OWASP (page): https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html . Supports: random, long, single-use, expiring tokens, "stored securely". No hashing detail, no lifetime.
+- [S3] Block Search indexing with noindex, Google Search Central (snippet): https://developers.google.com/search/docs/crawling-indexing/block-indexing . Supports: `X-Robots-Tag: noindex`; a robots.txt-blocked page can still appear in results.
+- [S4] Referrer Policy, MDN (snippet): https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy . Supports: `no-referrer` omits the Referer header.

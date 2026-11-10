@@ -30,8 +30,16 @@ Tabs: Overview (cards), Features (grouped switches, dependency notes, reset butt
 phones, confirm dialogs), Sign-up (radio cards with plain-language consequences). Each has loading, error and empty
 states. Changing a flag invalidates the `features` query, so the nav updates at once.
 
+## Evidence changed
+
+None contradicts a decision, but support is thin. The twelve-factor page backs env-based config, not "env beats UI"
+(D1 is our own rule). Searches found no OWASP text on protecting the last administrator (D2, own judgment) and the
+OWASP reset sheet does not cover admin-issued temporary passwords (D3), only random, single-use secrets.
+
 ## Sources
 
-- [S1] Twelve-factor app, config in the environment, https://12factor.net/config
-- [S2] OWASP, Authorization Cheat Sheet (avoid lockout of privileged roles), https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
-- [S3] OWASP, Forgot Password Cheat Sheet (single-use, high-entropy secrets), https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary only.
+
+- [S1] III. Config, The Twelve-Factor App (page): https://12factor.net/config . Supports env vars as the per-deploy config mechanism.
+- [S2] Testing for Weak Lock Out Mechanism, OWASP WSTG (snippet): https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/03-Testing_for_Weak_Lock_Out_Mechanism . Loosely related: admins need a recovery path.
+- [S3] Forgot Password Cheat Sheet, OWASP (page): https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html . Supports random, long, single-use secrets. Silent on admin resets.
