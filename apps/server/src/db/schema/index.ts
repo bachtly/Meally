@@ -5,3 +5,4 @@ export * from "./recipes.js";
 export * from "./organizers.js";
 export * from "./mealplan.js";
 export * from "./shopping.js";
+export * from "./share.js";

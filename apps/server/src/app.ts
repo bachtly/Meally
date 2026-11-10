@@ -18,6 +18,7 @@ import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { householdRoutes } from "./features/households/routes.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
+import { publicRoutes, shareRoutes } from "./features/share/routes.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 
 export const version = "0.0.0";
@@ -57,6 +58,7 @@ export function createApp(opts: AppOptions = {}) {
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
+  const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
 
@@ -69,11 +71,14 @@ export function createApp(opts: AppOptions = {}) {
     c.set("auth", auth);
     c.set("fetcher", fetcher);
     c.set("importLimiter", importLimiter);
+    c.set("shareLimiter", shareLimiter);
     await next();
   });
   api.use("*", csrfProtection);
   api.route("/auth", authRoutes);
   api.route("/features", featureRoutes);
+  api.route("/public", publicRoutes);
+  api.route("/", shareRoutes);
   api.route("/recipes", recipeRoutes);
   api.route("/organizers", organizerRoutes);
   api.route("/meal-plan", mealPlanRoutes);
@@ -91,7 +96,13 @@ export function createApp(opts: AppOptions = {}) {
     const root = path.relative(process.cwd(), dist).replaceAll("\\", "/");
     const index = fs.readFileSync(path.join(dist, "index.html"), "utf8");
     app.use("*", serveStatic({ root }));
-    app.get("*", (c) => c.html(index));
+    app.get("*", (c) => {
+      if (c.req.path.startsWith("/s/")) {
+        c.header("Referrer-Policy", "no-referrer");
+        c.header("X-Robots-Tag", "noindex, nofollow");
+      }
+      return c.html(index);
+    });
   }
   return app;
 }

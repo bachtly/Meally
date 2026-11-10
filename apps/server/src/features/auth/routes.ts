@@ -42,7 +42,7 @@ async function body<S extends z.ZodTypeAny>(c: Context<AppEnv>, schema: S): Prom
   return parsed.data;
 }
 
-function clientIp(c: Context<AppEnv>): string {
+export function clientIp(c: Context<AppEnv>): string {
   if (c.get("auth").trustProxy) {
     const fwd = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
     if (fwd) return fwd;

@@ -71,6 +71,13 @@
       "when": 1794337034501,
       "tag": "0009_reflective_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794337743905,
+      "tag": "0010_yielding_karma",
+      "breakpoints": true
     }
   ]
 }

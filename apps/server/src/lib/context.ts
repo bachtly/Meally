@@ -26,6 +26,7 @@ export type AppEnv = {
     auth: AuthSettings;
     fetcher: Fetcher;
     importLimiter: RateLimiter;
+    shareLimiter: RateLimiter;
     user: SessionUser;
     householdId: string;
   };

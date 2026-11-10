@@ -16,6 +16,7 @@ import { SettingsPage } from "../features/households/SettingsPage";
 import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { CookPage } from "../features/cook-mode/CookPage";
+import { PublicRecipePage } from "../features/share/PublicRecipePage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
+      <Route path="/s/:token" element={<PublicRecipePage />} />
       <Route
         element={
           <RequireAuth>

@@ -1,4 +1,4 @@
-import { CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
+import { CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Share2, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
@@ -15,6 +15,7 @@ import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
 import { Feature } from "../features/Feature";
 import { useChecks } from "./useChecks";
+import { ShareDialog } from "../share/ShareDialog";
 import { RecipeChips } from "../organizers/RecipeChips";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
@@ -39,6 +40,8 @@ export function RecipePage() {
   const { checks, toggle, reset, any } = useChecks(slug);
   const [confirm, setConfirm] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareOn = useFeature("share-links");
   const planOn = useFeature("meal-plan");
   const scalingOn = useFeature("scaling");
   const [params, setParams] = useSearchParams();
@@ -139,6 +142,12 @@ export function RecipePage() {
                   <DropdownMenuItem onSelect={() => setPlanOpen(true)}>
                     <CalendarPlus className="size-4" aria-hidden />
                     Add to plan
+                  </DropdownMenuItem>
+                )}
+                {shareOn && (
+                  <DropdownMenuItem onSelect={() => setShareOpen(true)}>
+                    <Share2 className="size-4" aria-hidden />
+                    Share
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => setConfirm(true)}>
@@ -315,6 +324,7 @@ export function RecipePage() {
           </Button>
         </div>
       </Dialog>
+      {shareOn && <ShareDialog slug={r.slug} name={r.name} open={shareOpen} onOpenChange={setShareOpen} />}
       {planOn && <AddSheet open={planOpen} onOpenChange={setPlanOpen} date={localToday()} recipe={{ id: r.id, name: r.name }} />}
     </article>
   );
