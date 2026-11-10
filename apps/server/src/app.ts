@@ -1,3 +1,4 @@
+import { foodRoutes, unitRoutes } from "./features/foods/routes.js";
 import { organizerRoutes } from "./features/organizers/routes.js";
 import { mealPlanRoutes } from "./features/mealplan/routes.js";
 import { shoppingRoutes } from "./features/shopping/routes.js";
@@ -114,6 +115,8 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/admin", adminRoutes);
   api.route("/recipes", recipeRoutes);
   api.route("/organizers", organizerRoutes);
+  api.route("/foods", foodRoutes);
+  api.route("/units", unitRoutes);
   api.route("/meal-plan", mealPlanRoutes);
   api.route("/shopping", shoppingRoutes);
   api.route("/tokens", tokenRoutes);

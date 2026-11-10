@@ -79,7 +79,7 @@ const llmIngredients = z.object({
 aiRoutes.post("/parse-ingredients", limit, async (c) => {
   const p = z.object({ lines: z.array(z.string().max(500)).max(100) }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) throw new ApiError(400, "invalid_body", "lines: expected an array of at most 100 strings");
-  const parsed: ParsedIngredient[] = p.data.lines.map(parseIngredient);
+  const parsed: ParsedIngredient[] = p.data.lines.map((l) => parseIngredient(l));
   const todo = parsed.map((x, i) => ({ x, i })).filter(({ x }) => !x.food && x.raw.trim());
   if (!todo.length) return c.json({ parsed });
   const config = requireAiConfig(c.get("env"));

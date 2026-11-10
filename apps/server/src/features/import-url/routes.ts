@@ -41,7 +41,7 @@ importRoutes.post("/", async (c) => {
     input.tags = cleanNames(found.keywords, 10);
     input.categories = cleanNames(found.categories, 10);
   }
-  const recipe = await createRecipe(db, c.get("householdId"), c.get("user").id, input, { org, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled });
+  const recipe = await createRecipe(db, c.get("householdId"), c.get("user").id, input, { org, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled, foods: (await c.get("flags").getFeatures())["foods-units"].enabled });
   if (found.imageUrl) {
     // A missing or bad image never fails the import.
     try {

@@ -1,6 +1,7 @@
 import type { Nutrition } from "@meally/shared";
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { households, users } from "./auth.js";
+import { foods } from "./foods.js";
 
 /** Stored image metadata; the files live under $DATA_DIR/images/<householdId>/. */
 export const images = sqliteTable("images", {
@@ -52,6 +53,8 @@ export const recipeIngredients = sqliteTable(
     quantity: real("quantity"),
     unit: text("unit"),
     food: text("food"),
+    /** Set only while the foods-units flag is on. */
+    foodId: text("food_id").references(() => foods.id, { onDelete: "set null" }),
     note: text("note"),
     /** The original line, always kept. */
     raw: text("raw").notNull(),

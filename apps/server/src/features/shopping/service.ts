@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { foodNames } from "../foods/service.js";
 import { and, asc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import {
   formatQuantity,
@@ -518,13 +519,15 @@ async function recipeIncoming(
     .from(recipeIngredients)
     .where(eq(recipeIngredients.recipeId, recipeId))
     .orderBy(asc(recipeIngredients.position));
+  // Ingredients linked to a catalogue food use its name, so different spellings merge.
+  const names = await foodNames(db, householdId, ings.flatMap((i) => (i.foodId ? [i.foodId] : [])));
   return ings.map((i) => ({
     quantity:
       i.quantity == null
         ? null
         : Math.round(i.quantity * (factor ?? 1) * 1000) / 1000,
     unit: i.unit,
-    food: i.food,
+    food: (i.foodId && names.get(i.foodId)) || i.food,
     note: i.note,
     raw: i.raw,
     ref,

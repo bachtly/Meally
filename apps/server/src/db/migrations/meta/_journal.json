@@ -120,6 +120,13 @@
       "when": 1794344448784,
       "tag": "0016_short_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794346371628,
+      "tag": "0017_left_centennial",
+      "breakpoints": true
     }
   ]
 }

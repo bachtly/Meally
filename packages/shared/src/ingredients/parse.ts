@@ -93,16 +93,39 @@ function splitNote(rest: string): { food: string; note: string | null } {
   return { food, note: notes.length ? notes.join("; ") : null };
 }
 
-function takeUnit(s: string, allow?: (key: string) => boolean): { unit: string; rest: string } | null {
+/** Optional household vocabulary. The parser stays pure: the caller loads and passes this in. */
+export interface ParseVocab {
+  /** Household-defined units; `names` are extra spellings, matched case-insensitively. */
+  units?: Array<{ key: string; names: string[] }>;
+  /** Foods with their other spellings; a parsed food matching one becomes `name`. */
+  foods?: Array<{ name: string; plural?: string | null; aliases?: string[] }>;
+}
+
+function takeUnit(s: string, allow?: (key: string) => boolean, vocab?: ParseVocab): { unit: string; rest: string } | null {
   const words = s.split(/\s+/);
-  for (let n = Math.min(MAX_UNIT_WORDS, words.length); n >= 1; n--) {
-    const def = findUnit(words.slice(0, n).join(" "));
+  const custom = new Map<string, string>();
+  for (const u of vocab?.units ?? []) for (const n of u.names) custom.set(n.toLowerCase(), u.key);
+  const maxWords = Math.max(MAX_UNIT_WORDS, ...[...custom.keys()].map((n) => n.split(" ").length));
+  for (let n = Math.min(maxWords, words.length); n >= 1; n--) {
+    const phrase = words.slice(0, n).join(" ");
+    const ck = custom.get(phrase.toLowerCase().replace(/\.$/, ""));
+    if (ck && (!allow || allow(ck))) return { unit: ck, rest: words.slice(n).join(" ") };
+    const def = findUnit(phrase);
     if (def && (!allow || allow(def.key))) return { unit: def.key, rest: words.slice(n).join(" ") };
   }
   return null;
 }
 
-export function parseIngredient(line: string): ParsedIngredient {
+/** The canonical household food name for a parsed food, or the input when nothing matches. */
+export function canonicalFood(food: string, foods: ParseVocab["foods"]): string {
+  const f = food.trim().toLowerCase();
+  for (const c of foods ?? []) {
+    if ([c.name, c.plural ?? "", ...(c.aliases ?? [])].some((n) => n && n.trim().toLowerCase() === f)) return c.name;
+  }
+  return food;
+}
+
+export function parseIngredient(line: string, vocab?: ParseVocab): ParsedIngredient {
   const raw = line;
   let s = normalizeFractions(stripBullet(line.replace(/ /g, " "))).replace(/\s+/g, " ").trim();
   const result: ParsedIngredient = { quantity: null, quantityMax: null, unit: null, food: null, note: null, raw };
@@ -119,17 +142,17 @@ export function parseIngredient(line: string): ParsedIngredient {
     s = s.slice(q[0].length).trim();
     // size before the unit: "1 (14 oz) can tomatoes"
     const par = /^\(([^)]*)\)\s*(.*)$/.exec(s);
-    if (par && takeUnit(par[2]!)) {
+    if (par && takeUnit(par[2]!, undefined, vocab)) {
       extra.push(par[1]!.trim());
       s = par[2]!;
     }
-    const tu = takeUnit(s);
+    const tu = takeUnit(s, undefined, vocab);
     if (tu) {
       result.unit = tu.unit;
       s = tu.rest.replace(/^of\s+/i, "");
     }
   } else {
-    const tu = takeUnit(s, (k) => k === "pinch" || k === "dash");
+    const tu = takeUnit(s, (k) => k === "pinch" || k === "dash", vocab);
     if (tu) {
       result.unit = tu.unit;
       s = tu.rest.replace(/^of\s+/i, "");
@@ -138,13 +161,13 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   const { food, note } = splitNote(s);
   const notes = [...extra, ...(note ? [note] : [])];
-  result.food = food || null;
+  result.food = food ? canonicalFood(food, vocab?.foods) : null;
   result.note = notes.length ? notes.join("; ") : null;
   return result;
 }
 
 /** Split pasted text into ingredient lines. Blank lines are dropped; section headers label the lines below them. */
-export function parseIngredients(text: string): Array<ParsedIngredient & { section?: string }> {
+export function parseIngredients(text: string, vocab?: ParseVocab): Array<ParsedIngredient & { section?: string }> {
   const out: Array<ParsedIngredient & { section?: string }> = [];
   let section: string | undefined;
   for (const line of text.split(/\r?\n/)) {
@@ -153,7 +176,7 @@ export function parseIngredients(text: string): Array<ParsedIngredient & { secti
       section = line.trim().replace(/^#+\s*/, "").replace(/:$/, "").trim();
       continue;
     }
-    const p = parseIngredient(line);
+    const p = parseIngredient(line, vocab);
     out.push(section ? { ...p, section } : p);
   }
   return out;

@@ -18,6 +18,7 @@ import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { CookbookPage } from "../features/cookbooks/CookbookPage";
 import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
 import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
+import { FoodsPage } from "../features/foods/FoodsPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
@@ -111,6 +112,14 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="timeline">
               <ActivityPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/foods"
+          element={
+            <FeatureRoute on="foods-units">
+              <FoodsPage />
             </FeatureRoute>
           }
         />

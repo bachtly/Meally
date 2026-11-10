@@ -42,6 +42,13 @@ export function SettingsPage() {
           </Link>
         </Section>
       </Feature>
+      <Feature on="foods-units">
+        <Section title="Foods and units">
+          <Link to="/foods" className="text-accent underline">
+            Manage foods, aliases and units
+          </Link>
+        </Section>
+      </Feature>
       <Feature on="import-files">
         <Section title="Import recipes">
           <Link to="/settings/import" className="text-accent underline">

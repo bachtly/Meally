@@ -8,10 +8,11 @@ import type { Db } from "../../db/index.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { getMe, householdRating } from "../ratings/service.js";
+import { linkFoods } from "../foods/service.js";
 import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
 
 /** `org` is true when the organizers flag is on; when off, organiser fields are ignored and omitted. */
-type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boolean; nutrition?: boolean };
+type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boolean; nutrition?: boolean; foods?: boolean };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
@@ -53,11 +54,15 @@ async function reindex(tx: Tx, householdId: string, id: string, data: RecipeData
   );
 }
 
-async function writeChildren(tx: Tx, id: string, data: RecipeData) {
+async function writeChildren(tx: Tx, householdId: string, id: string, data: RecipeData, o: Org) {
   await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, id));
   await tx.delete(recipeSteps).where(eq(recipeSteps.recipeId, id));
-  if (data.ingredients.length)
-    await tx.insert(recipeIngredients).values(data.ingredients.map((i, position) => ({ ...i, recipeId: id, position })));
+  if (data.ingredients.length) {
+    const foodIds = o.foods ? await linkFoods(tx, householdId, data.ingredients.map((i) => i.food)) : [];
+    await tx
+      .insert(recipeIngredients)
+      .values(data.ingredients.map((i, position) => ({ ...i, foodId: foodIds[position] ?? null, recipeId: id, position })));
+  }
   if (data.steps.length)
     await tx.insert(recipeSteps).values(data.steps.map((s, position) => ({ ...s, recipeId: id, position })));
 }
@@ -139,7 +144,7 @@ export async function createRecipe(db: Db, householdId: string, userId: string, 
       .insert(recipes)
       .values({ id, householdId, slug, ...fields(data), ...nutritionCols(data, o), createdBy: userId, createdAt: now, updatedAt: now })
       .returning();
-    await writeChildren(tx, id, data);
+    await writeChildren(tx, householdId, id, data, o);
     if (o.org) await writeOrganizers(tx, householdId, id, data);
     await reindex(tx, householdId, id, data);
     return row!;
@@ -161,7 +166,7 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
       .set({ ...fields(data), ...nutritionCols(data, o), updatedAt: new Date() })
       .where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)))
       .returning();
-    await writeChildren(tx, existing.id, data);
+    await writeChildren(tx, householdId, existing.id, data, o);
     if (o.org) await writeOrganizers(tx, householdId, existing.id, data);
     await reindex(tx, householdId, existing.id, data);
     return row!;

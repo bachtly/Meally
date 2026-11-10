@@ -33,6 +33,11 @@ export function MorePage() {
           Tags, categories and tools
         </Link>
       </Feature>
+      <Feature on="foods-units">
+        <Link to="/foods" className="text-accent underline">
+          Foods and units
+        </Link>
+      </Feature>
       <InstallItem />
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Appearance</h2>

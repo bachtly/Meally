@@ -31,7 +31,7 @@ function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
 const orgOn = async (c: Context<AppEnv>) => (await c.get("flags").getFeatures()).organizers.enabled;
 const ratingsOn = async (c: Context<AppEnv>) => (await c.get("flags").getFeatures()).ratings.enabled;
 /** Per-request options for the optional features: organisers and per-user ratings. */
-const opts = async (c: Context<AppEnv>) => ({ org: await orgOn(c), ratings: await ratingsOn(c), timeline: (await c.get("flags").getFeatures()).timeline.enabled, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled, userId: c.get("user").id });
+const opts = async (c: Context<AppEnv>) => ({ org: await orgOn(c), ratings: await ratingsOn(c), timeline: (await c.get("flags").getFeatures()).timeline.enabled, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled, foods: (await c.get("flags").getFeatures())["foods-units"].enabled, userId: c.get("user").id });
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
 
 export const recipeRoutes = new Hono<AppEnv>();
