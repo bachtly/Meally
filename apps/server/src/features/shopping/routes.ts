@@ -16,7 +16,7 @@ import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { daysBetween } from "../mealplan/service.js";
-import { shoppingBus } from "./bus.js";
+import { ShoppingBus } from "./bus.js";
 import * as svc from "./service.js";
 
 function body<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
@@ -150,7 +150,7 @@ shoppingRoutes
     const listId = c.req.param("id");
     await svc.assertList(db, householdId, listId);
     return streamSSE(c, async (stream) => {
-      const off = shoppingBus.subscribe(
+      const off = new ShoppingBus(c.get("platform").events).subscribe(
         householdId,
         listId,
         (e) =>

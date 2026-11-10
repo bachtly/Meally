@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import type { Scheduler } from "../../ports/index.js";
 import path from "node:path";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
@@ -110,12 +111,15 @@ export async function createBackup(db: Db, dataDir: string, version: string, kee
   }
 }
 
-/** Simple in-process timer. The first run is queued shortly after start if the newest backup is older than the interval. */
+const BACKUP_JOB = "backups.run";
+
+/** Scheduler-driven. The first run is queued shortly after start if the newest backup is older than the interval. */
 export function startBackupScheduler(opts: {
   db: Db;
   dataDir: string;
   version: string;
   settings: BackupSettings;
+  scheduler: Scheduler;
   enabled: () => Promise<boolean>;
   log?: (msg: string) => void;
 }): () => void {
@@ -132,17 +136,11 @@ export function startBackupScheduler(opts: {
       log(`Scheduled backup failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  const interval = setInterval(run, every);
-  interval.unref();
-  let first: NodeJS.Timeout | null = null;
+  // Idempotent: a duplicate run just writes one more backup, which pruning trims.
+  opts.scheduler.define(BACKUP_JOB, run);
   void listBackups(opts.dataDir).then((l) => {
-    if (!l[0] || Date.now() - l[0].createdAt >= every) {
-      first = setTimeout(run, 30_000);
-      first.unref();
-    }
+    const due = !l[0] || Date.now() - l[0].createdAt >= every;
+    opts.scheduler.every(BACKUP_JOB, every, due ? { firstInMs: 30_000 } : undefined);
   });
-  return () => {
-    clearInterval(interval);
-    if (first) clearTimeout(first);
-  };
+  return () => opts.scheduler.stop();
 }

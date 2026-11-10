@@ -21,7 +21,10 @@ import { aiRoutes } from "./features/ai/routes.js";
 import { allowPrivateUrls, createFetcher, type Fetcher } from "./features/import-url/fetch.js";
 import { importRoutes } from "./features/import-url/routes.js";
 import { importFileRoutes } from "./features/import-files/routes.js";
-import { failStaleJobs } from "./features/import-files/service.js";
+import type { Platform } from "./ports/index.js";
+import { createNodePlatform } from "./adapters/node/index.js";
+import { ShoppingBus, registerShoppingBus } from "./features/shopping/bus.js";
+import { defineImportJob, failStaleJobs } from "./features/import-files/service.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { householdRoutes } from "./features/households/routes.js";
@@ -42,7 +45,9 @@ export interface AppOptions {
   flags?: FlagsService;
   /** Environment used for flag locks; defaults to process.env. */
   env?: Record<string, string | undefined>;
-  /** log2 of the scrypt cost; lowered in tests only. */
+  /** Host services (images, events, scheduler, hasher); defaults to the Node adapters. */
+  platform?: Platform;
+  /** log2 of the scrypt cost for the default platform; lowered in tests only. */
   scryptLogN?: number;
   /** Root for uploaded files; defaults to DATA_DIR or ./data. */
   dataDir?: string;
@@ -64,19 +69,21 @@ export function createApp(opts: AppOptions = {}) {
   const flags = opts.flags ?? createFlagsService(db, opts.env ?? process.env);
   const env = opts.env ?? process.env;
   const dataDir = opts.dataDir ?? env.DATA_DIR ?? "./data";
+  const platform = opts.platform ?? createNodePlatform({ dataDir, scryptLogN: opts.scryptLogN });
+  registerShoppingBus(db, new ShoppingBus(platform.events));
+  defineImportJob(platform.scheduler, db, platform.images);
   const baseUrl = parseBaseUrl(env.BASE_URL);
   const auth: AuthSettings = {
     lockedSignupMode: signupModes.find((m) => m === env.MEALLY_SIGNUP_MODE) as SignupMode | undefined ?? null,
     secureCookies: baseUrl.protocol === "https:",
     baseOrigin: baseUrl.origin,
     trustProxy: env.MEALLY_TRUST_PROXY === "true",
-    scryptLogN: opts.scryptLogN ?? 17,
     loginLimiter: createRateLimiter({ max: 10, windowMs: 15 * 60_000 }),
     registerLimiter: createRateLimiter({ max: 20, windowMs: 60 * 60_000 }),
     inviteLimiter: createRateLimiter({ max: 30, windowMs: 15 * 60_000 }),
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
-  const webhooks = createDispatcher({ db, fetcher, flags, allowPrivate: allowPrivateUrls(env) });
+  const webhooks = createDispatcher({ db, fetcher, flags, scheduler: platform.scheduler, allowPrivate: allowPrivateUrls(env) });
   if (opts.webhookScheduler) webhooks.start();
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
@@ -92,6 +99,7 @@ export function createApp(opts: AppOptions = {}) {
     await owned?.ready;
     c.set("db", db);
     c.set("dataDir", dataDir);
+    c.set("platform", platform);
     c.set("env", env);
     c.set("flags", flags);
     c.set("auth", auth);

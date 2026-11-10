@@ -20,7 +20,6 @@ import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
 import { consumeInvite, findValidInvite } from "../households/service.js";
-import { hashPassword, verifyPassword } from "./password.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
 export const SIGNUP_KEY = "signup_mode";
@@ -69,7 +68,7 @@ async function createAccount(
   opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean; inviteToken?: string },
 ) {
   const db = c.get("db");
-  const passwordHash = await hashPassword(input.password, c.get("auth").scryptLogN);
+  const passwordHash = await c.get("platform").hasher.hash(input.password);
   const now = new Date();
   let householdId: string = randomUUID();
   let householdRole: "owner" | "member" = "owner";
@@ -166,8 +165,8 @@ export const authRoutes = new Hono<AppEnv>()
     const input = await body(c, loginSchema);
     const db = c.get("db");
     const [user] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
-    dummyHash ??= hashPassword("meally-dummy", c.get("auth").scryptLogN);
-    const ok = await verifyPassword(input.password, user?.passwordHash ?? (await dummyHash));
+    dummyHash ??= c.get("platform").hasher.hash("meally-dummy");
+    const { ok } = await c.get("platform").hasher.verify(input.password, user?.passwordHash ?? (await dummyHash));
     if (!user || !ok) throw new ApiError(401, "invalid_credentials", "Incorrect email or password");
     setSessionCookie(c, await createSession(db, user.id, c.req.header("user-agent")));
     const [household] = await db.select().from(households).where(eq(households.id, user.householdId)).limit(1);

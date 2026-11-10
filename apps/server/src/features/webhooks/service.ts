@@ -1,4 +1,6 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import type { Scheduler } from "../../ports/index.js";
+import { createNodeScheduler } from "../../adapters/node/scheduler.js";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Webhook, WebhookDelivery, WebhookEvent, WebhookWithSecret } from "@meally/shared";
 import type { z } from "@meally/shared";
@@ -161,8 +163,19 @@ export function digestDue(now: Date, h: { dailyAt: string; tz: string; lastDiges
   return { due: late >= 0 && late <= DIGEST_WINDOW_MIN && h.lastDigestOn !== date, date };
 }
 
+const RETRY_JOB = "webhooks.retry";
+const DIGEST_JOB = "webhooks.digest";
+interface RetryPayload {
+  hookId: string;
+  event: string;
+  body: string;
+  n: number;
+}
+
 export interface DispatcherDeps {
   db: Db;
+  /** Runs retries and the digest tick; defaults to a private Node scheduler. */
+  scheduler?: Scheduler;
   fetcher: Fetcher;
   flags: FlagsService;
   now?: () => Date;
@@ -177,9 +190,7 @@ export interface DeliveryResult {
   durationMs: number;
 }
 
-export function createDispatcher({ db, fetcher, flags, now = () => new Date(), allowPrivate = false, random = () => Math.random() }: DispatcherDeps) {
-  const timers = new Set<ReturnType<typeof setTimeout>>();
-  let ticker: ReturnType<typeof setInterval> | null = null;
+export function createDispatcher({ db, fetcher, flags, scheduler = createNodeScheduler(), now = () => new Date(), allowPrivate = false, random = () => Math.random() }: DispatcherDeps) {
 
   async function record(hook: Row, event: string, res: DeliveryResult) {
     const at = now();
@@ -243,18 +254,18 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date(), a
   function scheduleRetry(hookId: string, event: string, body: string, n: number) {
     if (n >= MAX_RETRIES) return;
     const delay = retryDelayMs(n, random);
-    const t = setTimeout(() => {
-      timers.delete(t);
-      void (async () => {
-        const [hook] = await db.select().from(webhooks).where(eq(webhooks.id, hookId)).limit(1);
-        if (!hook || !hook.enabled) return;
-        const res = await attempt(hook, event, body);
-        if (!res.ok) scheduleRetry(hookId, event, body, n + 1);
-      })().catch(() => {});
-    }, delay);
-    t.unref?.();
-    timers.add(t);
+    scheduler.runAfter(RETRY_JOB, delay, { hookId, event, body, n } satisfies RetryPayload);
   }
+
+  /** A repeated retry just sends one more signed delivery with a fresh id. */
+  async function retry({ hookId, event, body, n }: RetryPayload) {
+    const [hook] = await db.select().from(webhooks).where(eq(webhooks.id, hookId)).limit(1);
+    if (!hook || !hook.enabled) return;
+    const res = await attempt(hook, event, body);
+    if (!res.ok) scheduleRetry(hookId, event, body, n + 1);
+  }
+  scheduler.define(RETRY_JOB, (p) => retry(p as RetryPayload));
+  scheduler.define(DIGEST_JOB, () => tick());
 
   async function household(id: string) {
     const [h] = await db.select({ id: households.id, name: households.name }).from(households).where(eq(households.id, id)).limit(1);
@@ -299,14 +310,10 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date(), a
     emitAndWait: emit,
     tick,
     start() {
-      ticker ??= setInterval(() => void tick().catch(() => {}), 60_000);
-      ticker.unref?.();
+      scheduler.every(DIGEST_JOB, 60_000);
     },
     stop() {
-      if (ticker) clearInterval(ticker);
-      ticker = null;
-      for (const t of timers) clearTimeout(t);
-      timers.clear();
+      scheduler.stop();
     },
     async sendTest(householdId: string, id: string) {
       const hook = await find(db, householdId, id);

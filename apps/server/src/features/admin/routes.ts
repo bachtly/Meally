@@ -9,7 +9,6 @@ import { households, instanceSettings, recipes, sessions, users } from "../../db
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { backupSettings } from "../backups/service.js";
-import { hashPassword } from "../auth/password.js";
 import { requireAdmin, requireAuth } from "../auth/middleware.js";
 import { resolveSignupMode, SIGNUP_KEY } from "../auth/routes.js";
 import { SESSION_TTL_MS } from "../auth/sessions.js";
@@ -157,7 +156,7 @@ adminRoutes.post("/users/:id/reset-password", async (c) => {
   const u = await findUser(c);
   // 12 random bytes as base64url: 96 bits, shown once. The user should change it after signing in.
   const temporaryPassword = randomBytes(12).toString("base64url");
-  const hash = await hashPassword(temporaryPassword, c.get("auth").scryptLogN);
+  const hash = await c.get("platform").hasher.hash(temporaryPassword);
   await c.get("db").transaction(async (tx) => {
     await tx.update(users).set({ passwordHash: hash }).where(eq(users.id, u.id));
     await tx.delete(sessions).where(eq(sessions.userId, u.id));

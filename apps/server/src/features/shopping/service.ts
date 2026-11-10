@@ -23,7 +23,7 @@ import {
   shoppingLists,
 } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
-import { shoppingBus } from "./bus.js";
+import { shoppingBusFor } from "./bus.js";
 
 const notFound = () => new ApiError(404, "not_found", "Not found");
 type ItemRow = typeof shoppingItems.$inferSelect;
@@ -353,7 +353,7 @@ export async function renameList(
     .update(shoppingLists)
     .set({ name, updatedAt: new Date() })
     .where(eq(shoppingLists.id, id));
-  shoppingBus.emit(householdId, id, "list");
+  shoppingBusFor(db)?.emit(householdId, id, "list");
   return (await listLists(db, householdId)).find((l) => l.id === id)!;
 }
 
@@ -361,7 +361,7 @@ export async function deleteList(db: Db, householdId: string, id: string) {
   await getList(db, householdId, id);
   await db.delete(shoppingItems).where(eq(shoppingItems.listId, id));
   await db.delete(shoppingLists).where(eq(shoppingLists.id, id));
-  shoppingBus.emit(householdId, id, "deleted");
+  shoppingBusFor(db)?.emit(householdId, id, "deleted");
 }
 
 export async function getListWithItems(
@@ -400,7 +400,7 @@ async function changed(db: Db, householdId: string, listId: string) {
     .update(shoppingLists)
     .set({ updatedAt: new Date() })
     .where(eq(shoppingLists.id, listId));
-  shoppingBus.emit(householdId, listId, "items");
+  shoppingBusFor(db)?.emit(householdId, listId, "items");
 }
 
 // ---- items ----

@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { imageSizes, recipeInputSchema, recipeListQuerySchema, recipeMeInputSchema, z, type ImageSize } from "@meally/shared";
@@ -11,7 +10,6 @@ import {
   deleteRecipe,
   findImage,
   getRecipe,
-  imagePath,
   listRecipes,
   replaceRecipe,
   setRecipeImage,
@@ -59,7 +57,7 @@ recipeRoutes
     return c.json(await setMe(c.get("db"), c.get("user").id, recipe.id, patch));
   })
   .delete("/:slug", async (c) => {
-    await deleteRecipe(c.get("db"), c.get("dataDir"), c.get("householdId"), c.req.param("slug"));
+    await deleteRecipe(c.get("db"), c.get("platform").images, c.get("householdId"), c.req.param("slug"));
     return c.body(null, 204);
   })
   .post(
@@ -81,7 +79,7 @@ recipeRoutes
       if (file.size > MAX_IMAGE_BYTES) throw new ApiError(413, "too_large", "Image must be 10 MB or smaller");
       if (!file.type.startsWith("image/")) throw new ApiError(415, "unsupported_media", "Only image files are allowed");
       try {
-        await setRecipeImage(db, c.get("dataDir"), householdId, slug, Buffer.from(await file.arrayBuffer()));
+        await setRecipeImage(db, c.get("platform").images, householdId, slug, Buffer.from(await file.arrayBuffer()));
       } catch (e) {
         if (e instanceof ApiError) throw e;
         throw new ApiError(415, "unsupported_media", "That file is not a readable image");
@@ -99,11 +97,11 @@ imageRoutes.get("/:id/:size", async (c) => {
   const id = c.req.param("id");
   const img = await findImage(c.get("db"), householdId, id);
   if (!img) throw new ApiError(404, "not_found", "Image not found");
-  const data = await fs.readFile(imagePath(c.get("dataDir"), householdId, id, size)).catch(() => null);
+  const data = await c.get("platform").images.get(householdId, id, size);
   if (!data) throw new ApiError(404, "not_found", "Image not found");
   // An image never changes and ids are never reused, so it is cacheable for a year (per browser only).
-  return c.body(new Uint8Array(data), 200, {
-    "Content-Type": "image/webp",
+  return c.body(data.bytes as Uint8Array<ArrayBuffer>, 200, {
+    "Content-Type": data.contentType,
     "Cache-Control": "private, max-age=31536000, immutable",
   });
 });

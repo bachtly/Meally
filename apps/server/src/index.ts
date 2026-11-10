@@ -6,6 +6,7 @@ import { config } from "./lib/config.js";
 import { createDb } from "./db/index.js";
 import { createFlagsService } from "./features/features/service.js";
 import { backupSettings, startBackupScheduler } from "./features/backups/service.js";
+import { createNodePlatform } from "./adapters/node/index.js";
 import { acquireLock } from "./lib/lock.js";
 
 acquireLock(config.DATA_DIR);
@@ -17,14 +18,16 @@ const webDist =
   config.NODE_ENV === "production" ? (process.env.WEB_DIST ?? path.resolve(here, "../../web/dist")) : undefined;
 
 const flags = createFlagsService(db, process.env);
+const platform = createNodePlatform({ dataDir: config.DATA_DIR });
 startBackupScheduler({
   db,
   dataDir: config.DATA_DIR,
   version,
   settings: backupSettings(process.env),
+  scheduler: platform.scheduler,
   enabled: async () => (await flags.getFeatures()).backups.enabled,
 });
 
-serve({ fetch: createApp({ webDist, db, flags, webhookScheduler: true }).fetch, port: config.PORT }, (info) => {
+serve({ fetch: createApp({ webDist, db, flags, platform, dataDir: config.DATA_DIR, webhookScheduler: true }).fetch, port: config.PORT }, (info) => {
   console.log(`Meally listening on :${info.port}`);
 });

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import type { ImageStore, Scheduler } from "../../ports/index.js";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { recipeInputSchema } from "@meally/shared";
@@ -64,7 +65,7 @@ export function enqueue(task: () => Promise<void>): Promise<void> {
 
 interface Ctx {
   db: Db;
-  dataDir: string;
+  images: ImageStore;
   householdId: string;
   userId: string;
   org: boolean;
@@ -151,7 +152,7 @@ export async function runJob(ctx: Ctx) {
                 imageTimeLeft -= Date.now() - t0;
               }
             }
-            if (bytes?.length) await setRecipeImage(db, ctx.dataDir, ctx.householdId, recipe.slug, bytes);
+            if (bytes?.length) await setRecipeImage(db, ctx.images, ctx.householdId, recipe.slug, bytes);
           } catch {
             /* keep the recipe without a photo */
           }
@@ -170,3 +171,12 @@ export async function runJob(ctx: Ctx) {
     await fs.rm(ctx.file, { force: true });
   }
 }
+
+export const IMPORT_JOB = "import.run";
+type JobPayload = Omit<Ctx, "db" | "images">;
+
+/** Registers the import job; runs are chained so one import runs at a time. */
+export function defineImportJob(scheduler: Scheduler, db: Db, images: ImageStore) {
+  scheduler.define(IMPORT_JOB, (p) => enqueue(() => runJob({ db, images, ...(p as JobPayload) })));
+}
+export const scheduleImport = (scheduler: Scheduler, payload: JobPayload) => scheduler.runAfter(IMPORT_JOB, 0, payload);

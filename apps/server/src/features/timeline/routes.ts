@@ -46,7 +46,7 @@ timelineRoutes
     c.json(await updateEvent(c.get("db"), c.get("householdId"), who(c), c.req.param("id"), parse(await json(c), timelinePatchSchema))),
   )
   .delete("/timeline/:id", async (c) => {
-    await deleteEvent(c.get("db"), c.get("dataDir"), c.get("householdId"), who(c), c.req.param("id"));
+    await deleteEvent(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"));
     return c.body(null, 204);
   })
   .post(
@@ -65,7 +65,7 @@ timelineRoutes
       if (!file.type.startsWith("image/")) throw new ApiError(415, "unsupported_media", "Only image files are allowed");
       try {
         const buf = Buffer.from(await file.arrayBuffer());
-        return c.json(await setEventImage(c.get("db"), c.get("dataDir"), c.get("householdId"), who(c), c.req.param("id"), buf), 201);
+        return c.json(await setEventImage(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"), buf), 201);
       } catch (e) {
         if (e instanceof ApiError) throw e;
         throw new ApiError(415, "unsupported_media", "That file is not a readable image");

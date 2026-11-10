@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { Hono } from "hono";
 import { createShareSchema, imageSizes, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
@@ -6,7 +5,6 @@ import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { clientIp } from "../auth/routes.js";
 import { requireFeature } from "../features/middleware.js";
-import { imagePath } from "../recipes/service.js";
 import { createShare, listShares, publicImage, publicRecipe, revokeShare } from "./service.js";
 
 /** Authenticated: /api/v1/recipes/:slug/shares and /api/v1/shares/:id (mounted at /api/v1). */
@@ -54,8 +52,8 @@ publicRoutes
     if (!imageSizes.includes(size)) throw gone();
     const img = await publicImage(c.get("db"), c.req.param("token"));
     if (!img) throw gone();
-    const data = await fs.readFile(imagePath(c.get("dataDir"), img.householdId, img.imageId, size)).catch(() => null);
+    const data = await c.get("platform").images.get(img.householdId, img.imageId, size);
     if (!data) throw gone();
     c.header("Cache-Control", "private, max-age=3600");
-    return c.body(new Uint8Array(data), 200, { "Content-Type": "image/webp" });
+    return c.body(data.bytes as Uint8Array<ArrayBuffer>, 200, { "Content-Type": data.contentType });
   });

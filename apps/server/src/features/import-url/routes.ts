@@ -46,7 +46,7 @@ importRoutes.post("/", async (c) => {
     // A missing or bad image never fails the import.
     try {
       const img = await c.get("fetcher")(found.imageUrl, { kind: "image" });
-      await setRecipeImage(db, c.get("dataDir"), c.get("householdId"), recipe.slug, img.body);
+      await setRecipeImage(db, c.get("platform").images, c.get("householdId"), recipe.slug, img.body);
     } catch {
       /* keep the recipe without a photo */
     }

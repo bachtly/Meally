@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
+import type { ImageStore } from "../../ports/index.js";
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Nutrition, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
-import { imageSizes, isNutritionEmpty } from "@meally/shared";
+import { isNutritionEmpty } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
@@ -175,7 +174,7 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
   return load(db, row, o);
 }
 
-export async function deleteRecipe(db: Db, dataDir: string, householdId: string, slug: string) {
+export async function deleteRecipe(db: Db, store: ImageStore, householdId: string, slug: string) {
   const extra: string[] = [];
   let deleted = { slug, name: "" };
   const imageId = await db.transaction(async (tx) => {
@@ -192,8 +191,8 @@ export async function deleteRecipe(db: Db, dataDir: string, householdId: string,
     return existing.imageId;
   });
   emitWebhookEvent(db, householdId, "recipe.deleted", deleted);
-  if (imageId) await removeImageFiles(dataDir, householdId, imageId);
-  for (const id of extra) await removeImageFiles(dataDir, householdId, id);
+  if (imageId) await store.delete(householdId, imageId);
+  for (const id of extra) await store.delete(householdId, id);
 }
 
 /** Turns free text into an FTS5 prefix query: every word must match as a prefix. */
@@ -301,41 +300,10 @@ export async function listRecipes(
 
 // ---- images ----
 
-const imageDir = (dataDir: string, householdId: string) => path.join(dataDir, "images", householdId);
-export const imagePath = (dataDir: string, householdId: string, id: string, size: ImageSize) =>
-  path.join(imageDir(dataDir, householdId), `${id}-${size}.webp`);
-
-export async function removeImageFiles(dataDir: string, householdId: string, id: string) {
-  await Promise.all(imageSizes.map((s) => fs.rm(imagePath(dataDir, householdId, id, s), { force: true })));
-}
-
-/** Resizes to WebP at every size and stores the files; returns the new image id. The caller records the row. */
-export async function processImage(dataDir: string, householdId: string, input: Buffer): Promise<string> {
-  const { default: sharp } = await import("sharp");
-  const id = randomUUID();
-  await fs.mkdir(imageDir(dataDir, householdId), { recursive: true });
-  try {
-    await Promise.all(
-      imageSizes.map(async (size) => {
-        const out = await sharp(input, { limitInputPixels: 100_000_000 })
-          .rotate()
-          .resize({ width: size, height: size, fit: "inside", withoutEnlargement: true })
-          .webp({ quality: 80 })
-          .toBuffer();
-        await fs.writeFile(imagePath(dataDir, householdId, id, size), out);
-      }),
-    );
-  } catch (e) {
-    await removeImageFiles(dataDir, householdId, id);
-    throw e;
-  }
-  return id;
-}
-
 /** Stores a new image and points the recipe at it. */
-export async function setRecipeImage(db: Db, dataDir: string, householdId: string, slug: string, input: Buffer): Promise<string> {
+export async function setRecipeImage(db: Db, store: ImageStore, householdId: string, slug: string, input: Buffer): Promise<string> {
   const row = await findRow(db, householdId, slug);
-  const id = await processImage(dataDir, householdId, input);
+  const id = await store.putOriginal(householdId, input);
   await db.transaction(async (tx) => {
     await tx.insert(images).values({ id, householdId, createdAt: new Date() });
     await tx
@@ -344,7 +312,7 @@ export async function setRecipeImage(db: Db, dataDir: string, householdId: strin
       .where(and(eq(recipes.id, row.id), eq(recipes.householdId, householdId)));
     if (row.imageId) await tx.delete(images).where(eq(images.id, row.imageId));
   });
-  if (row.imageId) await removeImageFiles(dataDir, householdId, row.imageId);
+  if (row.imageId) await store.delete(householdId, row.imageId);
   return id;
 }
 

@@ -10,7 +10,7 @@ import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { planImport } from "./importers.js";
-import { createJob, enqueue, getJob, jobView, listJobs, runJob } from "./service.js";
+import { createJob, getJob, jobView, listJobs, scheduleImport } from "./service.js";
 
 export const MAX_UPLOAD = 200 * 1024 * 1024;
 
@@ -69,9 +69,8 @@ importFileRoutes.post("/files", async (c) => {
   const ratings = features.ratings.enabled;
   const fetcher = c.get("fetcher");
   const job = await createJob(db, householdId, user.id, plan.format, filename, plan.items.length);
-  const dataDir = c.get("dataDir");
   // Fire and forget: the client polls GET /jobs/:id.
-  void enqueue(() => runJob({ db, dataDir, householdId, userId: user.id, org, nutrition, ratings, fetcher, jobId: job.id, file, plan }));
+  scheduleImport(c.get("platform").scheduler, { householdId, userId: user.id, org, nutrition, ratings, fetcher, jobId: job.id, file, plan });
   return c.json(jobView(job), 202);
 });
 

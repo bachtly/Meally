@@ -65,6 +65,22 @@ packages/shared/src/
   features.ts, schemas/<feature>.ts, ingredients/, units/
 ```
 
+## Ports
+
+Features reach the host only through four interfaces in `apps/server/src/ports/`, bundled as a `Platform`
+(`{name, images, events, scheduler, hasher}`) that `createApp` puts on the context (`c.get("platform")`):
+
+- `ImageStore`: `putOriginal` (processes an upload, returns the image id), `put`, `get`, `delete`, `urlFor` (null when
+  the server proxies bytes) and an optional `localDir` that backups read.
+- `Events`: `publish` / `subscribe(channel, cb)` and `supportsStreaming` (SSE routes need it).
+- `Scheduler`: named jobs (`define`, `every`, `daily`, `runAfter`, `runJob`). Handlers must be idempotent.
+- `PasswordHasher`: `hash`, `verify` returning `{ok, needsRehash}`; hash strings are versioned (`scrypt$...`).
+
+`apps/server/src/adapters/node/` implements them (disk plus sharp, in-process bus, timers, scrypt), and
+`createNodePlatform` builds the default used by `index.ts` and tests. Backups, the restore CLI, the process lock and
+import upload temp files stay Node-only. A test (`platform-guard.test.ts`) fails if other code imports `node:fs` or
+`sharp` directly.
+
 ## API conventions
 
 - JSON under `/api/v1`. Errors look like `{ "error": "<code>", "message": "..." }`.

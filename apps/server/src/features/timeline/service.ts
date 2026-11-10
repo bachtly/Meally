@@ -4,7 +4,8 @@ import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shar
 import type { Db } from "../../db/index.js";
 import { images, recipes, recipeUserData, timelineEvents, users } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
-import { decode, encode, findRow, imageUrl, processImage, removeImageFiles } from "../recipes/service.js";
+import type { ImageStore } from "../../ports/index.js";
+import { decode, encode, findRow, imageUrl } from "../recipes/service.js";
 
 export type Actor = { id: string; householdRole: "owner" | "member" };
 
@@ -121,25 +122,25 @@ export async function updateEvent(db: Db, householdId: string, who: Actor, id: s
   return (await getOne(db, householdId, id, who)).event;
 }
 
-export async function deleteEvent(db: Db, dataDir: string, householdId: string, who: Actor, id: string) {
+export async function deleteEvent(db: Db, store: ImageStore, householdId: string, who: Actor, id: string) {
   const { raw, event } = await getOne(db, householdId, id, who);
   if (!event.canDelete) throw new ApiError(403, "forbidden", "Only the author or a household owner can delete this");
   await db.transaction(async (tx) => {
     await tx.delete(timelineEvents).where(and(eq(timelineEvents.id, id), eq(timelineEvents.householdId, householdId)));
     if (raw.imageId) await tx.delete(images).where(eq(images.id, raw.imageId));
   });
-  if (raw.imageId) await removeImageFiles(dataDir, householdId, raw.imageId);
+  if (raw.imageId) await store.delete(householdId, raw.imageId);
 }
 
-export async function setEventImage(db: Db, dataDir: string, householdId: string, who: Actor, id: string, input: Buffer) {
+export async function setEventImage(db: Db, store: ImageStore, householdId: string, who: Actor, id: string, input: Buffer) {
   const { raw } = await getOne(db, householdId, id, who);
   if (raw.userId !== who.id) throw new ApiError(403, "forbidden", "Only the author can edit this");
-  const imageId = await processImage(dataDir, householdId, input);
+  const imageId = await store.putOriginal(householdId, input);
   await db.transaction(async (tx) => {
     await tx.insert(images).values({ id: imageId, householdId, createdAt: new Date() });
     await tx.update(timelineEvents).set({ imageId }).where(eq(timelineEvents.id, id));
     if (raw.imageId) await tx.delete(images).where(eq(images.id, raw.imageId));
   });
-  if (raw.imageId) await removeImageFiles(dataDir, householdId, raw.imageId);
+  if (raw.imageId) await store.delete(householdId, raw.imageId);
   return (await getOne(db, householdId, id, who)).event;
 }

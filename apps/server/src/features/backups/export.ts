@@ -3,7 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { isNutritionEmpty, type Recipe } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { recipes } from "../../db/schema/index.js";
-import { findRow, getRecipe, imagePath } from "../recipes/service.js";
+import { findRow, getRecipe } from "../recipes/service.js";
+import { imagePath } from "../../adapters/node/images.js";
 import type { ZipWriter } from "./zipwriter.js";
 
 export const exportFormats = ["jsonld", "markdown"] as const;

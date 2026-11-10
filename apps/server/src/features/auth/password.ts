@@ -22,10 +22,16 @@ export async function hashPassword(password: string, logN = 17): Promise<string>
   return `scrypt$${n}$${R}$${P}$${salt.toString("base64")}$${key.toString("base64")}`;
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export function parseScrypt(stored: string) {
   const [alg, n, r, p, salt, hash] = stored.split("$");
-  if (alg !== "scrypt" || !n || !salt || !hash || r !== String(R) || p !== String(P)) return false;
-  const expected = Buffer.from(hash, "base64");
-  const actual = await derive(password, Buffer.from(salt, "base64"), Number(n));
+  if (alg !== "scrypt" || !n || !salt || !hash || r !== String(R) || p !== String(P)) return null;
+  return { n: Number(n), salt: Buffer.from(salt, "base64"), hash: Buffer.from(hash, "base64") };
+}
+
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const parsed = parseScrypt(stored);
+  if (!parsed) return false;
+  const expected = parsed.hash;
+  const actual = await derive(password, parsed.salt, parsed.n);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
