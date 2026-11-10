@@ -16,6 +16,7 @@ import { featureRoutes } from "./features/features/routes.js";
 import type { AppEnv, AuthSettings } from "./lib/context.js";
 import { authRoutes } from "./features/auth/routes.js";
 import { ingredientRoutes } from "./features/ingredients/routes.js";
+import { aiRoutes } from "./features/ai/routes.js";
 import { allowPrivateUrls, createFetcher, type Fetcher } from "./features/import-url/fetch.js";
 import { importRoutes } from "./features/import-url/routes.js";
 import { importFileRoutes } from "./features/import-files/routes.js";
@@ -50,6 +51,10 @@ export interface AppOptions {
   tokenLimit?: number;
   /** Starts the daily-digest timer; the server entry point turns this on. */
   webhookScheduler?: boolean;
+  /** fetch used for AI provider calls; tests replace it. */
+  aiFetch?: typeof fetch;
+  /** AI requests per hour per user; lowered in tests only. */
+  aiLimit?: number;
 }
 
 export function createApp(opts: AppOptions = {}) {
@@ -75,6 +80,8 @@ export function createApp(opts: AppOptions = {}) {
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
   const tokenLimiter = createRateLimiter({ max: opts.tokenLimit ?? 600, windowMs: 10 * 60_000 });
+  const aiLimiter = createRateLimiter({ max: opts.aiLimit ?? 30, windowMs: 60 * 60_000 });
+  const aiFetch = opts.aiFetch ?? ((input, init) => fetch(input, init));
   void (owned?.ready ?? Promise.resolve()).then(() => failStaleJobs(db)).catch(() => {});
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
@@ -92,6 +99,8 @@ export function createApp(opts: AppOptions = {}) {
     c.set("importLimiter", importLimiter);
     c.set("shareLimiter", shareLimiter);
     c.set("tokenLimiter", tokenLimiter);
+    c.set("aiLimiter", aiLimiter);
+    c.set("aiFetch", aiFetch);
     await next();
   });
   api.use("*", csrfProtection);
@@ -108,6 +117,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/meal-plan", mealPlanRoutes);
   api.route("/shopping", shoppingRoutes);
   api.route("/tokens", tokenRoutes);
+  api.route("/ai", aiRoutes);
   api.route("/webhooks", webhookRoutes);
   api.route("/cookbooks", cookbookRoutes);
   api.route("/household", householdRoutes);

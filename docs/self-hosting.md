@@ -51,3 +51,18 @@ npm run restore -w apps/server -- /path/to/meally-<timestamp>.zip
 It refuses to run while the server's lock file (`$DATA_DIR/meally.lock`) names a running process (`--force`
 overrides). It moves the current database and images to `$DATA_DIR/pre-restore-<timestamp>/`, unpacks the backup, and
 refuses a backup made by a newer version than the one you run. Start Meally again afterwards.
+
+## AI (optional)
+
+The `ai` feature flag (off by default) adds recipe import from pasted text or photos. Nothing is sent anywhere until you
+configure a provider; the key lives only in the environment.
+
+| Variable | Meaning |
+|---|---|
+| `MEALLY_AI_PROVIDER` | `anthropic` or `openai` (any OpenAI-compatible server, including Ollama and LM Studio) |
+| `MEALLY_AI_API_KEY` | Provider key. Optional for local OpenAI-compatible servers |
+| `MEALLY_AI_MODEL` | Model name. Defaults to `claude-sonnet-5-5` for anthropic; required for openai |
+| `MEALLY_AI_BASE_URL` | Optional API address, e.g. `http://localhost:11434` for Ollama |
+
+Use a vision-capable model for photo import. Requests are limited to 30 per hour per user and time out after 60 s.
+Users' text and photos are sent to the configured provider.

@@ -5,7 +5,9 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Recipe } from "@meally/shared";
 import { ApiRequestError, postJson } from "../../lib/api";
 import { RecipeEditor } from "../recipes/RecipeEditor";
-import { Button, Card, Field, Input, useToast } from "../../ui";
+import { useFeature } from "../features/FeaturesProvider";
+import { AiImport } from "./AiImport";
+import { Button, Card, Field, Input, Tabs, TabsContent, TabsList, TabsTrigger, useToast } from "../../ui";
 
 interface Preview {
   recipe: Partial<Recipe> & {
@@ -50,6 +52,32 @@ const bookmarklet = () =>
   `javascript:(()=>{window.open('${location.origin}/recipes/import?url='+encodeURIComponent(location.href))})()`;
 
 export function RecipeImportPage() {
+  const ai = useFeature("ai");
+  if (!ai) return <LinkImport />;
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <h1 className="text-2xl font-semibold">Import a recipe</h1>
+      <Tabs defaultValue="link" className="flex flex-col gap-4">
+        <TabsList>
+          <TabsTrigger value="link">From a link</TabsTrigger>
+          <TabsTrigger value="text">From text</TabsTrigger>
+          <TabsTrigger value="photos">From photos</TabsTrigger>
+        </TabsList>
+        <TabsContent value="link">
+          <LinkImport embedded />
+        </TabsContent>
+        <TabsContent value="text">
+          <AiImport mode="text" />
+        </TabsContent>
+        <TabsContent value="photos">
+          <AiImport mode="photos" />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function LinkImport({ embedded = false }: { embedded?: boolean }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -104,7 +132,7 @@ export function RecipeImportPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Import from URL</h1>
+      {!embedded && <h1 className="text-2xl font-semibold">Import from URL</h1>}
       <form
         noValidate
         className="flex flex-col gap-3"

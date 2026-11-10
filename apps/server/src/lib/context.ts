@@ -2,6 +2,7 @@ import type { SessionUser, SignupMode } from "@meally/shared";
 import type { Db } from "../db/index.js";
 import type { FlagsService } from "../features/features/service.js";
 import type { Fetcher } from "../features/import-url/fetch.js";
+import type { AiFetch } from "../features/ai/client.js";
 import type { Dispatcher } from "../features/webhooks/service.js";
 import type { RateLimiter } from "./rate-limit.js";
 
@@ -31,6 +32,8 @@ export type AppEnv = {
     importLimiter: RateLimiter;
     shareLimiter: RateLimiter;
     tokenLimiter: RateLimiter;
+    aiLimiter: RateLimiter;
+    aiFetch: AiFetch;
     authVia: "session" | "token";
     user: SessionUser;
     householdId: string;
