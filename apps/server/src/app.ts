@@ -76,7 +76,7 @@ export function createApp(opts: AppOptions = {}) {
     inviteLimiter: createRateLimiter({ max: 30, windowMs: 15 * 60_000 }),
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
-  const webhooks = createDispatcher({ db, fetcher, flags });
+  const webhooks = createDispatcher({ db, fetcher, flags, allowPrivate: allowPrivateUrls(env) });
   if (opts.webhookScheduler) webhooks.start();
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });

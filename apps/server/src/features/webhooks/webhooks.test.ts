@@ -6,7 +6,8 @@ import { openDb } from "../../db/index.js";
 import { webhookDeliveries } from "../../db/schema/index.js";
 import { createFlagsService } from "../features/service.js";
 import { createFetcher, type Fetcher } from "../import-url/fetch.js";
-import { createDispatcher, digestDue, KEEP_DELIVERIES, MAX_FAILURES, RETRY_DELAYS_MS, sign } from "./service.js";
+import { verifyWebhook } from "./verify-helper.js";
+import { createDispatcher, digestDue, KEEP_DELIVERIES, MAX_FAILURES, MAX_RETRIES, RETRY_CAP_MS, RETRY_BASE_MS, assertWebhookUrl, legacySign, retryDelayMs, sign } from "./service.js";
 
 const H = { "content-type": "application/json", "x-requested-with": "meally" };
 const GOOD = { name: "Hook", url: "https://example.com/hook", events: ["recipe.created", "mealplan.today"], tz: "Asia/Tokyo", dailyAt: "07:00" };
@@ -47,9 +48,24 @@ async function mk(status: number | "throw" = 200) {
 }
 
 describe("signing", () => {
-  it("matches an independent HMAC-SHA256 of the raw body", () => {
-    const body = '{"event":"ping"}';
-    expect(sign("s3cret", body)).toBe(`sha256=${createHmac("sha256", "s3cret").update(body).digest("hex")}`);
+  const body = '{"event":"ping"}';
+  it("matches an independent HMAC-SHA256 of '<t>.<body>'", () => {
+    expect(sign("s3cret", body, 1700000000)).toBe(`t=1700000000,v1=${createHmac("sha256", "s3cret").update(`1700000000.${body}`).digest("hex")}`);
+  });
+  it("matches a fixed vector", () => {
+    expect(sign("secret", "hello", 1000)).toBe("t=1000,v1=68b4e0f3cbf572d8f2a61a0a26389c0880345705e6cbca10add63a2651feefb0");
+    expect(legacySign("secret", "hello")).toBe("sha256=88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b");
+  });
+  it("verifies, and enforces the 5 minute tolerance and tampering", () => {
+    const h = sign("s", body, 1000);
+    expect(verifyWebhook(body, h, "s", 1000)).toBe(true);
+    expect(verifyWebhook(body, h, "s", 1300)).toBe(true);
+    expect(verifyWebhook(body, h, "s", 1301)).toBe(false);
+    expect(verifyWebhook(body, h, "s", 699)).toBe(false);
+    expect(verifyWebhook(body + " ", h, "s", 1000)).toBe(false);
+    expect(verifyWebhook(body, h, "other", 1000)).toBe(false);
+    expect(verifyWebhook(body, "t=1000,v1=zz", "s", 1000)).toBe(false);
+    expect(verifyWebhook(body, undefined, "s", 1000)).toBe(false);
   });
 });
 
@@ -102,7 +118,11 @@ describe("webhook routes", () => {
     const s = t.sent[0]!;
     expect(s.headers["X-Meally-Event"]).toBe("ping");
     expect(s.headers["X-Meally-Delivery"]).toBeTruthy();
-    expect(s.headers["X-Meally-Signature"]).toBe(sign(w.secret, s.body));
+    const ts = Number(s.headers["X-Meally-Timestamp"]);
+    expect(Math.abs(Date.now() / 1000 - ts)).toBeLessThan(5);
+    expect(s.headers["X-Meally-Signature"]).toBe(sign(w.secret, s.body, ts));
+    expect(verifyWebhook(s.body, s.headers["X-Meally-Signature"], w.secret, ts)).toBe(true);
+    expect(s.headers["X-Meally-Signature-256"]).toBe(legacySign(w.secret, s.body));
     expect(JSON.parse(s.body)).toMatchObject({ event: "ping", household: { name: expect.any(String) } });
     expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}/deliveries`))).items).toHaveLength(1);
     expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`))).lastStatus).toBe(200);
@@ -128,10 +148,11 @@ describe("delivery", () => {
     expect(t.sent).toHaveLength(0);
   });
 
-  it("retries after 1, 5 and 30 minutes, then stops", async () => {
+  it("retries 3 times with jittered backoff, then stops", async () => {
     const t = await mk(500);
     await t.create();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     // vi.waitFor would advance fake time, so poll with the real setImmediate.
     const until = async (n: number) => {
       for (let i = 0; i < 400 && t.sent.length < n; i++) await new Promise((r) => setImmediate(r));
@@ -140,8 +161,9 @@ describe("delivery", () => {
     };
     await t.call(t.A, "POST", "/recipes", RECIPE);
     await until(1);
-    for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
-      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[i]! - 1);
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      const delay = retryDelayMs(i, () => 0.5);
+      await vi.advanceTimersByTimeAsync(delay - 1);
       expect(t.sent).toHaveLength(i + 1);
       await vi.advanceTimersByTimeAsync(1);
       await until(i + 2);
@@ -189,6 +211,71 @@ describe("delivery", () => {
     expect(r.status).toBe(302);
     expect(transport).toHaveBeenCalledTimes(1);
     expect(transport.mock.calls[0]![0]).toMatchObject({ method: "POST", body: '{"a":1}', headers: { "X-Meally-Event": "ping" } });
+  });
+});
+
+describe("retry jitter", () => {
+  it("stays within [0, min(cap, base*2^n)) and grows then caps, with a seeded random", () => {
+    let seed = 42;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 2 ** 32) / 2 ** 32);
+    for (let n = 0; n < 10; n++) {
+      const ceil = Math.min(RETRY_CAP_MS, RETRY_BASE_MS * 2 ** n);
+      for (let i = 0; i < 200; i++) {
+        const d = retryDelayMs(n, rnd);
+        expect(d).toBeGreaterThanOrEqual(0);
+        expect(d).toBeLessThan(ceil);
+      }
+    }
+    expect(retryDelayMs(0, () => 0.999999)).toBeLessThan(RETRY_BASE_MS);
+    expect(retryDelayMs(20, () => 0.999999)).toBeLessThan(RETRY_CAP_MS);
+    expect(retryDelayMs(3, () => 0)).toBe(0);
+    expect(new Set(Array.from({ length: 20 }, () => retryDelayMs(2, rnd))).size).toBeGreaterThan(1);
+  });
+});
+
+describe("https only", () => {
+  const HTTP = { ...GOOD, url: "http://hook.lan/x" };
+  it("rejects http on create and update by default", async () => {
+    const t = await mk();
+    const r = await t.call(t.A, "POST", "/webhooks", HTTP);
+    expect(r.status).toBe(400);
+    expect((await t.json(r)).message).toContain("https://");
+    const w = await t.create();
+    expect((await t.call(t.A, "PUT", `/webhooks/${w.id}`, HTTP)).status).toBe(400);
+  });
+  it("assertWebhookUrl allows http only with private URLs allowed", () => {
+    expect(() => assertWebhookUrl("http://a.lan/x", false)).toThrow(/https/);
+    expect(() => assertWebhookUrl("ftp://a.lan/x", true)).toThrow(/https/);
+    expect(() => assertWebhookUrl("http://a.lan/x", true)).not.toThrow();
+    expect(() => assertWebhookUrl("https://a.example/x", false)).not.toThrow();
+  });
+  it("allows http with MEALLY_ALLOW_PRIVATE_URLS and still delivers", async () => {
+    const o = openDb(":memory:");
+    const env = { MEALLY_SIGNUP_MODE: "open", MEALLY_ALLOW_PRIVATE_URLS: "true" };
+    const flags = createFlagsService(o.db, env);
+    const sent: string[] = [];
+    const fetcher: Fetcher = async (url) => (sent.push(url), { body: Buffer.alloc(0), contentType: "", finalUrl: url, status: 200 });
+    const app = createApp({ db: o.db, flags, env, scryptLogN: 10, fetcher });
+    await o.ready;
+    await flags.setOverride("api-tokens", true);
+    await flags.setOverride("webhooks", true);
+    const su = await app.request("/api/v1/auth/setup", { method: "POST", headers: H, body: JSON.stringify({ email: "a@example.com", name: "n", password: "correct horse" }) });
+    const cookie = su.headers.get("set-cookie")!.split(";")[0]!;
+    const r = await app.request("/api/v1/webhooks", { method: "POST", headers: { ...H, cookie }, body: JSON.stringify(HTTP) });
+    expect(r.status).toBe(201);
+    const w = (await r.json()) as any;
+    const test = await app.request(`/api/v1/webhooks/${w.id}/test`, { method: "POST", headers: { ...H, cookie } });
+    expect(((await test.json()) as any).ok).toBe(true);
+    expect(sent).toEqual(["http://hook.lan/x"]);
+  });
+  it("refuses to deliver to a stored http URL when not allowed", async () => {
+    const t = await mk();
+    const w = await t.create();
+    await t.o.client.execute({ sql: "UPDATE webhooks SET url = ? WHERE id = ?", args: ["http://hook.lan/x", w.id] });
+    const r = await t.json(await t.call(t.A, "POST", `/webhooks/${w.id}/test`));
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain("https://");
+    expect(t.sent).toHaveLength(0);
   });
 });
 

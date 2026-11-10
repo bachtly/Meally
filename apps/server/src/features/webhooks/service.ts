@@ -11,7 +11,13 @@ import type { FlagsService } from "../features/service.js";
 import { listEntries } from "../mealplan/service.js";
 import { registerWebhookEmitter } from "./events.js";
 
-export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000];
+/** In-memory retries: 3 attempts, exponential backoff with full jitter, capped. Durable retries come with the cron work. */
+export const MAX_RETRIES = 3;
+export const RETRY_BASE_MS = 60_000;
+export const RETRY_CAP_MS = 30 * 60_000;
+/** Full jitter: uniform in [0, min(cap, base * 2^n)). `random` returns [0, 1). */
+export const retryDelayMs = (n: number, random: () => number = Math.random) =>
+  Math.floor(random() * Math.min(RETRY_CAP_MS, RETRY_BASE_MS * 2 ** n));
 export const MAX_FAILURES = 20;
 export const KEEP_DELIVERIES = 50;
 const DIGEST_WINDOW_MIN = 120;
@@ -20,7 +26,23 @@ export type WebhookData = z.output<typeof webhookInputSchema>;
 type Row = typeof webhooks.$inferSelect;
 const notFound = () => new ApiError(404, "not_found", "Webhook not found");
 
-export const sign = (secret: string, body: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+/** `X-Meally-Signature` value: `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">`. */
+export const sign = (secret: string, body: string, timestamp: number) =>
+  `t=${timestamp},v1=${createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")}`;
+/** Deprecated body-only `X-Meally-Signature-256` value (`sha256=<hex>`), kept for one release. */
+export const legacySign = (secret: string, body: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+
+/** Webhook URLs must be https unless private URLs are allowed (home labs). */
+export function assertWebhookUrl(url: string, allowPrivate: boolean) {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new ApiError(400, "invalid_url", "Webhook URL is not valid");
+  }
+  if (u.protocol === "https:" || (allowPrivate && u.protocol === "http:")) return;
+  throw new ApiError(400, "invalid_url", "Webhook URLs must start with https:// (set MEALLY_ALLOW_PRIVATE_URLS=true to allow http)");
+}
 export const newSecret = () => `whsec_${randomBytes(24).toString("base64url")}`;
 
 const toWebhook = (r: Row): Webhook => ({
@@ -51,7 +73,8 @@ export async function listWebhooks(db: Db, householdId: string): Promise<Webhook
 export async function getWebhook(db: Db, householdId: string, id: string) {
   return withSecret(await find(db, householdId, id));
 }
-export async function createWebhook(db: Db, householdId: string, input: WebhookData): Promise<WebhookWithSecret> {
+export async function createWebhook(db: Db, householdId: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
+  assertWebhookUrl(input.url, allowPrivate);
   const [r] = await db
     .insert(webhooks)
     .values({
@@ -69,7 +92,8 @@ export async function createWebhook(db: Db, householdId: string, input: WebhookD
     .returning();
   return withSecret(r!);
 }
-export async function updateWebhook(db: Db, householdId: string, id: string, input: WebhookData): Promise<WebhookWithSecret> {
+export async function updateWebhook(db: Db, householdId: string, id: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
+  assertWebhookUrl(input.url, allowPrivate);
   const cur = await find(db, householdId, id);
   const enabled = input.enabled ?? cur.enabled;
   const [r] = await db
@@ -142,6 +166,9 @@ export interface DispatcherDeps {
   fetcher: Fetcher;
   flags: FlagsService;
   now?: () => Date;
+  /** MEALLY_ALLOW_PRIVATE_URLS: lets delivery use http. */
+  allowPrivate?: boolean;
+  random?: () => number;
 }
 export interface DeliveryResult {
   ok: boolean;
@@ -150,7 +177,7 @@ export interface DeliveryResult {
   durationMs: number;
 }
 
-export function createDispatcher({ db, fetcher, flags, now = () => new Date() }: DispatcherDeps) {
+export function createDispatcher({ db, fetcher, flags, now = () => new Date(), allowPrivate = false, random = () => Math.random() }: DispatcherDeps) {
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let ticker: ReturnType<typeof setInterval> | null = null;
 
@@ -183,6 +210,8 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date() }:
     const started = Date.now();
     let res: DeliveryResult;
     try {
+      assertWebhookUrl(hook.url, allowPrivate);
+      const ts = Math.floor(now().getTime() / 1000);
       const r = await fetcher(hook.url, {
         kind: "post",
         body,
@@ -190,7 +219,10 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date() }:
           "Content-Type": "application/json",
           "X-Meally-Event": event,
           "X-Meally-Delivery": deliveryId,
-          "X-Meally-Signature": sign(hook.secret, body),
+          "X-Meally-Timestamp": String(ts),
+          "X-Meally-Signature": sign(hook.secret, body, ts),
+          // Deprecated: body-only signature, removed after one release.
+          "X-Meally-Signature-256": legacySign(hook.secret, body),
         },
       });
       const status = r.status ?? 0;
@@ -209,8 +241,8 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date() }:
   }
 
   function scheduleRetry(hookId: string, event: string, body: string, n: number) {
-    const delay = RETRY_DELAYS_MS[n];
-    if (delay === undefined) return;
+    if (n >= MAX_RETRIES) return;
+    const delay = retryDelayMs(n, random);
     const t = setTimeout(() => {
       timers.delete(t);
       void (async () => {
@@ -229,7 +261,7 @@ export function createDispatcher({ db, fetcher, flags, now = () => new Date() }:
     return h ?? { id, name: "" };
   }
 
-  /** Sends now. With `retry`, failures are retried after 1, 5 and 30 minutes. */
+  /** Sends now. With `retry`, failures are retried up to 3 times with jittered backoff. */
   async function deliver(hook: Row, event: string, data: unknown, retry: boolean): Promise<DeliveryResult> {
     const body = JSON.stringify({ event, occurredAt: now().toISOString(), household: await household(hook.householdId), data });
     const res = await attempt(hook, event, body);

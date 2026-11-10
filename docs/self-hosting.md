@@ -121,7 +121,7 @@ Before you open Meally to people you don't know:
 - [ ] **Rate limits.** Sign-in, sign-up, invite, URL import, share-link and API-token requests are limited per client
       address, in memory (see [below](#rate-limits)). They need `MEALLY_TRUST_PROXY` to see real client addresses.
 - [ ] **Private addresses.** Leave `MEALLY_ALLOW_PRIVATE_URLS` unset. It lets URL import and webhooks reach your local
-      network.
+      network, and lets webhooks use plain `http://`.
 - [ ] **AI off.** Leave the `ai` flag off unless you accept that recipe text and photos go to the provider whose key is
       configured. That is a privacy decision for you and your users.
 - [ ] **Flags.** Turn off features you do not want to support (`MEALLY_FEATURE_<KEY>=off`), for example `webhooks`.
@@ -151,7 +151,7 @@ Fixed windows, per client address, kept in memory and reset on restart:
 | `WEB_DIST` | built-in path | Folder of the built web app. Rarely needed. |
 | `MEALLY_SIGNUP_MODE` | `invite` | `open`, `invite` or `closed`. When set, admins cannot change it in the app. |
 | `MEALLY_TRUST_PROXY` | `false` | `true` makes rate limits use `X-Forwarded-For`. Only behind a proxy you control. |
-| `MEALLY_ALLOW_PRIVATE_URLS` | `false` | `true` lets URL import and webhooks reach private, loopback and non-standard-port addresses. |
+| `MEALLY_ALLOW_PRIVATE_URLS` | `false` | `true` lets URL import and webhooks reach private, loopback and non-standard-port addresses, and allows `http://` webhook URLs (otherwise https only). |
 | `MEALLY_IMPORT_ALLOW_PRIVATE` | `false` | Old name of `MEALLY_ALLOW_PRIVATE_URLS`; still works. |
 | `MEALLY_BACKUP_CRON_HOURS` | `24` | Hours between automatic backups. `0` turns them off. |
 | `MEALLY_BACKUP_KEEP` | `7` | How many backups to keep. |

@@ -4,6 +4,7 @@ import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
+import { allowPrivateUrls } from "../import-url/fetch.js";
 import * as svc from "./service.js";
 
 const requireOwner: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -22,9 +23,9 @@ async function input(c: Context<AppEnv>) {
 
 webhookRoutes
   .get("/", async (c) => c.json({ items: await svc.listWebhooks(c.get("db"), c.get("householdId")) }))
-  .post("/", async (c) => c.json(await svc.createWebhook(c.get("db"), c.get("householdId"), await input(c)), 201))
+  .post("/", async (c) => c.json(await svc.createWebhook(c.get("db"), c.get("householdId"), await input(c), allowPrivateUrls(c.get("env"))), 201))
   .get("/:id", async (c) => c.json(await svc.getWebhook(c.get("db"), c.get("householdId"), c.req.param("id"))))
-  .put("/:id", async (c) => c.json(await svc.updateWebhook(c.get("db"), c.get("householdId"), c.req.param("id"), await input(c))))
+  .put("/:id", async (c) => c.json(await svc.updateWebhook(c.get("db"), c.get("householdId"), c.req.param("id"), await input(c), allowPrivateUrls(c.get("env")))))
   .delete("/:id", async (c) => {
     await svc.deleteWebhook(c.get("db"), c.get("householdId"), c.req.param("id"));
     return c.body(null, 204);
