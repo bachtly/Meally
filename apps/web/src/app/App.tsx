@@ -16,6 +16,7 @@ import { SettingsPage } from "../features/households/SettingsPage";
 import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { CookbookPage } from "../features/cookbooks/CookbookPage";
 import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
+import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { PublicRecipePage } from "../features/share/PublicRecipePage";
@@ -118,6 +119,14 @@ export const appRoutes = createRoutesFromElements(
         />
         <Route path="/more" element={<MorePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/settings/import"
+          element={
+            <FeatureRoute on="import-files">
+              <ImportFilesPage />
+            </FeatureRoute>
+          }
+        />
         <Route
           path="/invite/:token"
           element={

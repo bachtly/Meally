@@ -41,7 +41,7 @@ export function parseDuration(v: unknown): number | null {
 }
 
 const asArray = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v : [v]);
-type Obj = Record<string, unknown>;
+export type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function hasType(node: Obj, type: string) {
@@ -96,7 +96,7 @@ function imageOf(v: unknown, base: string): string | null {
   return null;
 }
 
-function yieldOf(v: unknown): { yieldText: string | null; servings: number | null } {
+export function yieldOf(v: unknown): { yieldText: string | null; servings: number | null } {
   const first = asArray(v)[0];
   const s = typeof first === "number" ? String(first) : text(first);
   if (!s) return { yieldText: null, servings: null };
@@ -105,8 +105,8 @@ function yieldOf(v: unknown): { yieldText: string | null; servings: number | nul
   return { yieldText: /^\d+$/.test(s) ? `${s} servings` : s, servings: servings && servings > 0 && servings <= 1000 ? servings : null };
 }
 
-type Step = { text: string; section: string | null };
-function stepsOf(v: unknown, section: string | null = null, depth = 0): Step[] {
+export type Step = { text: string; section: string | null };
+export function stepsOf(v: unknown, section: string | null = null, depth = 0): Step[] {
   if (depth > 4 || v == null) return [];
   if (typeof v === "string") {
     return cleanText(v)
@@ -126,22 +126,23 @@ function stepsOf(v: unknown, section: string | null = null, depth = 0): Step[] {
   return [];
 }
 
-function listOf(v: unknown): string[] {
+export function listOf(v: unknown): string[] {
   const items = asArray(v).flatMap((x) => (typeof x === "string" ? x.split(",") : []));
   return [...new Set(items.map((s) => cleanText(s)).filter(Boolean))].slice(0, 30);
 }
 
-function ingredientsOf(lines: string[]) {
-  return lines
-    .map((l) => cleanText(l))
-    .filter(Boolean)
-    .map((raw) => {
-      const p = parseIngredient(raw);
-      return { section: null, quantity: p.quantity, unit: p.unit, food: p.food, note: p.note, raw };
-    });
+export function ingredientRow(line: string, section: string | null = null) {
+  const raw = cleanText(line);
+  if (!raw) return null;
+  const p = parseIngredient(raw);
+  return { section, quantity: p.quantity, unit: p.unit, food: p.food, note: p.note, raw: raw.slice(0, 500) };
 }
 
-interface Fields {
+function ingredientsOf(lines: string[]) {
+  return lines.map((l) => ingredientRow(l)).filter((r): r is NonNullable<typeof r> => r !== null);
+}
+
+export interface Fields {
   name: string;
   description: string;
   image: unknown;
@@ -155,8 +156,8 @@ interface Fields {
   category: unknown;
 }
 
-function build(f: Fields, url: string): ExtractedRecipe | null {
-  const ingredients = ingredientsOf(f.ingredients);
+export function build(f: Fields, url: string | null, ready?: NonNullable<RecipeInput["ingredients"]>): ExtractedRecipe | null {
+  const ingredients = ready ?? ingredientsOf(f.ingredients);
   const steps = stepsOf(f.instructions);
   if (!f.name || (!ingredients.length && !steps.length)) return null;
   const y = yieldOf(f.yield);
@@ -169,14 +170,53 @@ function build(f: Fields, url: string): ExtractedRecipe | null {
       prepMinutes: parseDuration(f.prep),
       cookMinutes: parseDuration(f.cook),
       totalMinutes: parseDuration(f.total),
-      sourceUrl: url,
+      sourceUrl: url || null,
       ingredients: ingredients.slice(0, 200),
       steps: steps.slice(0, 200).map((s) => ({ ...s, text: s.text.slice(0, 5000) })),
     },
-    imageUrl: imageOf(f.image, url),
+    imageUrl: url ? imageOf(f.image, url) : null,
     keywords: listOf(f.keywords),
     categories: listOf(f.category),
   };
+}
+
+/** Maps one schema.org Recipe node. `url` is the source link, or null when the recipe came from a file. */
+export function recipeFromNode(r: Obj, url: string | null): ExtractedRecipe | null {
+  return build(
+    {
+      name: text(r.name),
+      description: text(r.description),
+      image: r.image,
+      yield: r.recipeYield,
+      prep: r.prepTime,
+      cook: r.cookTime,
+      total: r.totalTime,
+      ingredients: asArray(r.recipeIngredient ?? r.ingredients).filter((x): x is string => typeof x === "string"),
+      instructions: r.recipeInstructions,
+      keywords: r.keywords,
+      category: r.recipeCategory,
+    },
+    url,
+  );
+}
+
+/** Every Recipe node in parsed JSON-LD (a single recipe, an array, or an @graph). */
+export function findAllRecipes(node: unknown, depth = 0, out: Obj[] = []): Obj[] {
+  if (depth > 8 || out.length > 20_000) return out;
+  if (Array.isArray(node)) node.forEach((n) => findAllRecipes(n, depth + 1, out));
+  else if (isObj(node)) {
+    if (hasType(node, "Recipe")) out.push(node);
+    else for (const k of ["@graph", "mainEntity", "itemListElement", "item"]) findAllRecipes(node[k], depth + 1, out);
+  }
+  return out;
+}
+
+/** A recipe's own http(s) link, when the JSON-LD names one. */
+export function nodeSourceUrl(r: Obj): string | null {
+  for (const v of [r.url, r.mainEntityOfPage, isObj(r.mainEntityOfPage) ? r.mainEntityOfPage["@id"] : null]) {
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) return v.trim().slice(0, 2000);
+  }
+  return null;
 }
 
 function fromJsonLd(root: HTMLElement, url: string): ExtractedRecipe | null {
@@ -189,22 +229,7 @@ function fromJsonLd(root: HTMLElement, url: string): ExtractedRecipe | null {
     }
     const r = findRecipe(data);
     if (!r) continue;
-    const out = build(
-      {
-        name: text(r.name),
-        description: text(r.description),
-        image: r.image,
-        yield: r.recipeYield,
-        prep: r.prepTime,
-        cook: r.cookTime,
-        total: r.totalTime,
-        ingredients: asArray(r.recipeIngredient ?? r.ingredients).filter((x): x is string => typeof x === "string"),
-        instructions: r.recipeInstructions,
-        keywords: r.keywords,
-        category: r.recipeCategory,
-      },
-      url,
-    );
+    const out = recipeFromNode(r, url);
     if (out) return out;
   }
   return null;

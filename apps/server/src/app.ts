@@ -15,6 +15,8 @@ import { authRoutes } from "./features/auth/routes.js";
 import { ingredientRoutes } from "./features/ingredients/routes.js";
 import { createFetcher, type Fetcher } from "./features/import-url/fetch.js";
 import { importRoutes } from "./features/import-url/routes.js";
+import { importFileRoutes } from "./features/import-files/routes.js";
+import { failStaleJobs } from "./features/import-files/service.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
 import { householdRoutes } from "./features/households/routes.js";
@@ -60,6 +62,7 @@ export function createApp(opts: AppOptions = {}) {
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: env.MEALLY_IMPORT_ALLOW_PRIVATE === "true", version });
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+  void (owned?.ready ?? Promise.resolve()).then(() => failStaleJobs(db)).catch(() => {});
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
 
@@ -88,6 +91,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/household", householdRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
+  api.route("/import", importFileRoutes);
   api.route("/images", imageRoutes);
   api.get("/health", (c) => c.json({ ok: true, version, name: appName }));
   app.route("/api/v1", api);

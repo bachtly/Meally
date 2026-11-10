@@ -16,14 +16,19 @@
     "@hono/node-server": "^2.1.6",
     "@libsql/client": "^0.18.0",
     "@meally/shared": "^0.0.0",
+    "busboy": "^1.6.0",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.17",
     "node-html-parser": "^9.0.7",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.5",
     "@types/node": "^24.19.2",
+    "@types/yauzl": "^3.4.0",
     "drizzle-kit": "^0.31.11",
+    "fflate": "^0.8.3",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15"
   }
