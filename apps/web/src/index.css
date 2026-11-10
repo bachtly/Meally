@@ -1,2 +1,18 @@
 @import "tailwindcss";
 @import "./ui/theme.css";
+
+/* Photo-less recipe cards: --h is a warm hue (20-90) derived from the name. Text keeps AA contrast. */
+.recipe-tint {
+  background: oklch(0.93 0.05 var(--h));
+  color: oklch(0.38 0.09 var(--h));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .recipe-tint {
+    background: oklch(0.3 0.05 var(--h));
+    color: oklch(0.88 0.09 var(--h));
+  }
+}
+:root[data-theme="dark"] .recipe-tint {
+  background: oklch(0.3 0.05 var(--h));
+  color: oklch(0.88 0.09 var(--h));
+}

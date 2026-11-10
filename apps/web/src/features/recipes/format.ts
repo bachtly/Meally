@@ -21,3 +21,10 @@ export function hostname(url: string | null): string | null {
     return null;
   }
 }
+
+/** A stable warm hue (20-90 degrees) derived from a name, for photo-less cards. */
+export function warmHue(name: string): number {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return 20 + (h % 71);
+}

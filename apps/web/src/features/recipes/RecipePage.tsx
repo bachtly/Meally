@@ -1,8 +1,8 @@
-import { Clock, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
+import { Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ApiRequestError } from "../../lib/api";
-import { Button, Dialog, EmptyState, Skeleton, useToast } from "../../ui";
+import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { useDeleteRecipe, useRecipe } from "./api";
 import { formatMinutes, hostname, imageSrcSet } from "./format";
 import { useChecks } from "./useChecks";
@@ -80,15 +80,33 @@ export function RecipePage() {
       <header className="mb-6">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-3xl font-semibold leading-tight">{r.name}</h1>
-          <div className="flex shrink-0 items-center gap-1" role="toolbar" aria-label="Recipe actions">
-            <Link to={`/recipes/${r.slug}/edit`} className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-medium hover:bg-sunken">
+          <div className="flex shrink-0 items-center gap-1">
+            <Link
+              to={`/recipes/${r.slug}/edit`}
+              className="hidden min-h-11 items-center gap-2 rounded-md px-3 font-medium hover:bg-sunken lg:inline-flex"
+            >
               <Pencil className="size-4" aria-hidden />
               Edit
             </Link>
-            <Button variant="ghost" onClick={() => setConfirm(true)}>
-              <Trash2 className="size-4" aria-hidden />
-              Delete
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton aria-label="More actions">
+                  <Ellipsis className="size-5" aria-hidden />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild className="lg:hidden">
+                  <Link to={`/recipes/${r.slug}/edit`}>
+                    <Pencil className="size-4" aria-hidden />
+                    Edit
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setConfirm(true)}>
+                  <Trash2 className="size-4" aria-hidden />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}

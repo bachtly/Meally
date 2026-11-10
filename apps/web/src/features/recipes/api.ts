@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Recipe, RecipeListResponse } from "@meally/shared";
+import type { Recipe, RecipeInput, RecipeListResponse } from "@meally/shared";
 import { api } from "../../lib/api";
 
 export type RecipeSort = "updated" | "name" | "created";
@@ -36,6 +36,33 @@ export function useDeleteRecipe() {
     mutationFn: (slug: string) => api<void>(`/recipes/${encodeURIComponent(slug)}`, { method: "DELETE" }),
     onSuccess: (_d, slug) => {
       qc.removeQueries({ queryKey: ["recipes", "detail", slug] });
+      void qc.invalidateQueries({ queryKey: ["recipes", "list"] });
+    },
+  });
+}
+
+export function useSaveRecipe(slug?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ input, image }: { input: RecipeInput; image: File | null }) => {
+      let recipe = await api<Recipe>(slug ? `/recipes/${encodeURIComponent(slug)}` : "/recipes", {
+        method: slug ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      });
+      let imageFailed = false;
+      if (image) {
+        const body = new FormData();
+        body.append("file", image);
+        try {
+          recipe = await api<Recipe>(`/recipes/${encodeURIComponent(recipe.slug)}/image`, { method: "POST", body });
+        } catch {
+          imageFailed = true;
+        }
+      }
+      return { recipe, imageFailed };
+    },
+    onSuccess: ({ recipe }) => {
+      qc.setQueryData(["recipes", "detail", recipe.slug], recipe);
       void qc.invalidateQueries({ queryKey: ["recipes", "list"] });
     },
   });

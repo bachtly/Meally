@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router";
+import { createMemoryRouter, Outlet, RouterProvider, useLocation } from "react-router";
 import { axe } from "vitest-axe";
 import * as matchers from "vitest-axe/matchers";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FeaturesProvider } from "../features/FeaturesProvider";
-import { AppRoutes } from "../../app/App";
+import { appRoutes } from "../../app/App";
 
 expect.extend(matchers);
 
@@ -44,6 +44,18 @@ function Where() {
   return <div data-testid="where">{l.pathname + l.search}</div>;
 }
 
+const withWhere = [
+  {
+    element: (
+      <>
+        <Outlet />
+        <Where />
+      </>
+    ),
+    children: appRoutes,
+  },
+];
+
 function renderAt(path: string) {
   const info = { enabled: true, locked: false, source: "default", label: "x", description: "y" };
   const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } };
@@ -72,10 +84,7 @@ function renderAt(path: string) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <FeaturesProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-          <Where />
-        </MemoryRouter>
+        <RouterProvider router={createMemoryRouter(withWhere, { initialEntries: [path] })} />
       </FeaturesProvider>
     </QueryClientProvider>,
   );
@@ -132,7 +141,8 @@ it("shows not found", async () => {
 
 it("deletes after confirming and returns to the library", async () => {
   renderAt("/recipes/tomato-soup");
-  await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+  await userEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
   const dialog = await screen.findByRole("dialog");
   await userEvent.click(Array.from(dialog.querySelectorAll("button")).find((b) => b.textContent === "Delete")!);
   await waitFor(() => expect(deleted).toBe(true));

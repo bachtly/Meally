@@ -14,9 +14,7 @@ function Soon({ title }: { title: string }) {
     </>
   );
 }
-export const RecipeNewPage = () => <Soon title="New recipe" />;
 export const RecipeImportPage = () => <Soon title="Import from URL" />;
-export const RecipeEditPage = () => <Soon title="Edit recipe" />;
 
 export function PlanPage() {
   return (

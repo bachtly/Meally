@@ -1,10 +1,11 @@
 import { ArrowDownUp, BookOpen, SearchX } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
 import { Feature } from "../features/Feature";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
 import { useRecipes, type RecipeSort } from "./api";
-import { formatMinutes, imageSrcSet } from "./format";
+import { formatMinutes, imageSrcSet, warmHue } from "./format";
 
 const SORTS: { value: RecipeSort; label: string }[] = [
   { value: "updated", label: "Recently updated" },
@@ -30,7 +31,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
               className="size-full object-cover"
             />
           ) : (
-            <div aria-hidden className="flex size-full items-center justify-center bg-accent/10 text-4xl font-semibold text-accent">
+            <div aria-hidden style={{ "--h": warmHue(recipe.name) } as CSSProperties} className="recipe-tint flex size-full items-center justify-center text-4xl font-semibold">
               {recipe.name.trim().charAt(0).toUpperCase()}
             </div>
           )}

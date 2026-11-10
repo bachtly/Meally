@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from "react-router";
 import { FeatureRoute } from "../features/features/Feature";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { RequireAuth, SetupPage, SignInPage, SignUpPage } from "../features/auth/AuthPages";
@@ -7,13 +7,15 @@ import { AppShell } from "./AppShell";
 import { Gallery } from "./pages/Gallery";
 import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
 import { RecipePage } from "../features/recipes/RecipePage";
-import { MorePage, PlanPage, RecipeEditPage, RecipeImportPage, RecipeNewPage, ShoppingPage } from "./pages/Placeholders";
+import { RecipeEditPage, RecipeNewPage } from "../features/recipes/RecipeEditor";
+import { MorePage, PlanPage, RecipeImportPage, ShoppingPage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
+let router: ReturnType<typeof createBrowserRouter> | undefined;
 
-export function AppRoutes() {
-  return (
-    <Routes>
+/** Routes are data-router objects so the editor can use `useBlocker`. */
+export const appRoutes = createRoutesFromElements(
+  <>
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
@@ -56,17 +58,14 @@ export function AppRoutes() {
         <Route path="/more" element={<MorePage />} />
         {import.meta.env.DEV && <Route path="/ui" element={<Gallery />} />}
       </Route>
-    </Routes>
-  );
-}
+  </>,
+);
 
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FeaturesProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <RouterProvider router={(router ??= createBrowserRouter(appRoutes))} />
       </FeaturesProvider>
     </QueryClientProvider>
   );

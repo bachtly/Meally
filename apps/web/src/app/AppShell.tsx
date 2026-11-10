@@ -38,7 +38,6 @@ export function AppShell() {
               <NavLink
                 key={to}
                 to={to}
-                end={to === "/recipes"}
                 className={({ isActive }) =>
                   cn(
                     "flex min-h-11 items-center gap-3 rounded-md px-3 text-base",
@@ -57,7 +56,7 @@ export function AppShell() {
           <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
           <HeaderSearch ref={searchRef} />
           <div className="flex items-center gap-1">
-            <IconButton aria-label="Search and commands" onClick={() => setPaletteOpen(true)}>
+            <IconButton aria-label="Search and commands" className="lg:hidden" onClick={() => setPaletteOpen(true)}>
               <Search className="size-5" aria-hidden />
             </IconButton>
             <DropdownMenu>
@@ -94,8 +93,7 @@ export function AppShell() {
               <li key={to} className="flex-1">
                 <NavLink
                   to={to}
-                  end={to === "/recipes"}
-                  className={({ isActive }) =>
+                    className={({ isActive }) =>
                     cn(
                       "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs",
                       isActive ? "font-medium text-accent" : "text-muted",
