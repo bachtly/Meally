@@ -19,8 +19,8 @@ plus `images/`.
 |---|---|---|
 | A1 | TypeScript monorepo with npm workspaces | One language end to end. Types and zod schemas are shared between client and server. npm comes with Node, so there's nothing extra to install. |
 | A2 | Hono server on Node | Small, fast, built on web standards, with typed routes. It has middleware for cookies, CORS and secure headers. |
-| A3 | SQLite through Drizzle, migrations with drizzle-kit | Nothing extra to run (G5). WAL mode copes with concurrent users. FTS5 gives search. Drizzle also supports Postgres if we add it later. |
-| A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. API tokens (F22) use the same table design. |
+| A3 | SQLite through Drizzle, migrations with drizzle-kit | Nothing extra to run (G5). WAL mode copes with concurrent users. FTS5 gives search (its table and triggers go in a hand-written SQL migration, since drizzle-kit can't model them). Keep write transactions short. Drizzle also supports Postgres if we add it later. |
+| A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. Use N=2^17, r=8, p=1 and raise `maxmem` (OWASP's scrypt setting). API tokens (F22) use the same table design. |
 | A5 | React 19 + Vite + TanStack Query + React Router | A mainstream stack that's fast to build. Query handles cache, retries and optimistic updates. |
 | A6 | Tailwind CSS v4 with our own components on Radix primitives (shadcn-style, written in this repo) | Modern look with accessible dialogs, menus and popovers, and no heavy UI kit. |
 | A7 | Design tokens as CSS variables (OKLCH), light and dark themes, `prefers-color-scheme` with a manual override | Consistent theming and AA contrast. |
