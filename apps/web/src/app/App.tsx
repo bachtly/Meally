@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from "react-router";
+import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route, RouterProvider } from "react-router";
 import { FeatureRoute } from "../features/features/Feature";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { RequireAuth, SetupPage, SignInPage, SignUpPage } from "../features/auth/AuthPages";
@@ -15,6 +15,7 @@ import { PlanPage } from "../features/meal-plan/PlanPage";
 import { SettingsPage } from "../features/households/SettingsPage";
 import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
+import { CookPage } from "../features/cook-mode/CookPage";
 import { MorePage } from "./pages/Placeholders";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,22 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
+      <Route
+        element={
+          <RequireAuth>
+            <Outlet />
+          </RequireAuth>
+        }
+      >
+        <Route
+          path="/recipes/:slug/cook"
+          element={
+            <FeatureRoute on="cook-mode">
+              <CookPage />
+            </FeatureRoute>
+          }
+        />
+      </Route>
       <Route
         element={
           <RequireAuth>

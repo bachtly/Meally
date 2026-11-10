@@ -1,4 +1,4 @@
-import { CalendarPlus, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
+import { CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, RotateCcw, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
@@ -11,6 +11,7 @@ import { AddToListButton } from "../shopping/AddToListButton";
 import { useFeature } from "../features/FeaturesProvider";
 import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
+import { Feature } from "../features/Feature";
 import { useChecks } from "./useChecks";
 import { RecipeChips } from "../organizers/RecipeChips";
 
@@ -177,7 +178,18 @@ export function RecipePage() {
             <UnitsToggle value={units} onChange={(u) => setParam("units", u === "original" ? null : u)} />
           </div>
         )}
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {r.steps.length > 0 && (
+            <Feature on="cook-mode">
+              <Link
+                to={`/recipes/${r.slug}/cook${params.toString() ? `?${params}` : ""}`}
+                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 font-medium text-accent-contrast"
+              >
+                <ChefHat className="size-4" aria-hidden />
+                Start cooking
+              </Link>
+            </Feature>
+          )}
           <AddToListButton key={servings} slug={r.slug} servings={servings} />
         </div>
       </header>
