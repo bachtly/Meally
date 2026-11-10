@@ -6,6 +6,8 @@ import { useSession } from "../features/auth/useSession";
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, ToastProvider } from "../ui";
 import { CommandPalette } from "./CommandPalette";
 import { HeaderSearch } from "./HeaderSearch";
+import { OfflineBanner } from "../pwa/Pwa";
+import { clearOfflineCaches } from "../pwa/register";
 import { useVisibleNav } from "./useVisibleNav";
 
 export function AppShell() {
@@ -78,7 +80,7 @@ export function AppShell() {
                 )}
                 <DropdownMenuItem
                   onSelect={() => {
-                    void signOut().then(() => navigate("/signin", { replace: true }));
+                    void signOut().then(() => clearOfflineCaches()).then(() => navigate("/signin", { replace: true }));
                   }}
                 >
                   <LogOut className="size-4" aria-hidden />
@@ -89,6 +91,7 @@ export function AppShell() {
           </div>
         </header>
 
+        <OfflineBanner />
         <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
           <Outlet />
         </main>

@@ -3,6 +3,7 @@ import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route,
 import { FeatureRoute } from "../features/features/Feature";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { RequireAuth, SetupPage, SignInPage, SignUpPage } from "../features/auth/AuthPages";
+import { PwaProvider } from "../pwa/Pwa";
 import { AppShell } from "./AppShell";
 import { Gallery } from "./pages/Gallery";
 import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
@@ -25,7 +26,8 @@ import { ActivityPage } from "../features/timeline/ActivityPage";
 import { AdminPage } from "../features/admin/AdminPage";
 import { MorePage } from "./pages/Placeholders";
 
-const queryClient = new QueryClient();
+// offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
+const queryClient = new QueryClient({ defaultOptions: { queries: { networkMode: "offlineFirst" } } });
 let router: ReturnType<typeof createBrowserRouter> | undefined;
 
 /** Routes are data-router objects so the editor can use `useBlocker`. */
@@ -164,7 +166,9 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FeaturesProvider>
-        <RouterProvider router={(router ??= createBrowserRouter(appRoutes))} />
+        <PwaProvider>
+          <RouterProvider router={(router ??= createBrowserRouter(appRoutes))} />
+        </PwaProvider>
       </FeaturesProvider>
     </QueryClientProvider>
   );

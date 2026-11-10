@@ -1,6 +1,7 @@
 import { useSession } from "../../features/auth/useSession";
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
+import { InstallItem } from "../../pwa/Pwa";
 import { Feature } from "../../features/features/Feature";
 import { ThemeToggle } from "../../ui";
 
@@ -32,6 +33,7 @@ export function MorePage() {
           Tags, categories and tools
         </Link>
       </Feature>
+      <InstallItem />
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Appearance</h2>
         <ThemeToggle />

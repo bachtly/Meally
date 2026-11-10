@@ -123,6 +123,16 @@ export function createApp(opts: AppOptions = {}) {
   if (dist && fs.existsSync(dist)) {
     const root = path.relative(process.cwd(), dist).replaceAll("\\", "/");
     const index = fs.readFileSync(path.join(dist, "index.html"), "utf8");
+    // The service worker and manifest must always revalidate so updates roll out; Workbox chunks are hashed.
+    app.use("*", async (c, next) => {
+      await next();
+      const p = c.req.path;
+      if (c.res.status === 200 && (p === "/sw.js" || p === "/manifest.webmanifest" || p === "/registerSW.js")) {
+        c.res.headers.set("Cache-Control", "no-cache");
+      } else if (c.res.status === 200 && /^\/workbox-[\w-]+\.js$/.test(p)) {
+        c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    });
     app.use("*", serveStatic({ root }));
     app.get("*", (c) => {
       if (c.req.path.startsWith("/s/")) {

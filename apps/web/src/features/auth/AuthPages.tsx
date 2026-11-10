@@ -210,7 +210,7 @@ export function SetupPage() {
 
 /** Wraps routes that need a session; redirects to sign in and remembers where the user was going. */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { me, isLoading } = useSession();
+  const { me, isLoading, isError } = useSession();
   const location = useLocation();
   if (isLoading) {
     return (
@@ -219,6 +219,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!me) return <Navigate to="/signin" replace state={{ from: location.pathname + location.search }} />;
+  // Offline cold start: the session check fails with a network error, not a 401. Let cached pages render.
+  if (!me && !(isError && !navigator.onLine)) return <Navigate to="/signin" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
