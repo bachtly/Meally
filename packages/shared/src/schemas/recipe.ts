@@ -29,6 +29,37 @@ const organizerNames = z.array(organizerNameSchema).max(30).optional();
 export const organizerRefSchema = z.object({ name: z.string(), slug: z.string() });
 export type OrganizerRef = z.infer<typeof organizerRefSchema>;
 
+const nutrient = (max: number) => z.number().min(0).max(max).nullish().transform((v) => v ?? null);
+
+/** Per serving. Every value is optional; `source` says where the numbers came from. */
+export const nutritionSchema = z.object({
+  calories: nutrient(100_000),
+  proteinG: nutrient(10_000),
+  carbsG: nutrient(10_000),
+  fatG: nutrient(10_000),
+  saturatedFatG: nutrient(10_000),
+  fibreG: nutrient(10_000),
+  sugarG: nutrient(10_000),
+  sodiumMg: nutrient(1_000_000),
+  source: optText(300),
+});
+export type Nutrition = z.output<typeof nutritionSchema>;
+export const nutritionFields = [
+  { key: "calories", label: "Calories", unit: "kcal" },
+  { key: "fatG", label: "Total fat", unit: "g" },
+  { key: "saturatedFatG", label: "Saturated fat", unit: "g" },
+  { key: "sodiumMg", label: "Sodium", unit: "mg" },
+  { key: "carbsG", label: "Carbohydrate", unit: "g" },
+  { key: "fibreG", label: "Fibre", unit: "g" },
+  { key: "sugarG", label: "Sugar", unit: "g" },
+  { key: "proteinG", label: "Protein", unit: "g" },
+] as const satisfies readonly { key: keyof Nutrition; label: string; unit: string }[];
+
+/** True when no value and no source is set. */
+export function isNutritionEmpty(n: Nutrition | null | undefined): boolean {
+  return !n || (nutritionFields.every((f) => n[f.key] == null) && !n.source);
+}
+
 /** Array order is the position. */
 export const recipeInputSchema = z.object({
   name: text(200).min(1, "Name is required"),
@@ -53,6 +84,8 @@ export const recipeInputSchema = z.object({
   tags: organizerNames,
   categories: organizerNames,
   tools: organizerNames,
+  /** Per serving. Omitted means "leave as is"; null clears it. Ignored when `nutrition` is off. */
+  nutrition: nutritionSchema.nullish(),
 });
 export type RecipeInput = z.input<typeof recipeInputSchema>;
 export type RecipeData = z.output<typeof recipeInputSchema>;
@@ -70,6 +103,8 @@ export const recipeSchema = recipeInputSchema.extend({
   tags: z.array(organizerRefSchema).optional(),
   categories: z.array(organizerRefSchema).optional(),
   tools: z.array(organizerRefSchema).optional(),
+  /** Present only when the `nutrition` flag is on (null when none is recorded). */
+  nutrition: nutritionSchema.nullable().optional(),
   /** Present only when the `ratings` flag is on. */
   me: z.object({ favourite: z.boolean(), rating: z.number().int().min(1).max(5).nullable() }).optional(),
   householdRating: z.object({ average: z.number().nullable(), count: z.number().int() }).optional(),

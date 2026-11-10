@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
-import type { ImageSize, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
-import { imageSizes } from "@meally/shared";
+import type { ImageSize, Nutrition, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
+import { imageSizes, isNutritionEmpty } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
@@ -11,7 +11,7 @@ import { getMe, householdRating } from "../ratings/service.js";
 import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
 
 /** `org` is true when the organizers flag is on; when off, organiser fields are ignored and omitted. */
-type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boolean };
+type Org = { org?: boolean; userId?: string; ratings?: boolean; timeline?: boolean; nutrition?: boolean };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
@@ -74,6 +74,12 @@ const fields = (d: RecipeData) => ({
   notes: d.notes,
 });
 
+/** Column values for nutrition: only when the flag is on and the input has the field. Empty input clears it. */
+function nutritionCols(d: RecipeData, o: Org): { nutrition?: Nutrition | null } {
+  if (!o.nutrition || d.nutrition === undefined) return {};
+  return { nutrition: d.nutrition === null || isNutritionEmpty(d.nutrition) ? null : d.nutrition };
+}
+
 async function writeOrganizers(tx: Tx, householdId: string, id: string, data: RecipeData) {
   if (data.tags) await setRecipeOrganizers(tx, "tags", householdId, id, data.tags);
   if (data.categories) await setRecipeOrganizers(tx, "categories", householdId, id, data.categories);
@@ -94,6 +100,7 @@ async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Reci
       }
     : {};
   Object.assign(extra, rate);
+  if (o.nutrition) Object.assign(extra, { nutrition: row.nutrition ?? null });
   const ings = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, row.id)).orderBy(asc(recipeIngredients.position));
   const steps = await db.select().from(recipeSteps).where(eq(recipeSteps.recipeId, row.id)).orderBy(asc(recipeSteps.position));
   return {
@@ -130,7 +137,7 @@ export async function createRecipe(db: Db, householdId: string, userId: string, 
     const slug = await uniqueSlug(tx, householdId, data.name);
     const [row] = await tx
       .insert(recipes)
-      .values({ id, householdId, slug, ...fields(data), createdBy: userId, createdAt: now, updatedAt: now })
+      .values({ id, householdId, slug, ...fields(data), ...nutritionCols(data, o), createdBy: userId, createdAt: now, updatedAt: now })
       .returning();
     await writeChildren(tx, id, data);
     if (o.org) await writeOrganizers(tx, householdId, id, data);
@@ -151,7 +158,7 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
     const existing = await findRow(tx, householdId, slug);
     const [row] = await tx
       .update(recipes)
-      .set({ ...fields(data), updatedAt: new Date() })
+      .set({ ...fields(data), ...nutritionCols(data, o), updatedAt: new Date() })
       .where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)))
       .returning();
     await writeChildren(tx, existing.id, data);

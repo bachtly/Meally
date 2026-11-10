@@ -1,3 +1,4 @@
+import type { Nutrition } from "@meally/shared";
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { households, users } from "./auth.js";
 
@@ -27,6 +28,7 @@ export const recipes = sqliteTable(
     totalMinutes: integer("total_minutes"),
     sourceUrl: text("source_url"),
     notes: text("notes"),
+    nutrition: text("nutrition", { mode: "json" }).$type<Nutrition>(),
     imageId: text("image_id").references(() => images.id, { onDelete: "set null" }),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

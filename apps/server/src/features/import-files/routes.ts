@@ -64,10 +64,11 @@ importFileRoutes.post("/files", async (c) => {
   const user = c.get("user");
   const householdId = c.get("householdId");
   const org = (await c.get("flags").getFeatures()).organizers.enabled;
+  const nutrition = (await c.get("flags").getFeatures()).nutrition.enabled;
   const job = await createJob(db, householdId, user.id, plan.format, filename, plan.items.length);
   const dataDir = c.get("dataDir");
   // Fire and forget: the client polls GET /jobs/:id.
-  void enqueue(() => runJob({ db, dataDir, householdId, userId: user.id, org, jobId: job.id, file, plan }));
+  void enqueue(() => runJob({ db, dataDir, householdId, userId: user.id, org, nutrition, jobId: job.id, file, plan }));
   return c.json(jobView(job), 202);
 });
 

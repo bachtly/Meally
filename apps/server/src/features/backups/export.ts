@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { asc, eq } from "drizzle-orm";
-import type { Recipe } from "@meally/shared";
+import { isNutritionEmpty, type Recipe } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { recipes } from "../../db/schema/index.js";
 import { findRow, getRecipe, imagePath } from "../recipes/service.js";
@@ -14,6 +14,26 @@ const iso = (m: number | null) => {
   const h = Math.floor(m / 60);
   return `PT${h ? `${h}H` : ""}${m % 60 ? `${m % 60}M` : ""}`;
 };
+
+/** schema.org NutritionInformation, written only for values that are set. */
+function nutritionNode(n: Recipe["nutrition"]) {
+  if (isNutritionEmpty(n)) return undefined;
+  const v = (x: number | null | undefined, unit: string) => (x == null ? undefined : `${x} ${unit}`);
+  return Object.fromEntries(
+    Object.entries({
+      "@type": "NutritionInformation",
+      servingSize: "1 serving",
+      calories: v(n!.calories, "kcal"),
+      proteinContent: v(n!.proteinG, "g"),
+      carbohydrateContent: v(n!.carbsG, "g"),
+      fatContent: v(n!.fatG, "g"),
+      saturatedFatContent: v(n!.saturatedFatG, "g"),
+      fiberContent: v(n!.fibreG, "g"),
+      sugarContent: v(n!.sugarG, "g"),
+      sodiumContent: v(n!.sodiumMg, "mg"),
+    }).filter(([, x]) => x !== undefined),
+  );
+}
 
 /** schema.org Recipe node. Round-trips through our own JSON-LD importer (name, times, yield, ingredients, steps, keywords). */
 export function toJsonLd(r: Recipe, imageFile: string | null): Record<string, unknown> {
@@ -47,6 +67,7 @@ export function toJsonLd(r: Recipe, imageFile: string | null): Record<string, un
     recipeInstructions: steps,
     keywords: r.tags?.length ? r.tags.map((t) => t.name).join(", ") : undefined,
     recipeCategory: r.categories?.length ? r.categories.map((t) => t.name).join(", ") : undefined,
+    nutrition: nutritionNode(r.nutrition),
     dateCreated: new Date(r.createdAt).toISOString(),
     dateModified: new Date(r.updatedAt).toISOString(),
   };
@@ -114,6 +135,7 @@ export interface ExportOpts {
   dataDir: string;
   householdId: string;
   org: boolean;
+  nutrition?: boolean;
 }
 
 export async function exportHousehold(db: Db, z: ZipWriter, o: ExportOpts, format: ExportFormat) {
@@ -123,13 +145,13 @@ export async function exportHousehold(db: Db, z: ZipWriter, o: ExportOpts, forma
     .where(eq(recipes.householdId, o.householdId))
     .orderBy(asc(recipes.slug));
   for (const row of rows) {
-    const r = await getRecipe(db, o.householdId, row.slug, { org: o.org });
+    const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
     await addRecipe(z, o.dataDir, o.householdId, r, row.imageId, format);
   }
 }
 
 export async function exportOne(db: Db, z: ZipWriter, o: ExportOpts, slug: string, format: ExportFormat) {
   const row = await findRow(db, o.householdId, slug);
-  const r = await getRecipe(db, o.householdId, row.slug, { org: o.org });
+  const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
   await addRecipe(z, o.dataDir, o.householdId, r, row.imageId, format);
 }

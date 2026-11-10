@@ -15,6 +15,8 @@ import { StarRating } from "../ratings/StarRating";
 import { AddSheet } from "../meal-plan/AddSheet";
 import { localToday } from "../meal-plan/dates";
 import { Timeline } from "../timeline/Timeline";
+import { isNutritionEmpty } from "@meally/shared";
+import { NutritionCard } from "./NutritionCard";
 import { Feature } from "../features/Feature";
 import { useChecks } from "./useChecks";
 import { ShareDialog } from "../share/ShareDialog";
@@ -50,6 +52,7 @@ export function RecipePage() {
   const printOn = useFeature("print");
   const scalingOn = useFeature("scaling");
   const timelineOn = useFeature("timeline");
+  const nutritionOn = useFeature("nutrition");
   const [params, setParams] = useSearchParams();
   const setParam = (key: string, value: string | null) =>
     setParams(
@@ -321,6 +324,8 @@ export function RecipePage() {
           )}
         </section>
       </div>
+
+      {nutritionOn && r.nutrition && !isNutritionEmpty(r.nutrition) && <NutritionCard nutrition={r.nutrition} servings={servings} />}
 
       {r.notes && (
         <section aria-labelledby="notes-h" className="mt-10 max-w-prose rounded-lg bg-sunken p-4">

@@ -1,4 +1,4 @@
-import { isSectionHeader, parseIngredient, parseIngredients, recipeInputSchema, stripBullet, type Recipe, type RecipeInput } from "@meally/shared";
+import { isNutritionEmpty, isSectionHeader, nutritionFields, parseIngredient, parseIngredients, recipeInputSchema, stripBullet, type Recipe, type RecipeInput } from "@meally/shared";
 
 export type RowKind = "item" | "header";
 export interface Row {
@@ -51,6 +51,8 @@ export interface FormState {
   tags: string[];
   categories: string[];
   tools: string[];
+  /** Nutrition per serving, as typed; keyed by `nutritionFields` plus `source`. */
+  nutrition: Record<string, string>;
 }
 
 export function initialForm(r?: Recipe): FormState {
@@ -72,6 +74,7 @@ export function initialForm(r?: Recipe): FormState {
     tags: (r?.tags ?? []).map((o) => o.name),
     categories: (r?.categories ?? []).map((o) => o.name),
     tools: (r?.tools ?? []).map((o) => o.name),
+    nutrition: Object.fromEntries([...nutritionFields.map((f) => [f.key, n(r?.nutrition?.[f.key])]), ["source", r?.nutrition?.source ?? ""]]),
   };
 }
 
@@ -85,7 +88,7 @@ export const shownTotal = (f: FormState) => (f.totalEdited ? f.total : autoTotal
 export const snapshot = (f: FormState, hasPhoto: boolean) =>
   JSON.stringify({ ...f, total: shownTotal(f), ingredients: f.ingredients.map(({ kind, text }) => [kind, text]), steps: f.steps.map(({ kind, text }) => [kind, text]), hasPhoto });
 
-export type Errors = Partial<Record<"name" | "prep" | "cook" | "total" | "servings" | "sourceUrl" | "form", string>>;
+export type Errors = Partial<Record<"nutrition" | "name" | "prep" | "cook" | "total" | "servings" | "sourceUrl" | "form", string>>;
 
 function num(v: string, int: boolean): number | null | "bad" {
   if (v.trim() === "") return null;
@@ -94,7 +97,7 @@ function num(v: string, int: boolean): number | null | "bad" {
   return x;
 }
 
-export function buildInput(f: FormState, withOrganizers = false): { input?: RecipeInput; errors: Errors } {
+export function buildInput(f: FormState, withOrganizers = false, withNutrition = false): { input?: RecipeInput; errors: Errors } {
   const errors: Errors = {};
   const prep = num(f.prep, true);
   const cook = num(f.cook, true);
@@ -104,6 +107,14 @@ export function buildInput(f: FormState, withOrganizers = false): { input?: Reci
   if (cook === "bad") errors.cook = "Whole minutes only";
   if (total === "bad") errors.total = "Whole minutes only";
   if (servings === "bad" || servings === 0) errors.servings = "Enter a number above zero";
+
+  const nutrition: Record<string, number | string | null> = {};
+  for (const nf of nutritionFields) {
+    const v = num(f.nutrition[nf.key] ?? "", false);
+    if (v === "bad") errors.nutrition = `${nf.label} must be a number, zero or more`;
+    else nutrition[nf.key] = v;
+  }
+  nutrition.source = (f.nutrition.source ?? "").trim() || null;
 
   let sourceUrl = f.sourceUrl.trim();
   if (sourceUrl && !/^[a-z][a-z0-9+.-]*:\/\//i.test(sourceUrl)) sourceUrl = `https://${sourceUrl}`;
@@ -144,6 +155,7 @@ export function buildInput(f: FormState, withOrganizers = false): { input?: Reci
     notes: f.notes,
     ingredients,
     steps,
+    ...(withNutrition ? { nutrition: isNutritionEmpty(nutrition as never) ? null : (nutrition as never) } : {}),
     ...(withOrganizers ? { tags: f.tags, categories: f.categories, tools: f.tools } : {}),
   };
   const parsed = recipeInputSchema.safeParse(input);

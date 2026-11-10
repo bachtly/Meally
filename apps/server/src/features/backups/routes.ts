@@ -23,6 +23,7 @@ async function opts(c: Context<AppEnv>) {
     dataDir: c.get("dataDir"),
     householdId: c.get("householdId"),
     org: (await c.get("flags").getFeatures()).organizers.enabled,
+    nutrition: (await c.get("flags").getFeatures()).nutrition.enabled,
   };
 }
 

@@ -66,6 +66,7 @@ interface Ctx {
   householdId: string;
   userId: string;
   org: boolean;
+  nutrition: boolean;
   jobId: string;
   file: string;
   plan: Plan;
@@ -121,7 +122,7 @@ export async function runJob(ctx: Ctx) {
             input.tags = cleanNames(extracted.keywords, 10);
             input.categories = cleanNames(extracted.categories, 10);
           }
-          const recipe = await createRecipe(db, ctx.householdId, ctx.userId, input, { org: ctx.org });
+          const recipe = await createRecipe(db, ctx.householdId, ctx.userId, input, { org: ctx.org, nutrition: ctx.nutrition });
           imported++;
           if (image?.length) {
             // A bad photo never fails the recipe.

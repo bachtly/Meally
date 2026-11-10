@@ -1,5 +1,6 @@
 import { ImagePlus } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { nutritionFields } from "@meally/shared";
 import { Link, useBlocker, useNavigate, useParams } from "react-router";
 import type { Recipe } from "@meally/shared";
 import { ApiRequestError } from "../../lib/api";
@@ -80,6 +81,7 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
   const toast = useToast();
   const save = useSaveRecipe(recipe?.slug);
   const organizersOn = useFeature("organizers");
+  const nutritionOn = useFeature("nutrition");
   const tagOpts = useOrganizers("tags", organizersOn).data ?? [];
   const catOpts = useOrganizers("categories", organizersOn).data ?? [];
   const toolOpts = useOrganizers("tools", organizersOn).data ?? [];
@@ -107,7 +109,7 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
 
   const submit = () => {
     if (save.isPending) return;
-    const { input, errors: errs } = buildInput(form, organizersOn);
+    const { input, errors: errs } = buildInput(form, organizersOn, nutritionOn);
     setErrors(errs);
     if (!input) {
       if (errs.name) nameRef.current?.focus();
@@ -234,6 +236,33 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
       <Section title="Notes">
         <Textarea aria-label="Notes" rows={3} value={form.notes} onChange={(e) => patch({ notes: e.target.value })} />
       </Section>
+
+      {nutritionOn && (
+        <details className="rounded-lg border border-line p-4" open={Object.values(form.nutrition).some(Boolean)}>
+          <summary className="min-h-11 cursor-pointer text-xl font-semibold">Nutrition (per serving)</summary>
+          <fieldset className="mt-3 flex flex-col gap-3">
+            <legend className="sr-only">Nutrition per serving</legend>
+            <p className="text-sm text-muted">Optional. Enter the numbers for one serving, for example from a food label.</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {nutritionFields.map((nf) => (
+                <Field key={nf.key} label={`${nf.label} (${nf.unit})`}>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="any"
+                    value={form.nutrition[nf.key] ?? ""}
+                    onChange={(ev) => patch({ nutrition: { ...form.nutrition, [nf.key]: ev.target.value } })}
+                  />
+                </Field>
+              ))}
+            </div>
+            <Field label="Source" hint="For example, food label or USDA FoodData Central" error={errors.nutrition}>
+              <Input value={form.nutrition.source ?? ""} onChange={(ev) => patch({ nutrition: { ...form.nutrition, source: ev.target.value } })} />
+            </Field>
+          </fieldset>
+        </details>
+      )}
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-end gap-2 border-t border-line bg-raised px-4 py-2 lg:hidden">
         {actions}

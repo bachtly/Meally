@@ -1,5 +1,6 @@
 import { parse, type HTMLElement } from "node-html-parser";
 import { parseIngredient, type RecipeInput } from "@meally/shared";
+import { nutritionFromSchemaOrg } from "./nutrition.js";
 
 export interface ExtractedRecipe {
   recipe: RecipeInput;
@@ -154,6 +155,7 @@ export interface Fields {
   instructions: unknown;
   keywords: unknown;
   category: unknown;
+  nutrition?: unknown;
 }
 
 export function build(f: Fields, url: string | null, ready?: NonNullable<RecipeInput["ingredients"]>): ExtractedRecipe | null {
@@ -171,6 +173,7 @@ export function build(f: Fields, url: string | null, ready?: NonNullable<RecipeI
       cookMinutes: parseDuration(f.cook),
       totalMinutes: parseDuration(f.total),
       sourceUrl: url || null,
+      ...(f.nutrition ? { nutrition: nutritionFromSchemaOrg(f.nutrition) } : {}),
       ingredients: ingredients.slice(0, 200),
       steps: steps.slice(0, 200).map((s) => ({ ...s, text: s.text.slice(0, 5000) })),
     },
@@ -195,6 +198,7 @@ export function recipeFromNode(r: Obj, url: string | null): ExtractedRecipe | nu
       instructions: r.recipeInstructions,
       keywords: r.keywords,
       category: r.recipeCategory,
+      nutrition: r.nutrition,
     },
     url,
   );
