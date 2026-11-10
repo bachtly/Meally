@@ -7,6 +7,10 @@ import { imageSizes } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { images, recipeIngredients, recipes, recipeSteps } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
+import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
+
+/** `org` is true when the organizers flag is on; when off, organiser fields are ignored and omitted. */
+type Org = { org?: boolean };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Row = typeof recipes.$inferSelect;
@@ -67,7 +71,20 @@ const fields = (d: RecipeData) => ({
   notes: d.notes,
 });
 
-async function load(db: Pick<Db, "select">, row: Row): Promise<Recipe> {
+async function writeOrganizers(tx: Tx, householdId: string, id: string, data: RecipeData) {
+  if (data.tags) await setRecipeOrganizers(tx, "tags", householdId, id, data.tags);
+  if (data.categories) await setRecipeOrganizers(tx, "categories", householdId, id, data.categories);
+  if (data.tools) await setRecipeOrganizers(tx, "tools", householdId, id, data.tools);
+}
+
+async function load(db: Pick<Db, "select">, row: Row, org = false): Promise<Recipe> {
+  const extra = org
+    ? {
+        tags: (await loadRefs(db, "tags", [row.id])).get(row.id) ?? [],
+        categories: (await loadRefs(db, "categories", [row.id])).get(row.id) ?? [],
+        tools: (await loadRefs(db, "tools", [row.id])).get(row.id) ?? [],
+      }
+    : {};
   const ings = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, row.id)).orderBy(asc(recipeIngredients.position));
   const steps = await db.select().from(recipeSteps).where(eq(recipeSteps.recipeId, row.id)).orderBy(asc(recipeSteps.position));
   return {
@@ -87,6 +104,7 @@ async function load(db: Pick<Db, "select">, row: Row): Promise<Recipe> {
     steps: steps.map(({ position, section, text }) => ({ position, section, text })),
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
+    ...extra,
   };
 }
 
@@ -96,7 +114,7 @@ async function findRow(db: Pick<Db, "select">, householdId: string, slug: string
   return row;
 }
 
-export async function createRecipe(db: Db, householdId: string, userId: string, data: RecipeData): Promise<Recipe> {
+export async function createRecipe(db: Db, householdId: string, userId: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
   const now = new Date();
   const id = randomUUID();
   const row = await db.transaction(async (tx) => {
@@ -106,18 +124,19 @@ export async function createRecipe(db: Db, householdId: string, userId: string, 
       .values({ id, householdId, slug, ...fields(data), createdBy: userId, createdAt: now, updatedAt: now })
       .returning();
     await writeChildren(tx, id, data);
+    if (o.org) await writeOrganizers(tx, householdId, id, data);
     await reindex(tx, householdId, id, data);
     return row!;
   });
-  return load(db, row);
+  return load(db, row, o.org);
 }
 
-export async function getRecipe(db: Db, householdId: string, slug: string): Promise<Recipe> {
-  return load(db, await findRow(db, householdId, slug));
+export async function getRecipe(db: Db, householdId: string, slug: string, o: Org = {}): Promise<Recipe> {
+  return load(db, await findRow(db, householdId, slug), o.org);
 }
 
 /** Replaces the recipe fields, ingredients and steps in one transaction. The slug never changes. */
-export async function replaceRecipe(db: Db, householdId: string, slug: string, data: RecipeData): Promise<Recipe> {
+export async function replaceRecipe(db: Db, householdId: string, slug: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
   const row = await db.transaction(async (tx) => {
     const existing = await findRow(tx, householdId, slug);
     const [row] = await tx
@@ -126,10 +145,11 @@ export async function replaceRecipe(db: Db, householdId: string, slug: string, d
       .where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)))
       .returning();
     await writeChildren(tx, existing.id, data);
+    if (o.org) await writeOrganizers(tx, householdId, existing.id, data);
     await reindex(tx, householdId, existing.id, data);
     return row!;
   });
-  return load(db, row);
+  return load(db, row, o.org);
 }
 
 export async function deleteRecipe(db: Db, dataDir: string, householdId: string, slug: string) {
@@ -164,7 +184,15 @@ function decode(cursor: string): [string | number, string] {
 export async function listRecipes(
   db: Db,
   householdId: string,
-  opts: { q?: string; sort: "updated" | "name" | "created"; cursor?: string; limit: number },
+  opts: {
+    q?: string;
+    sort: "updated" | "name" | "created";
+    cursor?: string;
+    limit: number;
+    tag?: string[];
+    category?: string[];
+    tool?: string[];
+  } & Org,
 ): Promise<RecipeListResponse> {
   const conds: SQL[] = [eq(recipes.householdId, householdId)];
   if (opts.q) {
@@ -173,6 +201,12 @@ export async function listRecipes(
     conds.push(
       sql`${recipes.id} IN (SELECT recipe_id FROM recipes_fts WHERE recipes_fts MATCH ${match} AND household_id = ${householdId})`,
     );
+  }
+  // OR within a type, AND across types. Ignored when the flag is off.
+  if (opts.org) {
+    if (opts.tag?.length) conds.push(hasAnyOf("tags", householdId, opts.tag, recipes.id));
+    if (opts.category?.length) conds.push(hasAnyOf("categories", householdId, opts.category, recipes.id));
+    if (opts.tool?.length) conds.push(hasAnyOf("tools", householdId, opts.tool, recipes.id));
   }
   // Keyset pagination on (sort key, id). updated/created are newest first; name is A to Z.
   const key = opts.sort === "name" ? sql`lower(${recipes.name})` : opts.sort === "created" ? recipes.createdAt : recipes.updatedAt;
@@ -191,6 +225,9 @@ export async function listRecipes(
     .limit(opts.limit + 1);
   const page = rows.slice(0, opts.limit);
   const last = page[page.length - 1];
+  const ids = page.map(({ row }) => row.id);
+  const tagMap = opts.org ? await loadRefs(db, "tags", ids) : null;
+  const catMap = opts.org ? await loadRefs(db, "categories", ids) : null;
   const items: RecipeSummary[] = page.map(({ row }) => ({
     id: row.id,
     slug: row.slug,
@@ -199,6 +236,7 @@ export async function listRecipes(
     totalMinutes: row.totalMinutes,
     servings: row.servings,
     updatedAt: row.updatedAt.getTime(),
+    ...(tagMap && catMap ? { tags: tagMap.get(row.id) ?? [], categories: catMap.get(row.id) ?? [] } : {}),
   }));
   return { items, nextCursor: rows.length > opts.limit && last ? encode(last.k, last.row.id) : null };
 }

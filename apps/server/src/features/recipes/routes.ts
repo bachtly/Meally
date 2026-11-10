@@ -27,6 +27,7 @@ function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
   }
   return parsed.data;
 }
+const orgOn = async (c: Context<AppEnv>) => (await c.get("flags").getFeatures()).organizers.enabled;
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
 
 export const recipeRoutes = new Hono<AppEnv>();
@@ -34,17 +35,18 @@ recipeRoutes.use("*", requireAuth);
 
 recipeRoutes
   .get("/", async (c) => {
-    const query = parse(c.req.query(), recipeListQuerySchema);
-    return c.json(await listRecipes(c.get("db"), c.get("householdId"), query));
+    const raw = { ...c.req.query(), tag: c.req.queries("tag"), category: c.req.queries("category"), tool: c.req.queries("tool") };
+    const query = parse(raw, recipeListQuerySchema);
+    return c.json(await listRecipes(c.get("db"), c.get("householdId"), { ...query, org: await orgOn(c) }));
   })
   .post("/", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data), 201);
+    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data, { org: await orgOn(c) }), 201);
   })
-  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"))))
+  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), { org: await orgOn(c) })))
   .put("/:slug", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data));
+    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data, { org: await orgOn(c) }));
   })
   .delete("/:slug", async (c) => {
     await deleteRecipe(c.get("db"), c.get("dataDir"), c.get("householdId"), c.req.param("slug"));
@@ -74,7 +76,7 @@ recipeRoutes
         if (e instanceof ApiError) throw e;
         throw new ApiError(415, "unsupported_media", "That file is not a readable image");
       }
-      return c.json(await getRecipe(db, householdId, slug), 201);
+      return c.json(await getRecipe(db, householdId, slug, { org: await orgOn(c) }), 201);
     },
   );
 

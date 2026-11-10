@@ -36,6 +36,13 @@
       "when": 1794329464137,
       "tag": "0004_recipes_fts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794330549482,
+      "tag": "0005_funny_blue_shield",
+      "breakpoints": true
     }
   ]
 }

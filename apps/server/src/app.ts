@@ -1,3 +1,4 @@
+import { organizerRoutes } from "./features/organizers/routes.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
@@ -70,6 +71,7 @@ export function createApp(opts: AppOptions = {}) {
   api.route("/auth", authRoutes);
   api.route("/features", featureRoutes);
   api.route("/recipes", recipeRoutes);
+  api.route("/organizers", organizerRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
   api.route("/images", imageRoutes);

@@ -5,6 +5,7 @@ import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { createRecipe, setRecipeImage } from "../recipes/service.js";
+import { cleanNames } from "../organizers/service.js";
 import { extractRecipe } from "./extract.js";
 
 const bodySchema = z.object({ url: z.string().trim().min(1).max(2000) });
@@ -34,7 +35,13 @@ importRoutes.post("/preview", async (c) => c.json(await load(c)));
 importRoutes.post("/", async (c) => {
   const found = await load(c);
   const db = c.get("db");
-  const recipe = await createRecipe(db, c.get("householdId"), c.get("user").id, recipeInput(found.recipe));
+  const org = (await c.get("flags").getFeatures()).organizers.enabled;
+  const input = recipeInput(found.recipe);
+  if (org) {
+    input.tags = cleanNames(found.keywords, 10);
+    input.categories = cleanNames(found.categories, 10);
+  }
+  const recipe = await createRecipe(db, c.get("householdId"), c.get("user").id, input, { org });
   if (found.imageUrl) {
     // A missing or bad image never fails the import.
     try {

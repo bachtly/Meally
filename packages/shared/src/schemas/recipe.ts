@@ -22,6 +22,13 @@ export const stepInputSchema = z.object({
   text: text(5000).min(1, "Step text is required"),
 });
 
+export const organizerTypes = ["tags", "categories", "tools"] as const;
+export type OrganizerType = (typeof organizerTypes)[number];
+export const organizerNameSchema = text(60).min(1, "Name is required");
+const organizerNames = z.array(organizerNameSchema).max(30).optional();
+export const organizerRefSchema = z.object({ name: z.string(), slug: z.string() });
+export type OrganizerRef = z.infer<typeof organizerRefSchema>;
+
 /** Array order is the position. */
 export const recipeInputSchema = z.object({
   name: text(200).min(1, "Name is required"),
@@ -42,6 +49,10 @@ export const recipeInputSchema = z.object({
   notes: optText(10_000),
   ingredients: z.array(ingredientInputSchema).max(200).default([]),
   steps: z.array(stepInputSchema).max(200).default([]),
+  /** Names, upserted case-insensitively. Omitted means "leave as is"; ignored when `organizers` is off. */
+  tags: organizerNames,
+  categories: organizerNames,
+  tools: organizerNames,
 });
 export type RecipeInput = z.input<typeof recipeInputSchema>;
 export type RecipeData = z.output<typeof recipeInputSchema>;
@@ -55,6 +66,10 @@ export const recipeSchema = recipeInputSchema.extend({
   imageUrl: z.string().nullable(),
   ingredients: z.array(recipeIngredientSchema),
   steps: z.array(recipeStepSchema),
+  /** Present only when the `organizers` flag is on. */
+  tags: z.array(organizerRefSchema).optional(),
+  categories: z.array(organizerRefSchema).optional(),
+  tools: z.array(organizerRefSchema).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -67,14 +82,25 @@ export const recipeSummarySchema = z.object({
   imageUrl: z.string().nullable(),
   totalMinutes: z.number().nullable(),
   servings: z.number().nullable(),
+  tags: z.array(organizerRefSchema).optional(),
+  categories: z.array(organizerRefSchema).optional(),
   updatedAt: z.number(),
 });
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
+
+const slugList = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((v) => (v === undefined ? [] : (Array.isArray(v) ? v : [v]).map((x) => x.trim()).filter(Boolean).slice(0, 20)));
 
 export const recipeSorts = ["updated", "name", "created"] as const;
 export const recipeListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
   sort: z.enum(recipeSorts).default("updated"),
+  /** Organiser slugs. Repeat to match any of several (OR within a type; AND across types). */
+  tag: slugList,
+  category: slugList,
+  tool: slugList,
   cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(24),
 });

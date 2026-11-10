@@ -45,6 +45,12 @@ describe("import url routes", () => {
     expect(rec.sourceUrl).toBe("https://example.com/soup");
     expect(rec.imageUrl).toMatch(/^\/api\/v1\/images\//);
   });
+  it("saves keywords and categories as tags and categories", async () => {
+    const { slug } = (await (await post("", "https://example.com/soup2")).json()) as any;
+    const rec = (await (await app.request(`/api/v1/recipes/${slug}`, { headers: { ...H, cookie } })).json()) as any;
+    expect(rec.tags.length).toBeGreaterThan(0);
+    expect(rec.tags.length).toBeLessThanOrEqual(10);
+  });
   it("maps errors", async () => {
     expect((await post("", "https://example.com/none")).status).toBe(422);
     expect((await post("", "https://blocked.example/")).status).toBe(400);
