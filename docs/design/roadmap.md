@@ -24,7 +24,7 @@ following [the template](features/_template.md).
 | 17 | feat: cookbooks | F14 | Open (#24) |
 | 18 | feat: households, members, invites | F15 | Open (#18) |
 | 19 | feat: public share links | F16 | Open (#23) |
-| 20 | feat: foods and units catalogue | F7 | Open (this PR) |
+| 20 | feat: foods and units catalogue | F7 | Open (#37) |
 | 21 | feat: import from other apps | F17 | Open (#25) |
 | 22 | feat: export and backups | F18 | Open (#28) |
 | 23 | feat: timeline and comments | F19 | Open (#26) |
