@@ -1,21 +1,20 @@
 // Runtime caching rules for the generated service worker. Matchers are self-contained functions
-// because Workbox serialises them into sw.js (no imports or outer variables allowed inside).
+// because Workbox serialises them into sw.js with toString(): no imports, helpers or outer variables inside,
+// or every request throws a ReferenceError in the worker (pwa.test.tsx rebuilds them from source to check).
 interface MatchCtx {
   url: URL;
   request: { method: string };
   sameOrigin?: boolean;
 }
-const isGet = (r: { method: string }) => r.method === "GET";
-
 export const matchers = {
   /** Single recipe: /api/v1/recipes/<slug> only (not /image, /cook-log, ...). */
-  recipeDetail: ({ url, request }: MatchCtx) => isGet(request) && /^\/api\/v1\/recipes\/[^/]+$/.test(url.pathname),
+  recipeDetail: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/recipes\/[^/]+$/.test(url.pathname),
   /** Recipe list: /api/v1/recipes (with any query string). */
-  recipeList: ({ url, request }: MatchCtx) => isGet(request) && /^\/api\/v1\/recipes\/?$/.test(url.pathname),
+  recipeList: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/recipes\/?$/.test(url.pathname),
   /** Recipe images: /api/v1/images/<id>/<size>. */
-  images: ({ url, request }: MatchCtx) => isGet(request) && /^\/api\/v1\/images\/[^/]+\/[^/]+$/.test(url.pathname),
+  images: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/images\/[^/]+\/[^/]+$/.test(url.pathname),
   /** Feature flags: lets the app boot offline. Contains no personal data. */
-  features: ({ url, request }: MatchCtx) => isGet(request) && url.pathname === "/api/v1/features",
+  features: ({ url, request }: MatchCtx) => request.method === "GET" && url.pathname === "/api/v1/features",
 };
 
 export const runtimeCaching = [
