@@ -80,7 +80,7 @@ Receiver views:
 
 - **One recipe**: today's page plus a header line "Shared by Alice", the note, and the primary button.
 - **Set or cookbook**: title, "Shared by Alice", note, count, the card grid; each card opens the recipe inside the link
-  (`/s/:token/:n`). Buttons: "Save all (12)" and per-recipe "Save". Partial saves show "Saved 3 of 12".
+  (`/s/:token/:slug`). Buttons: "Save all (12)" and per-recipe "Save". Partial saves show "Saved 3 of 12".
 - **States**: skeleton while loading; "This link no longer works" (unknown, expired, revoked, flag off); "Sign-ups are
   closed on this server" (save hidden, print kept); save errors with retry; "Saving 12 recipes…" progress for bulk.
 
@@ -112,7 +112,7 @@ Public (no auth, 404 for unknown/expired/revoked/flag off, same headers as F16):
 
 - `GET /api/v1/public/shares/:token` → `{kind, title, note, sharedBy, count, recipe? , items?: {n, name, imageUrl,
   totalMinutes}[]}`.
-- `GET /api/v1/public/shares/:token/:n` and `…/:n/image/:size`. `GET /public/recipes/:token` stays as an alias.
+- `GET /api/v1/public/shares/:token/recipes/:slug` and `…/:slug/image/:size` (slug, not an index: stable when a live cookbook reorders). `GET /public/recipes/:token` stays as an alias.
 
 Exposure is F16's list plus `sharedBy` (only when the sharer left it on), `note` and `title`. Never ids, emails,
 household names, tags or ratings.

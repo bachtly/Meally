@@ -43,8 +43,8 @@ following [the template](features/_template.md).
 | 35 | feat(web): recipes and organisers read from the local copy | F2, F9 | Planned |
 | 36 | feat(web): meal plan and shopping lists read from the local copy | F12, F13 | Planned |
 | 37 | feat(web): writes confirm with the server, then refresh the local copy | F24 | Planned |
-| 38 | docs: design for sharing many recipes, saving a share and the receiver's path into the app (`2026-11-11-sharing/design.md`) | F16 | This PR |
-| 39 | feat(server): share sets and cookbooks, sharer name and note | F16, F14 | Planned |
+| 38 | docs: design for sharing many recipes, saving a share and the receiver's path into the app (`2026-11-11-sharing/design.md`) | F16 | Done (#54) |
+| 39 | feat(server): share sets and cookbooks, sharer name and note | F16, F14 | This PR |
 | 40 | feat(server): save a share into my household (copy, images, provenance, dedupe, bulk job) | F16 | Planned |
 | 41 | feat(web): library select mode, share many, share a cookbook, Shared links page | F16, F14 | Planned |
 | 42 | feat(web): share view for sets and cookbooks, in-shell when signed in, Save and Save all | F16 | Planned |

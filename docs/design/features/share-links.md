@@ -14,22 +14,34 @@ listed (created, expiry, views) and revoked at any time. The link is shown once,
 | D2 | Store only the SHA-256 of the token; the URL is returned once and cannot be recovered. | Store the token to show it again. | [S1], [S2] |
 | D3 | Expiry and revocation are required, per link; the public API answers 404 for unknown, expired, revoked or flag-off. | Permanent links only. | [S1] |
 | D4 | `X-Robots-Tag: noindex, nofollow` on the public API, and `Referrer-Policy: no-referrer` for `/s/*`, so the token is not leaked via Referer or indexed. | Rely on robots.txt (it only asks crawlers not to crawl, and the URL can still be indexed). | [S1], [S3] |
+| D5 | A link targets one recipe, a hand-picked **set** (1–100, ordered) or a **cookbook**. Sets store recipe ids and show each recipe's current version; a deleted recipe drops out. Cookbook links are fully live (up to 200 recipes); a smart cookbook re-runs its filter as the sharer. | Snapshot copies at share time; a separate collection feature. | [S5], [S6] |
+| D6 | "Shared by" is the sharer's name **snapshotted** on the link at creation, on by default (`showName: false` hides it). An optional note (≤ 280). Never a user id. | Live lookup of the profile; anonymous only. | [S7] |
+| D7 | A recipe inside a set or cookbook link is addressed by its **slug**, checked against what the link currently shows. Slugs are derived from names already on the page and stay stable when a live cookbook reorders. | An index `n` (shifts in a live cookbook); recipe ids (internal). | (judgement) |
+| D8 | A smart cookbook filtered by favourites or rating shows **nothing** once the sharer's account is gone, instead of the unfiltered library. | Fall back to no filter. | (judgement) |
 
 A slug-based public recipe would be guessable and permanent; a capability URL ties access to a secret that can be
 revoked without changing the recipe. The cost is that anyone holding the link can forward it; that is the intended model.
 
 ## Data and API
 
-Table `share_links`: id, household_id, recipe_id (cascade), token_hash (unique), created_by, created_at, expires_at,
-revoked_at, view_count.
+Table `share_links`: id, household_id, kind (`recipe`/`set`/`cookbook`), recipe_id (cascade, recipe links),
+cookbook_id (cascade, cookbook links), title (sets), note, sharer_name, token_hash (unique), created_by, created_at,
+expires_at, revoked_at, view_count. A check constraint ties the target columns to `kind`. Table `share_link_recipes`
+(share_link_id, recipe_id, position), both cascade.
 
-- `POST /api/v1/recipes/:slug/shares {expiresInDays?: 1|7|30|null}` returns `{url}`.
+- `POST /api/v1/recipes/:slug/shares {expiresInDays?, showName?, note?}` returns `{url}`.
+- `POST /api/v1/shares {recipeSlugs, title?, expiresInDays?, showName?, note?}` (a set; 400 if any slug isn't the
+  household's) and `POST /api/v1/cookbooks/:slug/shares {…}` (also needs `cookbooks`) return `{url}`.
+- `GET /api/v1/shares` lists every active link of the household (`ShareSummary`: kind, title, targetSlug, count,
+  sharedBy, note, dates, views), never tokens.
 - `GET /api/v1/recipes/:slug/shares` lists active links (id, createdAt, expiresAt, viewCount), never tokens.
 - `DELETE /api/v1/shares/:id` revokes.
-- `GET /api/v1/public/recipes/:token` (no auth, 60 requests per minute per IP) and
-  `GET /api/v1/public/recipes/:token/image/:size`.
+- `GET /api/v1/public/shares/:token` (`PublicShare`: kind, title, note, sharedBy, count, recipe for recipe links,
+  items), `GET /api/v1/public/shares/:token/recipes/:slug` and `…/:slug/image/:size`. No auth, 60 requests per minute
+  per IP. A cookbook link answers 404 while `cookbooks` is off.
+- `GET /api/v1/public/recipes/:token` and `…/image/:size` stay for recipe links already sent.
 
-Exposed: name, description, times, servings, source URL, notes, ingredients, steps, and the recipe's own image. Not
+Exposed: the link's title, note and sharer name (when shown), and for each recipe: slug (inside the link only), name, description, times, servings, source URL, notes, ingredients, steps, and the recipe's own image. Not
 exposed: any id, household, author or user data, tags, ratings, or other recipes. Images are fetched through the token,
 so a link can never read another recipe's file.
 
@@ -47,9 +59,14 @@ tokens are "stored securely" without saying "hashed". D2 (SHA-256 of a 256-bit r
 
 ## Sources
 
+Sets and cookbooks (PR 39) follow `docs/design/2026-11-11-sharing/design.md`, which has the full research.
+
 Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary only.
 
 - [S1] Good Practices for Capability URLs, W3C TAG (page): https://www.w3.org/2001/tag/doc/capability-urls/ . Supports: 120+ bits of entropy, expiry, owner revocation, several links per resource, Referer leakage mitigations, 404/410 once expired.
 - [S2] Forgot Password Cheat Sheet, OWASP (page): https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html . Supports: random, long, single-use, expiring tokens, "stored securely". No hashing detail, no lifetime.
 - [S3] Block Search indexing with noindex, Google Search Central (snippet): https://developers.google.com/search/docs/crawling-indexing/block-indexing . Supports: `X-Robots-Tag: noindex`; a robots.txt-blocked page can still appear in results.
 - [S4] Referrer Policy, MDN (snippet): https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy . Supports: `no-referrer` omits the Referer header.
+- [S5] RecipeSage docs, Sharing (page): https://docs.recipesage.com/docs/tutorials/people/sharing/ . Several recipes via one profile link.
+- [S6] Files.com, Snapshot and live share links (snippet): https://www.files.com/docs/sharing/share-links/snapshot-and-live-share-links . Live links show later changes; snapshots freeze them.
+- [S7] Plan to Eat, "Whose recipe is it anyway" (page): https://learn.plantoeat.com/help/whose-recipe-is-it-anyway . The source stays as the original author's credit, separate from who shared it.
