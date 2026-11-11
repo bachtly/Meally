@@ -267,8 +267,8 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
     const at = now();
     const claimed = await queryRows<{ id: string; webhook_id: string; event: string; payload: string; attempt: number }>(
       db,
-      sql`UPDATE webhook_retries SET next_at = ${new Date(at.getTime() + RETRY_LEASE_MS)}
-        WHERE id IN (SELECT id FROM webhook_retries WHERE next_at <= ${at} ORDER BY next_at LIMIT ${RETRY_BATCH} FOR UPDATE SKIP LOCKED)
+      sql`UPDATE webhook_retries SET next_at = ${new Date(at.getTime() + RETRY_LEASE_MS).toISOString()}::timestamptz
+        WHERE id IN (SELECT id FROM webhook_retries WHERE next_at <= ${at.toISOString()}::timestamptz ORDER BY next_at LIMIT ${RETRY_BATCH} FOR UPDATE SKIP LOCKED)
         RETURNING id, webhook_id, event, payload, attempt`,
     );
     for (const r of claimed) {
