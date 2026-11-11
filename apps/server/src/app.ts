@@ -12,6 +12,8 @@ import { backupRoutes } from "./features/backups/routes.js";
 import { defineImportJob, failStaleJobs } from "./features/import-files/service.js";
 import type { Platform } from "./ports/index.js";
 import { createNodePlatform } from "./adapters/node/index.js";
+import { injectShareHead } from "@meally/shared";
+import { publicShareMeta } from "./features/share/service.js";
 
 export { version };
 
@@ -71,12 +73,32 @@ export function createApp(opts: AppOptions = {}) {
       }
     });
     app.use("*", serveStatic({ root }));
-    app.get("*", (c) => {
-      if (c.req.path.startsWith("/s/")) {
-        c.header("Referrer-Policy", "no-referrer");
-        c.header("X-Robots-Tag", "noindex, nofollow");
+    const origin = (() => {
+      try {
+        return new URL(env.BASE_URL ?? "").origin;
+      } catch {
+        return null;
       }
-      return c.html(index);
+    })();
+    app.get("*", async (c) => {
+      const share = /^\/s\/([^/]+)(?:\/[^/]+)?\/?$/.exec(c.req.path);
+      if (!share) return c.html(index);
+      c.header("Referrer-Policy", "no-referrer");
+      c.header("X-Robots-Tag", "noindex, nofollow");
+      // Link previews: chat apps read Open Graph tags from the HTML and don't run JS. Best effort; never blocks the page.
+      try {
+        const f = await flags.getFeatures();
+        if (!f["share-links"].enabled) return c.html(index);
+        const meta = await publicShareMeta(db, decodeURIComponent(share[1]!), {
+          scaling: f.scaling.enabled,
+          cookbooks: f.cookbooks.enabled,
+          organizers: f.organizers.enabled,
+          ratings: f.ratings.enabled,
+        });
+        return c.html(meta ? injectShareHead(index, meta, origin ?? new URL(c.req.url).origin, c.req.path) : index);
+      } catch {
+        return c.html(index);
+      }
     });
   }
   return app;

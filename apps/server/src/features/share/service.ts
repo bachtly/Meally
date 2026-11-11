@@ -9,6 +9,7 @@ import {
   type PublicShare,
   type PublicShareItem,
   type ShareLink,
+  type ShareMeta,
   type ShareSummary,
 } from "@meally/shared";
 import type { Db } from "../../db/index.js";
@@ -233,8 +234,8 @@ async function toPublicRecipe(db: Db, r: RecipeRow, img: string | null, scaling:
   };
 }
 
-/** The landing payload for `/s/:token`. Counts a view. */
-export async function publicShare(db: Db, token: string, flags: ShareFlags): Promise<PublicShare | null> {
+/** The landing payload for `/s/:token`. Counts a view unless `countView` is false (link previews). */
+export async function publicShare(db: Db, token: string, flags: ShareFlags, countView = true): Promise<PublicShare | null> {
   const link = await findActive(db, token);
   if (!link) return null;
   const ids = await linkRecipeIds(db, link, flags);
@@ -243,7 +244,7 @@ export async function publicShare(db: Db, token: string, flags: ShareFlags): Pro
   const byId = new Map(rows.map((r) => [r.id, r]));
   const ordered = ids.map((id) => byId.get(id)).filter((r): r is RecipeRow => !!r);
   if (link.kind === "recipe" && !ordered.length) return null;
-  await db.update(shareLinks).set({ viewCount: link.viewCount + 1 }).where(eq(shareLinks.id, link.id));
+  if (countView) await db.update(shareLinks).set({ viewCount: link.viewCount + 1 }).where(eq(shareLinks.id, link.id));
   const items: PublicShareItem[] = ordered.map((r) => ({
     slug: r.slug,
     name: r.name,
@@ -261,6 +262,14 @@ export async function publicShare(db: Db, token: string, flags: ShareFlags): Pro
     recipe: link.kind === "recipe" && first ? await toPublicRecipe(db, first, `${base(token)}/${first.slug}/image/800`, flags.scaling) : null,
     items,
   };
+}
+
+/** What a link preview needs (Open Graph, JSON-LD). Never counts a view: chat apps fetch previews on their own. */
+export async function publicShareMeta(db: Db, token: string, flags: ShareFlags): Promise<ShareMeta | null> {
+  const s = await publicShare(db, token, flags, false);
+  if (!s) return null;
+  const withImage = s.recipe?.imageUrl ?? s.items.find((i) => i.imageUrl)?.imageUrl?.replace(/\/320$/, "/800") ?? null;
+  return { kind: s.kind, title: s.title, note: s.note, sharedBy: s.sharedBy, count: s.count, imagePath: withImage, recipe: s.recipe };
 }
 
 /** A recipe inside a link, addressed by its slug; null unless the link currently shows it. */

@@ -22,6 +22,9 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         display: "standalone",
+        // A link into the app (e.g. a share link) reuses the open Meally window instead of opening another one
+        // (Chrome desktop 139+ captures in-scope links by default; Android opens them in the installed app).
+        launch_handler: { client_mode: ["navigate-existing", "auto"] },
         theme_color: "#fcf8f2",
         background_color: "#fceee3",
         icons: [

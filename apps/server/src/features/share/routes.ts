@@ -15,6 +15,7 @@ import {
   publicRecipe,
   publicShare,
   publicShareImage,
+  publicShareMeta,
   publicShareRecipe,
   revokeShare,
   type ShareFlags,
@@ -94,7 +95,7 @@ publicRoutes.use("*", async (c, next) => {
 });
 const gone = () => new ApiError(404, "not_found", "This link no longer works");
 
-async function shareFlags(c: Context<AppEnv>): Promise<ShareFlags> {
+export async function shareFlags(c: Context<AppEnv>): Promise<ShareFlags> {
   const f = await c.get("flags").getFeatures();
   return { scaling: f.scaling.enabled, cookbooks: f.cookbooks.enabled, organizers: f.organizers.enabled, ratings: f.ratings.enabled };
 }
@@ -113,6 +114,12 @@ publicRoutes
     const s = await publicShare(c.get("db"), c.req.param("token"), await shareFlags(c));
     if (!s) throw gone();
     return c.json(s);
+  })
+  // For link previews (the Pages function and the Node server inject it into /s/* HTML). Doesn't count a view.
+  .get("/shares/:token/meta", async (c) => {
+    const m = await publicShareMeta(c.get("db"), c.req.param("token"), await shareFlags(c));
+    if (!m) throw gone();
+    return c.json(m);
   })
   .get("/shares/:token/recipes/:slug", async (c) => {
     const r = await publicShareRecipe(c.get("db"), c.req.param("token"), c.req.param("slug"), await shareFlags(c));
