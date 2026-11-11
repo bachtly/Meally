@@ -59,6 +59,21 @@ One share dialog for a recipe, a set or a cookbook: optional name (sets), note, 
 become toggle buttons, a sticky bar shows the count and **Share N**, up to 100); cookbooks have **Share** in the header;
 **Settings, Shared links** lists every active link with what it is, the name shown, expiry, views and Revoke.
 
+**Receiver** (`/s/:token`, `/s/:token/:slug`): inside the app shell when signed in, a bare page with Sign in otherwise
+(a skeleton while the session check runs, so the page doesn't remount). "Shared by Ada" with an initial and the note
+in a quote. One recipe: the recipe view with **Save to my recipes**. Set or cookbook: title, count, grid (Saved
+badges), **Save all N** / **Save the other N** into a new hand-picked cookbook named after the link, in batches of 10
+with "Saving 4 of 12…". Already saved: **Open my copy**; the sharer's own household: "already in your household".
+
+**Newcomer**: Save opens "Keep this recipe" with **Create account and save** (`/sign-up?next=/s/…?save=1`) and **I have
+an account** (`/signin?next=…`). `next` is a same-origin path kept in the URL, so it survives reloads and the switch
+between sign-up and sign-in. Back on the link, `?save=1` saves by itself and lands on the copy. Invite-only servers say
+to ask the sharer for an invite; closed servers offer sign-in only (sign-up mode always wins).
+
+**After saving**: "Saved to your recipes" and a one-time **Add Meally to your home screen** card (native prompt, or the
+iOS steps), dismissed for good with **Not now** (web.dev: promote after a completed journey, remember dismissal).
+Saved recipes show "Shared by Ada · saved 3 Nov".
+
 F16 (single recipe):
 
 Share dialog (create with expiry, copy, native share when available, list with revoke; loading and error states).

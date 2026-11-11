@@ -1,7 +1,16 @@
-import { Download, WifiOff } from "lucide-react";
+import { Download, Smartphone, WifiOff } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFeature, useFeaturesState } from "../features/features/FeaturesProvider";
 import { Button } from "../ui";
+
+const CARD_KEY = "meally.install-card.dismissed";
+function readDismissed() {
+  try {
+    return localStorage.getItem(CARD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 import { syncServiceWorker } from "./register";
 import { createUpdateScheduler, type UpdateScheduler } from "./updates";
 
@@ -137,5 +146,53 @@ export function InstallItem() {
         <p className="text-sm text-muted">On iPhone or iPad: tap the Share button in Safari, then "Add to Home Screen".</p>
       )}
     </section>
+  );
+}
+
+/**
+ * A one-time "add to home screen" card, shown after a newcomer's first save (web.dev: promote after a completed
+ * journey, let people dismiss it, and remember that). Hidden when installed, when install isn't possible, or once dismissed.
+ */
+export function InstallCard() {
+  const { canInstall, install, isIos, installed } = usePwa();
+  const [dismissed, setDismissed] = useState(readDismissed);
+  if (installed || dismissed || (!canInstall && !isIos)) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(CARD_KEY, "1");
+    } catch {
+      // storage blocked: it just comes back next time
+    }
+  };
+  return (
+    <aside aria-label="Install Meally" className="print:hidden flex items-start gap-3 rounded-lg border border-line bg-raised p-4 shadow-sm">
+      <Smartphone className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="font-medium">Add Meally to your home screen</p>
+        <p className="text-sm text-muted">
+          {canInstall
+            ? "Open your recipes like an app, and read recent ones offline."
+            : 'On iPhone or iPad: tap the Share button in Safari, then "Add to Home Screen".'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {canInstall && (
+            <Button
+              size="sm"
+              onClick={() => {
+                install();
+                dismiss();
+              }}
+            >
+              <Download className="size-4" aria-hidden />
+              Install
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={dismiss}>
+            Not now
+          </Button>
+        </div>
+      </div>
+    </aside>
   );
 }

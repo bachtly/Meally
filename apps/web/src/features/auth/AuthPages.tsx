@@ -23,6 +23,15 @@ function AuthCard({ title, children }: { title: string; children: ReactNode }) {
 
 type Errors = Record<string, string>;
 
+/** Where to go after signing in: `?next=` (kept across reloads, used by share links) or the router state. Same-origin paths only. */
+function useNext(): string | null {
+  const [params] = useSearchParams();
+  const location = useLocation();
+  const raw = params.get("next") ?? (location.state as { from?: string } | null)?.from ?? null;
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
+}
+const withNext = (path: string, next: string | null) => (next ? `${path}?next=${encodeURIComponent(next)}` : path);
+
 interface FormProps {
   schema: ZodType;
   endpoint: string;
@@ -36,7 +45,7 @@ interface FormProps {
 function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra }: FormProps) {
   const { setSession } = useSession();
   const navigate = useNavigate();
-  const location = useLocation();
+  const next = useNext();
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,8 +66,7 @@ function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra }: Form
     try {
       const me = await postJson<MeResponse>(endpoint, parsed.data);
       setSession(me);
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from.startsWith("/") ? from : "/", { replace: true });
+      navigate(next ?? "/", { replace: true });
     } catch (err) {
       setFormError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
     } finally {
@@ -99,7 +107,8 @@ const newPassword = {
 export function SignInPage() {
   const status = useAuthStatus();
   const { me, isLoading } = useSession();
-  if (me) return <Navigate to="/" replace />;
+  const next = useNext();
+  if (me) return <Navigate to={next ?? "/"} replace />;
   if (status.data?.needsSetup) return <Navigate to="/setup" replace />;
   return (
     <AuthCard title="Sign in">
@@ -115,7 +124,7 @@ export function SignInPage() {
             status.data && status.data.signupMode !== "closed" ? (
               <p className="text-center text-sm text-muted">
                 New here?{" "}
-                <Link to="/signup" className="font-medium text-accent underline">
+                <Link to={withNext("/signup", next)} className="font-medium text-accent underline">
                   Create an account
                 </Link>
               </p>
@@ -131,15 +140,16 @@ export function SignUpPage() {
   const status = useAuthStatus();
   const { me } = useSession();
   const token = useSearchParams()[0].get("invite") ?? "";
+  const next = useNext();
   const invite = useQuery({
     queryKey: ["invite", token],
     queryFn: () => api<InviteLookup>(`/auth/invite/${encodeURIComponent(token)}`),
     enabled: !!token,
     retry: false,
   });
-  if (me) return <Navigate to={token ? `/invite/${encodeURIComponent(token)}` : "/"} replace />;
+  if (me) return <Navigate to={token ? `/invite/${encodeURIComponent(token)}` : (next ?? "/")} replace />;
   if (status.data && (status.data.needsSetup || status.data.signupMode === "closed")) {
-    return <Navigate to="/signin" replace />;
+    return <Navigate to={withNext("/signin", next)} replace />;
   }
   const validInvite = invite.data?.valid ? invite.data : null;
   return (
@@ -165,7 +175,7 @@ export function SignUpPage() {
       ) : status.data?.signupMode === "invite" ? (
         <p className="text-sm text-muted">
           {token ? "This invite link is invalid or has expired. " : ""}Sign-up is by invitation only. Ask a household admin for an invite link, or{" "}
-          <Link to="/signin" className="font-medium text-accent underline">
+          <Link to={withNext("/signin", next)} className="font-medium text-accent underline">
             sign in
           </Link>
           .
@@ -179,7 +189,7 @@ export function SignUpPage() {
           footer={
             <p className="text-center text-sm text-muted">
               Have an account?{" "}
-              <Link to="/signin" className="font-medium text-accent underline">
+              <Link to={withNext("/signin", next)} className="font-medium text-accent underline">
                 Sign in
               </Link>
             </p>

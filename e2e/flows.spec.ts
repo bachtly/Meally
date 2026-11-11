@@ -1,5 +1,5 @@
 import { ADMIN, expect, nav, openRecipeMenu, test } from "./fixtures";
-import { cookiesFor, setupAdmin } from "./server";
+import { apiPost, cookiesFor, seedRecipe, setupAdmin } from "./server";
 
 test("1. first-run setup creates the admin and lands on the empty library", async ({ browser, fresh }) => {
   const context = await browser.newContext({ baseURL: fresh.url });
@@ -147,6 +147,36 @@ test("6. a share link opens in a fresh context without a session", async ({ page
   await expect(shared.getByText("2 cups flour")).toBeVisible();
   await expect(shared.getByRole("button", { name: "Account menu" })).toHaveCount(0);
   await anon.close();
+});
+
+test("6b. a newcomer opens a share link, signs up from it, and the recipe saves itself with who shared it", async ({ browser, fresh }) => {
+  const h = { "content-type": "application/json", "x-requested-with": "meally" };
+  const cookie = await setupAdmin(fresh.url);
+  await fetch(`${fresh.url}/api/v1/admin/settings`, { method: "PUT", headers: { ...h, cookie }, body: JSON.stringify({ signupMode: "open" }) });
+  const { slug } = await seedRecipe(fresh.url, cookie, "Shared lemon cake");
+  const { url } = await apiPost<{ url: string }>(fresh.url, cookie, `/recipes/${slug}/shares`, { note: "Bake this one" });
+
+  const context = await browser.newContext({ baseURL: fresh.url });
+  const page = await context.newPage();
+  await page.goto(url.replace(/^https?:\/\/[^/]+/, ""));
+  await expect(page.getByRole("heading", { level: 1, name: "Shared lemon cake" })).toBeVisible();
+  await expect(page.getByText("Ada Admin")).toBeVisible();
+  await expect(page.getByText("Bake this one")).toBeVisible();
+  await page.getByRole("button", { name: "Save to my recipes" }).click();
+  await page.getByRole("link", { name: "Create account and save" }).click();
+  await page.getByLabel("Your name").fill("Nina New");
+  await page.getByLabel("Email").fill("nina@example.com");
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(/Saved to your recipes/)).toBeVisible();
+  await expect(page).toHaveURL(/\/recipes\/shared-lemon-cake/);
+  await expect(page.getByRole("heading", { level: 1, name: "Shared lemon cake" })).toBeVisible();
+  await expect(page.getByText("Ada Admin")).toBeVisible();
+  await expect(page.getByText("2 cups flour")).toBeVisible();
+  // Opening the link again knows it's saved.
+  await page.goto(url.replace(/^https?:\/\/[^/]+/, ""));
+  await expect(page.getByRole("link", { name: "Open my copy" })).toBeVisible();
+  await context.close();
 });
 
 test("7. cook mode steps with the keyboard", async ({ page, recipe }) => {
