@@ -1,9 +1,11 @@
-import { Pencil, Trash2, X } from "lucide-react";
+import { Pencil, Share2, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { GRID, RecipeCard } from "../recipes/RecipeLibrary";
+import { useFeature } from "../features/FeaturesProvider";
+import { ShareDialog } from "../share/ShareDialog";
 import { CookbookDialog, describeFilter } from "./CookbookDialog";
 import { countLabel } from "./CookbooksPage";
 import { useCookbook, useCookbookMutations, useCookbookRecipes } from "./api";
@@ -17,6 +19,8 @@ export function CookbookPage() {
   const { remove, drop } = useCookbookMutations();
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const shareOn = useFeature("share-links");
 
   if (cb.isPending) return <Skeleton aria-busy="true" className="h-40" />;
   if (cb.isError) {
@@ -52,7 +56,13 @@ export function CookbookPage() {
               {countLabel(c)} · {manual ? "Hand-picked" : `Smart: ${describeFilter(c.filter)}`}
             </p>
           </div>
-          <div className="flex shrink-0 gap-1">
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            {shareOn && (
+              <Button variant="secondary" size="sm" onClick={() => setSharing(true)}>
+                <Share2 className="size-4" aria-hidden />
+                Share
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
               <Pencil className="size-4" aria-hidden />
               Edit
@@ -113,6 +123,7 @@ export function CookbookPage() {
         </>
       )}
 
+      {shareOn && <ShareDialog target={{ kind: "cookbook", slug: c.slug, name: c.name }} open={sharing} onOpenChange={setSharing} />}
       <CookbookDialog open={editing} onOpenChange={setEditing} cookbook={c} onSaved={(n) => n.slug !== c.slug && navigate(`/cookbooks/${n.slug}`, { replace: true })} />
       <Dialog open={confirm} onOpenChange={setConfirm} title="Delete this cookbook?" description="The recipes in it are not deleted.">
         <div className="flex justify-end gap-2">
