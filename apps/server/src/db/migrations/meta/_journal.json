@@ -15,6 +15,13 @@
       "when": 1794353855453,
       "tag": "0001_recipe_search",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794356246390,
+      "tag": "0002_keen_maddog",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,5 @@
+import { buildImageForm } from "../recipes/upload";
+import { metaQuery } from "../../lib/meta";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shared";
 import { api, postJson } from "../../lib/api";
@@ -25,8 +27,7 @@ export function useTimelineMutations(slug: string) {
     mutationFn: async (v: { kind: TimelineKind; text?: string; photo?: File | null }) => {
       const ev = await postJson<TimelineEvent>(`/recipes/${encodeURIComponent(slug)}/timeline`, { kind: v.kind, text: v.text || undefined });
       if (v.photo) {
-        const fd = new FormData();
-        fd.append("file", v.photo);
+        const fd = await buildImageForm(v.photo, (await qc.fetchQuery(metaQuery)).presizedImages);
         await api(`/timeline/${ev.id}/image`, { method: "POST", body: fd });
       }
       return ev;

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { storeImage, type ImageInput } from "../recipes/image-input.js";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shared";
 import { ms, type Db } from "../../db/core.js";
@@ -133,10 +134,10 @@ export async function deleteEvent(db: Db, store: ImageStore, householdId: string
   if (raw.imageId) await store.delete(householdId, raw.imageId);
 }
 
-export async function setEventImage(db: Db, store: ImageStore, householdId: string, who: Actor, id: string, input: Buffer) {
+export async function setEventImage(db: Db, store: ImageStore, householdId: string, who: Actor, id: string, input: ImageInput | Buffer) {
   const { raw } = await getOne(db, householdId, id, who);
   if (raw.userId !== who.id) throw new ApiError(403, "forbidden", "Only the author can edit this");
-  const imageId = await store.putOriginal(householdId, input);
+  const imageId = await storeImage(store, householdId, input);
   await db.transaction(async (tx) => {
     await tx.insert(images).values({ id: imageId, householdId, createdAt: new Date() });
     await tx.update(timelineEvents).set({ imageId }).where(eq(timelineEvents.id, id));

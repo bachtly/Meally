@@ -5,7 +5,7 @@ import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
-import { MAX_IMAGE_BYTES } from "../recipes/routes.js";
+import { MAX_IMAGE_BYTES, readImageUpload } from "../recipes/image-input.js";
 import { findRow } from "../recipes/service.js";
 import { addEvent, deleteEvent, listTimeline, setEventImage, updateEvent } from "./service.js";
 
@@ -58,17 +58,6 @@ timelineRoutes
       },
     }),
     async (c) => {
-      const form = await c.req.parseBody().catch(() => null);
-      const file = form?.file;
-      if (!(file instanceof File)) throw new ApiError(400, "invalid_body", "Attach an image as the 'file' field");
-      if (file.size > MAX_IMAGE_BYTES) throw new ApiError(413, "too_large", "Image must be 10 MB or smaller");
-      if (!file.type.startsWith("image/")) throw new ApiError(415, "unsupported_media", "Only image files are allowed");
-      try {
-        const buf = Buffer.from(await file.arrayBuffer());
-        return c.json(await setEventImage(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"), buf), 201);
-      } catch (e) {
-        if (e instanceof ApiError) throw e;
-        throw new ApiError(415, "unsupported_media", "That file is not a readable image");
-      }
+      return c.json(await setEventImage(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"), await readImageUpload(c)), 201);
     },
   );

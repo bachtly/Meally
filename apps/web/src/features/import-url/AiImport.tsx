@@ -1,3 +1,4 @@
+import { capImage } from "../recipes/upload";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { Recipe } from "@meally/shared";
@@ -35,10 +36,10 @@ export function AiImport({ mode }: { mode: "text" | "photos" }) {
   const [editing, setEditing] = useState(false);
 
   const run = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (mode === "text") return postJson<Preview>("/ai/recipe-from-text", { text });
       const fd = new FormData();
-      files.forEach((f) => fd.append("photos", f));
+      for (const f of files) fd.append("photos", await capImage(f));
       return api<Preview>("/ai/recipe-from-image", { method: "POST", body: fd });
     },
   });

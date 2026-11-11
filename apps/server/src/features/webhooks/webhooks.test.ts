@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../app.js";
 import { openTestDb } from "../../db/testing.js";
-import { webhookDeliveries, webhooks } from "../../db/schema/index.js";
+import { createNodePlatform } from "../../adapters/node/index.js";
+import { webhookDeliveries, webhookRetries, webhooks } from "../../db/schema/index.js";
 import { createFlagsService } from "../features/service.js";
 import { createFetcher, type Fetcher } from "../import-url/fetch.js";
 import { verifyWebhook } from "./verify-helper.js";
@@ -26,7 +27,8 @@ async function mk(status: number | "throw" = 200) {
     if (state.status === "throw") throw new Error("boom");
     return { body: Buffer.alloc(0), contentType: "", finalUrl: url, status: state.status as number };
   };
-  const app = createApp({ db: o.db, flags, env, scryptLogN: 10, fetcher });
+  const platform = createNodePlatform({ dataDir: "./.vdata-test-unused", scryptLogN: 10 });
+  const app = createApp({ db: o.db, flags, env, platform, fetcher });
   await o.ready;
   await flags.setOverride("api-tokens", true);
   await flags.setOverride("webhooks", true);
@@ -44,7 +46,7 @@ async function mk(status: number | "throw" = 200) {
     app.request(`/api/v1${url}`, { method, headers: { ...H, cookie: c }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = async (r: Response) => (await r.json()) as any;
   const create = async (body: object = GOOD) => json(await call(A, "POST", "/webhooks", body));
-  return { app, o, flags, A, B, call, json, create, sent, state, su, fetcher };
+  return { app, o, flags, platform, A, B, call, json, create, sent, state, su, fetcher };
 }
 
 describe("signing", () => {
@@ -148,32 +150,49 @@ describe("delivery", () => {
     expect(t.sent).toHaveLength(0);
   });
 
-  it("retries 3 times with jittered backoff, then stops", async () => {
+  const dueNow = (t: Awaited<ReturnType<typeof mk>>) => t.o.db.update(webhookRetries).set({ nextAt: new Date(Date.now() - 1000) });
+  const waitSent = async (t: Awaited<ReturnType<typeof mk>>, n: number) => {
+    for (const end = Date.now() + 10_000; Date.now() < end && t.sent.length < n; ) await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 100)); // let the attempt be recorded
+  };
+
+  it("stores retries durably and sends them from the retry job, 3 times at most", async () => {
     const t = await mk(500);
     await t.create();
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    // vi.waitFor would advance fake time, so poll with the real setImmediate.
-    const until = async (n: number) => {
-      const spin = async (ms: number, stop: () => boolean) => {
-        for (const end = Date.now() + ms; Date.now() < end && !stop(); ) await new Promise((r) => setImmediate(r));
-      };
-      await spin(10_000, () => t.sent.length >= n);
-      await spin(150, () => false); // let the attempt be recorded (a real Postgres round trip takes longer than a tick)
-      expect(t.sent).toHaveLength(n);
-    };
     await t.call(t.A, "POST", "/recipes", RECIPE);
-    await until(1);
+    await waitSent(t, 1);
+    expect(t.sent).toHaveLength(1);
     for (let i = 0; i < MAX_RETRIES; i++) {
-      const delay = retryDelayMs(i, () => 0.5);
-      await vi.advanceTimersByTimeAsync(delay - 1);
-      expect(t.sent).toHaveLength(i + 1);
-      await vi.advanceTimersByTimeAsync(1);
-      await until(i + 2);
+      const rows = await t.o.db.select().from(webhookRetries);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.attempt).toBe(i);
+      expect(rows[0]!.nextAt.getTime()).toBeGreaterThan(Date.now() - 1000); // not due yet
+      await t.platform.scheduler.runJob("webhooks.retry");
+      expect(t.sent).toHaveLength(i + 1); // nothing due, nothing sent
+      await dueNow(t);
+      await t.platform.scheduler.runJob("webhooks.retry");
+      expect(t.sent).toHaveLength(i + 2);
     }
-    await vi.advanceTimersByTimeAsync(24 * 3600_000);
-    expect(t.sent).toHaveLength(4);
+    expect(await t.o.db.select().from(webhookRetries)).toHaveLength(0);
     expect(new Set(t.sent.map((s) => s.headers["X-Meally-Delivery"])).size).toBe(4);
+  });
+
+  it("is re-entrant: two overlapping retry runs send each retry once", async () => {
+    const t = await mk(500);
+    await t.create();
+    await t.call(t.A, "POST", "/recipes", RECIPE);
+    await waitSent(t, 1);
+    await dueNow(t);
+    await Promise.all([t.platform.scheduler.runJob("webhooks.retry"), t.platform.scheduler.runJob("webhooks.retry")]);
+    expect(t.sent).toHaveLength(2);
+  });
+
+  it("is re-entrant: two overlapping digest runs send the digest once", async () => {
+    const t = await mk(200);
+    const w = await t.create();
+    await t.o.db.update(webhooks).set({ dailyAt: new Date(Date.now() - 60_000).toISOString().slice(11, 16), tz: "UTC" }).where(eq(webhooks.id, w.id));
+    await Promise.all([t.platform.scheduler.runJob("mealplan.digest"), t.platform.scheduler.runJob("mealplan.digest")]);
+    expect(t.sent.filter((s) => s.headers["X-Meally-Event"] === "mealplan.today")).toHaveLength(1);
   });
 
   it("auto-disables after 20 consecutive failures and resets on success", async () => {
@@ -258,7 +277,8 @@ describe("https only", () => {
     const flags = createFlagsService(o.db, env);
     const sent: string[] = [];
     const fetcher: Fetcher = async (url) => (sent.push(url), { body: Buffer.alloc(0), contentType: "", finalUrl: url, status: 200 });
-    const app = createApp({ db: o.db, flags, env, scryptLogN: 10, fetcher });
+    const platform = createNodePlatform({ dataDir: "./.vdata-test-unused", scryptLogN: 10 });
+  const app = createApp({ db: o.db, flags, env, platform, fetcher });
     await o.ready;
     await flags.setOverride("api-tokens", true);
     await flags.setOverride("webhooks", true);

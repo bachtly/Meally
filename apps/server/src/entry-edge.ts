@@ -22,10 +22,16 @@ export function normalizeBasePath(raw: string | undefined): string {
   return p && !p.startsWith("/") ? `/${p}` : p;
 }
 
-export function createEdgeApp(env: Env = readEnv(), db = openPostgres(requireUrl(env)).db) {
+/** MEALLY_PUBLIC_URL (the browser-facing origin, e.g. the Vercel URL) is the CSRF/cookie origin, never the function Host. */
+export function withPublicUrl(env: Env): Env {
+  return env.MEALLY_PUBLIC_URL ? { ...env, BASE_URL: env.MEALLY_PUBLIC_URL } : env;
+}
+
+export function createEdgeApp(rawEnv: Env = readEnv(), db = openPostgres(requireUrl(rawEnv)).db) {
+  const env = withPublicUrl(rawEnv);
   const n = Number(env.MEALLY_PBKDF2_ITERATIONS);
   const iterations = Number.isInteger(n) && n >= 1000 ? n : DEFAULT_PBKDF2_ITERATIONS;
-  return createCoreApp({ db, env, platform: createEdgePlatform({ pbkdf2Iterations: iterations }), basePath: normalizeBasePath(env.MEALLY_BASE_PATH) });
+  return createCoreApp({ db, env, platform: createEdgePlatform({ pbkdf2Iterations: iterations, env }), basePath: normalizeBasePath(env.MEALLY_BASE_PATH) });
 }
 
 function requireUrl(env: Env): string {

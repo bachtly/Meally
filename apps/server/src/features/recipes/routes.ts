@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { MAX_IMAGE_BYTES, readImageUpload } from "./image-input.js";
 import { imageSizes, recipeInputSchema, recipeListQuerySchema, recipeMeInputSchema, z, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
@@ -15,7 +16,7 @@ import {
   setRecipeImage,
 } from "./service.js";
 
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export { MAX_IMAGE_BYTES };
 
 function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
   const parsed = schema.safeParse(raw);
@@ -73,17 +74,7 @@ recipeRoutes
       const householdId = c.get("householdId");
       const slug = c.req.param("slug");
       await getRecipe(db, householdId, slug); // 404 before touching the upload
-      const form = await c.req.parseBody().catch(() => null);
-      const file = form?.file;
-      if (!(file instanceof File)) throw new ApiError(400, "invalid_body", "Attach an image as the 'file' field");
-      if (file.size > MAX_IMAGE_BYTES) throw new ApiError(413, "too_large", "Image must be 10 MB or smaller");
-      if (!file.type.startsWith("image/")) throw new ApiError(415, "unsupported_media", "Only image files are allowed");
-      try {
-        await setRecipeImage(db, c.get("platform").images, householdId, slug, Buffer.from(await file.arrayBuffer()));
-      } catch (e) {
-        if (e instanceof ApiError) throw e;
-        throw new ApiError(415, "unsupported_media", "That file is not a readable image");
-      }
+      await setRecipeImage(db, c.get("platform").images, householdId, slug, await readImageUpload(c));
       return c.json(await getRecipe(db, householdId, slug, await opts(c)), 201);
     },
   );
@@ -97,6 +88,8 @@ imageRoutes.get("/:id/:size", async (c) => {
   const id = c.req.param("id");
   const img = await findImage(c.get("db"), householdId, id);
   if (!img) throw new ApiError(404, "not_found", "Image not found");
+  const signed = await c.get("platform").images.urlFor(householdId, id, size);
+  if (signed) return c.redirect(signed, 302);
   const data = await c.get("platform").images.get(householdId, id, size);
   if (!data) throw new ApiError(404, "not_found", "Image not found");
   // An image never changes and ids are never reused, so it is cacheable for a year (per browser only).

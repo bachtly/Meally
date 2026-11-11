@@ -97,8 +97,16 @@ import upload temp files stay Node-only. A test (`platform-guard.test.ts`) fails
   files; scrypt preferred.
 - **Edge** (`src/entry-edge.ts`, bundled by `npm run build:edge` into `dist-edge/meally.js`): exports a `fetch`
   handler built from `createCoreApp` (`app-core.ts`, which has no Node-only imports) with the skeleton platform in
-  `adapters/edge/` (PBKDF2 hasher, in-memory events with `supportsStreaming=false`, a scheduler that only runs jobs
-  through `runJob`, and an `ImageStore` that throws `not_configured` until the Supabase adapter lands). The database is
+  `adapters/edge/` (PBKDF2 hasher, events with `supportsStreaming=false` so clients poll, a scheduler that only runs jobs
+  through `runJob`, and with `MEALLY_PLATFORM=supabase` a Storage-backed `ImageStore`: private bucket `meally-images`,
+  objects at `<household>/<image>-<size>.webp`, plain REST with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; image
+  GETs check the household and then 302 to a 60 s signed URL). Without sharp, the web app resizes to WebP 320/800/1600 in
+  the browser and uploads `w320`, `w800`, `w1600` parts (the server takes them when `images.acceptsPresized`; `GET
+  /api/v1/meta` tells the client). `POST /api/v1/internal/jobs/:name` (Bearer `MEALLY_JOBS_SECRET`, constant-time
+  compare) runs `scheduler.runJob`: `webhooks.retry` (durable, `webhook_retries` table, used on Node too),
+  `mealplan.digest`, `import.run` (no-op on the edge), `shares.cleanup`. Handlers claim rows atomically so overlapping
+  runs are safe. Shopping list GETs send an `ETag` (304 on `If-None-Match`); the web app polls every 5 s while the tab is
+  visible when `/meta` says there is no streaming. The database is
   postgres-js from `DATABASE_URL`, kept as an external `npm:postgres` import; the schema is applied out of band.
   `MEALLY_BASE_PATH` (for example `/meally`) mounts everything under a prefix; `MEALLY_PBKDF2_ITERATIONS` lowers the
   cost (default 600000, the [OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
