@@ -53,8 +53,10 @@ Every step is safe to repeat. What it does:
 ### Database URL
 
 Supabase injects `SUPABASE_DB_URL` into functions as a direct connection (port 5432). Functions are short-lived and
-numerous, so we set our own `DATABASE_URL` to the transaction pooler (port 6543, built from the pooler host that
-`supabase link` writes to `supabase/.temp/pooler-url`); the app uses postgres-js with `prepare: false`.
+numerous, so we set our own `DATABASE_URL` to the pooler in **session mode** (port 5432, built from the pooler host
+that `supabase link` writes to `supabase/.temp/pooler-url`); the app uses postgres-js with `prepare: false`, two
+connections and a 20 s idle timeout. Not transaction mode (6543): it never answers pipelined queries, and
+postgres-js pipelines whenever requests overlap, so workers hung until their 150 s limit (546 errors).
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically and are the names the code reads.
 
 ### CSRF behind the proxy
@@ -78,7 +80,9 @@ from Settings. In Admin, backups and file import show as unavailable.
 - **Smoke test 404/502:** check `supabase functions logs meally`; confirm the `meally.js` bundle was copied (step 1).
 - **Login works but the session is lost, or CSRF 403:** `MEALLY_PUBLIC_URL` must equal the browser URL exactly (https, no trailing slash). Re-run the script.
 - **Cron does nothing:** `select * from cron.job_run_details order by start_time desc limit 5;` and check `net._http_response`. Re-run to reapply the Vault secret.
-- **Prepared-statement errors:** `DATABASE_URL` must use port 6543.
+- **Requests hang, then 546 (`WallClockTime` in the function logs):** `DATABASE_URL` must be the session pooler,
+  port 5432, not 6543. The function logs `[db] DATABASE_URL is the transaction pooler` at startup when it is.
+  A request still running after 12 s is answered 503 and logged as `[deadline]` / `[db] reset`.
 - **Cookies through Vercel:** the proxy is a rewrite, so the browser only talks to Vercel. Vercel docs do not explicitly
   state that `Set-Cookie` and `Origin` pass through external rewrites. It is expected to work, but verify a login after the first deploy.
 

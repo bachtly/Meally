@@ -43,6 +43,10 @@ hasher) with one adapter per target. Hono has an official
 - **Supavisor transaction mode** has no prepared statements: with postgres-js set `prepare: false`
   ([Supabase KB](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL)). Edge
   Functions should use the transaction pooler string, since each invocation may open new connections (judgement).
+  **Superseded 2026-11-11:** transaction mode never answers pipelined queries, and postgres-js pipelines whenever
+  queries overlap (measured: 5 parallel queries on 1 connection, or 20 on 3, hang; `max_pipeline: 0` avoids it but
+  breaks `sql.begin`). Session mode (5432) passed every run of 25 parallel queries plus 4 transactions. Functions
+  now use session mode with 2 connections and a 20 s idle timeout.
 - **FTS:** FTS5 has no Postgres equivalent. Postgres uses a generated `tsvector` column with a GIN index and
   `websearch_to_tsquery`; ranking differs (`ts_rank` vs bm25), so search tests need re-baselining (judgement).
 
@@ -145,7 +149,7 @@ under 20 MB.
 
 - D1 Postgres everywhere via Drizzle pg-core; Supabase via `DATABASE_URL`; PGlite self-host default, compose Postgres as fallback. Evidence: Drizzle PGlite driver; two dialects double every PR; Turso leaves Supabase Postgres unused.
 - D2 FTS becomes generated `tsvector` + GIN with `websearch_to_tsquery`; search tests re-baselined. Evidence: FTS5 does not exist in Postgres.
-- D3 postgres-js with `prepare: false` through the Supavisor transaction pooler. Evidence: [Supabase KB](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL).
+- D3 postgres-js with `prepare: false` through the Supavisor pooler in session mode (was transaction mode; see the FTS-adjacent note above for why it changed). Evidence: [Supabase KB](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL).
 - D4 `ImageStore` port; browser resize + private bucket + signed URLs on Supabase; sharp stays on Node. Evidence: native addons unconfirmed; transformations Pro-only.
 - D5 `Scheduler` port; pg_cron + pg_net calls `/internal/jobs/:name` with a shared secret; idempotent handlers. Evidence: [schedule docs](https://supabase.com/docs/guides/functions/schedule-functions.md); `waitUntil` does not extend wall clock.
 - D6 `Events` port; Supabase adapter polls with ETag; Broadcast is a later optional adapter. Evidence: idle/wall limits; own auth rules out private channels.

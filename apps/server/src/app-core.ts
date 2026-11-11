@@ -58,7 +58,16 @@ export interface CoreAppOptions {
   mountEarly?: (api: Hono<AppEnv>) => void;
   /** Mounts routes that need Node (file import) after the core routes. */
   mountLate?: (api: Hono<AppEnv>) => void;
+  /**
+   * Answer 503 when a request has not finished after this many ms (slow-by-design routes excepted), and call
+   * `onStall`. The edge sets it so a stalled database connection costs one retry, not a 150 s worker kill.
+   */
+  requestDeadlineMs?: number;
+  onStall?: (info: { method: string; path: string; ms: number }) => void;
 }
+
+/** Routes that legitimately run long (AI calls, imports, exports, jobs, streams): no deadline. */
+export const NO_DEADLINE = /\/api\/v1\/(ai|import|internal|admin\/backups)(\/|$)|\/export|\/events$/;
 
 /** The runtime-neutral app: no file system, no sharp, no embedded database. Node and edge entries both build on it. */
 export function createCoreApp(opts: CoreAppOptions) {
@@ -90,6 +99,26 @@ export function createCoreApp(opts: CoreAppOptions) {
   app.onError(errorHandler);
 
   const api = new Hono<AppEnv>();
+  const deadline = opts.requestDeadlineMs;
+  if (deadline) {
+    api.use("*", async (c, next) => {
+      if (NO_DEADLINE.test(c.req.path)) return next();
+      const started = Date.now();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const work = next();
+      // The stalled handler may still reject later (its connection was reset); that must not be unhandled.
+      work.catch(() => {});
+      const timedOut = await Promise.race([
+        work.then(() => false),
+        new Promise<true>((resolve) => (timer = setTimeout(() => resolve(true), deadline))),
+      ]).finally(() => clearTimeout(timer));
+      if (!timedOut) return;
+      const ms = Date.now() - started;
+      console.warn(`[deadline] ${c.req.method} ${c.req.path} after ${ms} ms`);
+      opts.onStall?.({ method: c.req.method, path: c.req.path, ms });
+      c.res = c.json({ error: "timeout", message: "The server took too long. Try again." }, 503, { "Retry-After": "1" });
+    });
+  }
   api.use("*", async (c, next) => {
     await opts.ready;
     c.set("db", db);

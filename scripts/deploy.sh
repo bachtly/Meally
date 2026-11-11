@@ -49,12 +49,14 @@ run $SB db push --linked --password "$SUPABASE_DB_PASSWORD" --yes
 step "4. Storage bucket meally-images (created by supabase/migrations/20200101000000_meally_images_bucket.sql in step 3)"
 
 step "5. Vault secret + pg_cron schedules"
-# Pooler connection string: the linked project's pooler URL (written by `supabase link`) with our password, port 6543.
+# Pooler connection string: the linked project's pooler URL (written by `supabase link`) with our password, in
+# SESSION mode (port 5432). Transaction mode (6543) never answers pipelined queries, and postgres-js pipelines
+# whenever requests overlap, so edge workers hung until their 150 s kill.
 DB_URL=""
 if [ "$DRY" = 1 ]; then
-  echo "[dry-run] node scripts/supabase-cron.mjs (DB_URL from supabase/.temp/pooler-url, port 6543)"
+  echo "[dry-run] node scripts/supabase-cron.mjs (DB_URL from supabase/.temp/pooler-url, session mode port 5432)"
 else
-  DB_URL="$(POOLER="$(cat supabase/.temp/pooler-url)" node -e 'const u = new URL(process.env.POOLER); u.password = process.env.SUPABASE_DB_PASSWORD; u.port = "6543"; process.stdout.write(u.toString());')"
+  DB_URL="$(POOLER="$(cat supabase/.temp/pooler-url)" node -e 'const u = new URL(process.env.POOLER); u.password = process.env.SUPABASE_DB_PASSWORD; u.port = "5432"; process.stdout.write(u.toString());')"
   DB_URL="$DB_URL" JOB_SECRET="$JOBS" node scripts/supabase-cron.mjs
 fi
 
@@ -76,7 +78,7 @@ set_secrets() {
   run $SB secrets set --env-file "$TMP/secrets.env" --project-ref "$REF"
 }
 
-step "6. Function secrets (DATABASE_URL = transaction pooler, port 6543; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected)"
+step "6. Function secrets (DATABASE_URL = session pooler, port 5432; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected)"
 set_secrets "$PUBLIC_URL"
 
 step "7. Deploy the Edge Function"
