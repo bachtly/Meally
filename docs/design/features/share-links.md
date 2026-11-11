@@ -79,6 +79,14 @@ Saved recipes show "Shared by Ada · saved 3 Nov".
 from other apps always open Safari, whose sign-in the Home Screen app doesn't share, so the signed-out page shows
 "Already have Meally on your home screen?" with **Copy link** (only on iOS, not in the installed app).
 
+**Link previews and portability**: `/s/*` HTML carries Open Graph and Twitter tags (title, "Shared by Ada · 12
+recipes · note", absolute image) and, for one recipe, schema.org `Recipe` JSON-LD, so chat apps show a card and other
+recipe apps or Meally servers can "Import from URL". Injected by a Cloudflare Pages function (`functions/s/[[path]].ts`,
+logic in `pages/sharePreview.ts`) and by the Node server's SPA fallback, from `GET /public/shares/:token/meta`, which
+never counts a view. Values are HTML-escaped and JSON-LD is `<`/`>`/`&`-escaped so a name or note can't close the tag.
+The HTML is `private, no-store`; `noindex` stays. Any failure serves the plain page. The manifest has
+`launch_handler: {client_mode: ["navigate-existing", "auto"]}` so a link reuses the open app window.
+
 F16 (single recipe):
 
 Share dialog (create with expiry, copy, native share when available, list with revoke; loading and error states).
@@ -104,3 +112,6 @@ Searched 2026-11-11. "(page)" = fetched and read; "(snippet)" = search summary o
 - [S5] RecipeSage docs, Sharing (page): https://docs.recipesage.com/docs/tutorials/people/sharing/ . Several recipes via one profile link.
 - [S6] Files.com, Snapshot and live share links (snippet): https://www.files.com/docs/sharing/share-links/snapshot-and-live-share-links . Live links show later changes; snapshots freeze them.
 - [S7] Plan to Eat, "Whose recipe is it anyway" (page): https://learn.plantoeat.com/help/whose-recipe-is-it-anyway . The source stays as the original author's credit, separate from who shared it.
+- [S8] Chrome for Developers, Navigation management into installed PWAs (page): https://developer.chrome.com/docs/capabilities/pwa-navigation-management . In-scope links open the installed app by default from Chrome 139 on desktop; `launch_handler.client_mode`.
+- [S9] Rich link previews need server-side meta tags (snippet): https://dev.to/grabbit/how-to-build-rich-link-previews-like-slack-and-imessage-3m5 . Fetchers don't run JS; absolute HTTPS `og:image`.
+- [S10] schema.org Recipe: https://schema.org/Recipe . `recipeIngredient`, `recipeInstructions` as `HowToStep`, ISO 8601 durations.
