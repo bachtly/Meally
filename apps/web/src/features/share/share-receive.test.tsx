@@ -41,7 +41,7 @@ function renderAt(path: string) {
           ? Response.json({ user: { id: "u2", email: "b@example.com", name: "Bob", role: "member", householdId: "h2" }, household: { id: "h2", name: "Bob's" } })
           : Response.json({ error: "unauthenticated" }, { status: 401 });
       if (u.includes("/auth/status")) return Response.json({ needsSetup: false, signupMode: cfg.signupMode });
-      if (u.includes("/features")) return Response.json({ features: { "share-links": on, cookbooks: on, pwa: on } });
+      if (u.includes("/features")) return Response.json({ features: { "share-links": on, cookbooks: on, pwa: on, "import-url": on } });
       if (u.match(/\/public\/shares\/[^/]+\/recipes\//)) return Response.json(pub);
       if (u.includes("/public/shares/")) return cfg.share ? Response.json(cfg.share) : Response.json({ error: "not_found" }, { status: 404 });
       if (u.includes("/save") && method === "POST") {
@@ -79,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 const saves = () => calls.filter((c) => c.method === "POST" && c.url.includes("/save")).map((c) => JSON.parse(c.body!));
 
@@ -183,4 +184,20 @@ it("a recipe inside a set links back to the set", async () => {
 it("sign-up keeps the share's next path on its sign-in link", async () => {
   renderAt(`/sign-up?next=${encodeURIComponent("/s/abc?save=1")}`);
   expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", `/signin?next=${encodeURIComponent("/s/abc?save=1")}`);
+});
+
+it("on iPhone Safari, signed out, offers to copy the link for the installed app", async () => {
+  vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) Safari/604.1");
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  renderAt("/s/abc");
+  const hint = await screen.findByRole("complementary", { name: "Open in the Meally app" });
+  await userEvent.click(within(hint).getByRole("button", { name: "Copy link" }));
+  expect(writeText).toHaveBeenCalledWith(`${location.origin}/s/abc`);
+});
+
+it("doesn't show the app hint off iOS", async () => {
+  renderAt("/s/abc");
+  expect(await screen.findByRole("heading", { name: "Soup" })).toBeInTheDocument();
+  expect(screen.queryByRole("complementary", { name: "Open in the Meally app" })).toBeNull();
 });

@@ -74,6 +74,11 @@ to ask the sharer for an invite; closed servers offer sign-in only (sign-up mode
 iOS steps), dismissed for good with **Not now** (web.dev: promote after a completed journey, remember dismissal).
 Saved recipes show "Shared by Ada · saved 3 Nov".
 
+**Opening in the app** (D9 of the sharing design): pasting or sharing (Web Share Target) one of this server's own
+`/s/…` links into the Import page opens the share view in the app instead of importing the page. On iPhone/iPad, links
+from other apps always open Safari, whose sign-in the Home Screen app doesn't share, so the signed-out page shows
+"Already have Meally on your home screen?" with **Copy link** (only on iOS, not in the installed app).
+
 F16 (single recipe):
 
 Share dialog (create with expiry, copy, native share when available, list with revoke; loading and error states).
