@@ -56,7 +56,7 @@ export function UnitsToggle({ value, onChange }: { value: UnitChoice; onChange: 
           role="radio"
           aria-checked={value === c.value}
           onClick={() => onChange(c.value)}
-          className={`min-h-10 rounded px-3 text-sm font-medium ${value === c.value ? "bg-raised text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+          className={`min-h-11 rounded px-3 text-sm font-medium ${value === c.value ? "bg-raised text-ink shadow-sm" : "text-muted hover:text-ink"}`}
         >
           {c.label}
         </button>

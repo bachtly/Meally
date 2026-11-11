@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import type { OrganizerRef } from "@meally/shared";
 import { useFeature } from "../features/FeaturesProvider";
 
-const chip = "inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-sm hover:underline";
+const chip = "inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-sm underline-offset-2 hover:underline active:bg-line pointer-coarse:min-h-11";
 
 /** One row of organiser chips; each links to the library filtered by it. Renders nothing when off or empty. */
 export function RecipeChips({ categories = [], tags = [], tools = [] }: { categories?: OrganizerRef[]; tags?: OrganizerRef[]; tools?: OrganizerRef[] }) {

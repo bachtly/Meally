@@ -104,7 +104,7 @@ export function OrganizerPicker({
             onFocus={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onKeyDown={onKeyDown}
-            className="min-h-8 min-w-[8rem] flex-1 bg-transparent px-1 text-base text-ink outline-none placeholder:text-muted"
+            className="min-h-8 min-w-[8rem] pointer-coarse:min-h-11 flex-1 bg-transparent px-1 text-base text-ink outline-none placeholder:text-muted"
           />
         </div>
         <ul
