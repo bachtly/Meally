@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 import { useState } from "react";
 import type { ApiToken, TokenScope } from "@meally/shared";
 import { api, ApiRequestError, postJson } from "../../lib/api";
-import { Button, Dialog, Field, Input, Skeleton, useToast } from "../../ui";
+import { Button, Dialog, Field, Input, Skeleton, Textarea, useToast } from "../../ui";
 
 const KEY = ["api-tokens"] as const;
 const EXPIRY = [
@@ -17,7 +17,7 @@ const SCOPES: { value: TokenScope; label: string }[] = [
   { value: "write", label: "Read and write" },
 ];
 const fmt = (ms: number) => new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
-const select = "min-h-11 w-full rounded-md border border-line bg-raised px-3";
+const select = "min-h-11 w-full rounded-md border border-line bg-raised px-3 text-base";
 
 function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
@@ -59,7 +59,8 @@ function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           <label className="text-sm font-medium" htmlFor="new-token">
             Token
           </label>
-          <input id="new-token" readOnly value={secret} onFocus={(e) => e.target.select()} className="min-h-11 rounded-md border border-line bg-raised px-3 font-mono text-sm" />
+          {/* A wrapping textarea keeps the whole token readable at 360px; 16px text stops iOS zooming on focus. */}
+          <Textarea id="new-token" readOnly rows={2} value={secret} onFocus={(e) => e.target.select()} spellCheck={false} className="resize-none break-all font-mono" />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={copy}>
               <Copy className="size-4" aria-hidden />
@@ -77,7 +78,7 @@ function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           }}
         >
           <Field label="Name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Home server script" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required autoComplete="off" enterKeyHint="done" placeholder="Home server script" />
           </Field>
           <Field label="Access">
             <select value={scope} onChange={(e) => setScope(e.target.value as TokenScope)} className={select}>

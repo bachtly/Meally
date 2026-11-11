@@ -41,17 +41,17 @@ function Aliases({ food }: { food: Food }) {
     save([...food.aliases, v]);
   };
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-3">
       {food.aliases.map((a) => (
         <Badge key={a} className="gap-1">
           {a}
-          <button type="button" aria-label={`Remove alias ${a} from ${food.name}`} className="grid size-5 place-items-center" onClick={() => save(food.aliases.filter((x) => x !== a))}>
+          <button type="button" aria-label={`Remove alias ${a} from ${food.name}`} className="relative grid size-5 place-items-center rounded-full after:absolute after:-inset-3 after:content-['']" onClick={() => save(food.aliases.filter((x) => x !== a))}>
             <X className="size-3" aria-hidden />
           </button>
         </Badge>
       ))}
-      <form onSubmit={add}>
-        <Input aria-label={`Add alias for ${food.name}`} placeholder="Add alias" value={draft} maxLength={100} onChange={(e) => setDraft(e.target.value)} className="min-h-9 w-36 py-1 text-sm" />
+      <form onSubmit={add} className="min-w-40 flex-1 sm:max-w-60">
+        <Input aria-label={`Add alias for ${food.name}`} placeholder="Add alias" value={draft} maxLength={100} onChange={(e) => setDraft(e.target.value)} autoComplete="off" enterKeyHint="done" />
       </form>
     </div>
   );
@@ -207,7 +207,7 @@ function FoodsTab() {
     <div className="flex flex-col gap-4">
       <Input type="search" aria-label="Search foods" placeholder="Search foods and aliases" value={q} onChange={(e) => setQ(e.target.value)} />
       <form onSubmit={add} className="flex gap-2">
-        <Input aria-label="New food" placeholder="New food" value={newName} maxLength={100} onChange={(e) => setNewName(e.target.value)} />
+        <Input aria-label="New food" placeholder="New food" value={newName} maxLength={100} autoComplete="off" enterKeyHint="done" onChange={(e) => setNewName(e.target.value)} />
         <Button type="submit" loading={m.create.isPending}>
           <Plus className="size-4" aria-hidden />
           Add
@@ -283,7 +283,7 @@ function UnitForm({ initial, onDone }: { initial?: UnitItem; onDone: () => void 
       {d.kind !== "count" && (
         <label className="flex flex-col gap-1.5 text-sm font-medium">
           {d.kind === "volume" ? "Millilitres in one" : "Grams in one"}
-          <Input type="number" min="0" step="any" value={d.factor} onChange={set("factor")} />
+          <Input type="number" inputMode="decimal" min="0" step="any" value={d.factor} onChange={set("factor")} />
         </label>
       )}
       <div className="flex justify-end gap-2">

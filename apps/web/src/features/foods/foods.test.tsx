@@ -78,3 +78,12 @@ it("shows built-in units read-only with a badge", async () => {
   expect(screen.getByRole("button", { name: "Edit scoop" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Edit cup" })).toBeNull();
 });
+
+it("keeps the alias field at 16px and 44px tall so iOS does not zoom", async () => {
+  renderAt("/foods");
+  const field = await screen.findByLabelText("Add alias for Scallion");
+  expect(field).toHaveClass("text-base", "min-h-11");
+  expect(field).not.toHaveClass("text-sm");
+  expect(field).not.toHaveClass("min-h-9");
+  expect(field).toHaveAttribute("enterkeyhint", "done");
+});
