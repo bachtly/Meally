@@ -11,8 +11,9 @@ const variants: Record<ButtonVariant, string> = {
   ghost: "bg-transparent text-ink hover:bg-sunken",
   danger: "bg-danger text-accent-contrast hover:opacity-90",
 };
+// `sm` stays compact for a mouse but grows to the 44px touch floor on coarse pointers.
 const sizes: Record<ButtonSize, string> = {
-  sm: "min-h-9 px-3 text-sm",
+  sm: "min-h-9 px-3 text-sm pointer-coarse:min-h-11",
   md: "min-h-11 px-4 text-base",
   lg: "min-h-12 px-6 text-lg",
 };
@@ -44,6 +45,11 @@ export function Button({ variant = "primary", size = "md", loading, disabled, cl
   );
 }
 
+/**
+ * A square icon-only button, 44px by default. A `className` can make it smaller for a mouse
+ * (e.g. `!size-8`), but on coarse pointers `min-width`/`min-height` keep it at 44px: min sizes
+ * win over `width`/`height`, even `!important` ones.
+ */
 export function IconButton({
   "aria-label": label,
   variant = "ghost",
@@ -52,7 +58,12 @@ export function IconButton({
   ...rest
 }: Omit<ButtonProps, "aria-label" | "size"> & { "aria-label": string }) {
   return (
-    <Button {...rest} aria-label={label} variant={variant} className={cn("size-11 !px-0", className)}>
+    <Button
+      {...rest}
+      aria-label={label}
+      variant={variant}
+      className={cn("size-11 !px-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11", className)}
+    >
       {children}
     </Button>
   );
