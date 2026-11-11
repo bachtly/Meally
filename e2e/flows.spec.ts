@@ -196,3 +196,20 @@ test("7. cook mode steps with the keyboard", async ({ page, recipe }) => {
   await expect(page.getByText("Step 1 of 3")).toBeVisible();
   await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
 });
+
+test("8. the library toolbar fits a 360px phone", async ({ page, recipe }) => {
+  void recipe; // a non-empty library shows every toolbar button
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/recipes");
+  const newRecipe = page.getByRole("button", { name: "New recipe" }).or(page.getByRole("link", { name: "New recipe" }));
+  await expect(newRecipe).toBeVisible();
+  const box = (await newRecipe.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(360);
+  // Labels must not wrap onto a second line (that is how the overflow first showed on iOS).
+  await expect(page.getByRole("button", { name: "Select recipes" })).toBeVisible();
+  for (const b of await page.locator("main h1 + div > *").all()) {
+    expect((await b.boundingBox())!.height).toBeLessThanOrEqual(48);
+  }
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBe(0);
+});
