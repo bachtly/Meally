@@ -17,6 +17,22 @@ export function AppShell() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Publish the header's real height (including the top safe-area inset in its padding) so sticky page bars sit right under it.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--header-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el, { box: "border-box" });
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--header-h");
+    };
+  }, []);
 
   // Ctrl/Cmd+K focuses the search field on desktop and opens the palette on small screens.
   useEffect(() => {
@@ -33,7 +49,7 @@ export function AppShell() {
   return (
     <ToastProvider>
       <div className="min-h-dvh lg:pl-60 print:pl-0">
-        <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 lg:flex">
+        <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 pt-[calc(1rem+var(--sat))] pb-[calc(1rem+var(--sab))] pl-[max(1rem,var(--sal))] lg:flex">
           <div className="px-3 text-xl font-semibold text-accent">Meally</div>
           <nav aria-label="Sidebar" className="flex flex-col gap-1">
             {items.map(({ to, label, icon: Icon }) => (
@@ -54,7 +70,10 @@ export function AppShell() {
           </nav>
         </aside>
 
-        <header className="print:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
+        <header
+          ref={headerRef}
+          className="print:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 py-2 pt-[calc(0.5rem+var(--sat))] pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] backdrop-blur lg:pl-4"
+        >
           <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
           <HeaderSearch ref={searchRef} />
           <div className="flex items-center gap-1">
@@ -92,11 +111,11 @@ export function AppShell() {
         </header>
 
         <OfflineBanner />
-        <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
+        <main className="mx-auto max-w-7xl pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] pb-[calc(7rem+var(--sab))] pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
           <Outlet />
         </main>
 
-        <nav aria-label="Tab bar" className="print:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <nav aria-label="Tab bar" className="print:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised pb-(--sab) pl-(--sal) pr-(--sar) lg:hidden">
           <ul className="flex">
             {items.filter((i) => !i.desktopOnly).map(({ to, label, icon: Icon }) => (
               <li key={to} className="flex-1">

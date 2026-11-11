@@ -6,6 +6,7 @@ import * as matchers from "vitest-axe/matchers";
 import { afterEach, expect, it, vi } from "vitest";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { appRoutes } from "./App";
+import html from "../../index.html?raw";
 
 expect.extend(matchers);
 
@@ -58,4 +59,32 @@ it("gallery has no axe violations", async () => {
   const { container } = renderAt("/ui");
   await screen.findByRole("heading", { name: "Component gallery" });
   expect(await axe(container)).toHaveNoViolations();
+});
+
+it("keeps the header and tab bar clear of device safe areas", async () => {
+  const observed: Element[] = [];
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private cb: () => void) {}
+      observe(el: Element) {
+        observed.push(el);
+        this.cb();
+      }
+      disconnect() {}
+    },
+  );
+  renderAt("/recipes");
+  const tabBar = await screen.findByRole("navigation", { name: "Tab bar" });
+  expect(tabBar.className).toContain("pb-(--sab)");
+  const header = document.querySelector("header")!;
+  expect(header.className).toContain("var(--sat)");
+  expect(observed).toContain(header);
+  // The sticky shopping form reads the header's measured height.
+  expect(document.documentElement.style.getPropertyValue("--header-h")).toMatch(/px$/);
+});
+
+it("opts into safe-area insets in the viewport meta", () => {
+  expect(html).toMatch(/name="viewport" content="[^"]*viewport-fit=cover/);
+  expect(html).not.toMatch(/user-scalable=no|maximum-scale=1/);
 });

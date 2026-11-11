@@ -111,7 +111,7 @@ export function CookPage() {
         if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setI((n) => (dx < 0 ? Math.min(n + 1, total) : Math.max(n - 1, 0)));
       }}
     >
-      <header className="flex items-center gap-2 border-b border-line px-3 py-2">
+      <header className="flex items-center gap-2 border-b border-line py-2 pt-[calc(0.5rem+var(--sat))] pl-[max(0.75rem,var(--sal))] pr-[max(0.75rem,var(--sar))]">
         <Link to={back} aria-label="Exit cook mode" className="inline-flex size-11 items-center justify-center rounded-md hover:bg-sunken">
           <X className="size-6" aria-hidden />
         </Link>
@@ -178,7 +178,7 @@ export function CookPage() {
         </ul>
       )}
 
-      <nav aria-label="Steps" className="grid grid-cols-2 gap-3 border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <nav aria-label="Steps" className="grid grid-cols-2 gap-3 border-t border-line p-3 pb-[max(0.75rem,var(--sab))] pl-[max(0.75rem,var(--sal))] pr-[max(0.75rem,var(--sar))]">
         <Button variant="secondary" className="min-h-16 text-lg" disabled={i === 0} onClick={() => setI(i - 1)}>
           <ArrowLeft className="size-5" aria-hidden />
           Previous

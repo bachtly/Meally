@@ -137,7 +137,7 @@ export function ShoppingListPage() {
         </div>
       </div>
 
-      <form onSubmit={add} className="sticky top-14 z-10 -mx-1 mb-4 bg-surface px-1 py-2">
+      <form onSubmit={add} className="sticky top-(--header-h) z-10 -mx-1 mb-4 bg-surface px-1 py-2">
         <div className="flex gap-2">
           <Input aria-label="Add item" placeholder="Add item, e.g. 2 cups flour" value={text} onChange={(e) => setText(e.target.value)} className="min-h-12 text-lg" />
           <Button type="submit" size="lg" disabled={!text.trim()}>
