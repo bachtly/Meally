@@ -31,7 +31,7 @@ bash scripts/deploy.sh
 Or run the **Deploy (Supabase + Vercel)** workflow by hand (`workflow_dispatch`) with the same values as repo secrets.
 Every step is safe to repeat. What it does:
 
-1. `npm ci`, `npm run build:edge`, copy the bundle to `supabase/functions/meally/meally.js` (gitignored).
+1. `npm ci`, `npm run build:edge -w apps/server`, copy the bundle to `supabase/functions/meally/meally.js` (gitignored).
 2. `supabase link`.
 3. Migrations: `scripts/sync-supabase-migrations.mjs` copies the drizzle SQL into `supabase/migrations/` as
    `<ts>_drizzle_<tag>.sql` (gitignored; drizzle stays the single source), then `supabase db push`. Chosen over a

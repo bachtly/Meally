@@ -35,7 +35,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 step "1. Install and build the edge bundle"
 run npm ci
-run npm run build:edge
+run npm run build:edge -w apps/server
 run cp apps/server/dist-edge/meally.js supabase/functions/meally/meally.js
 
 step "2. Link the Supabase project ($REF)"
