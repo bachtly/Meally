@@ -86,7 +86,7 @@ describe("Supabase image store", () => {
   const fake = (async (input: string, init: RequestInit = {}) => {
     const url = String(input);
     calls.push({ url, method: init.method ?? "GET", headers: init.headers as Record<string, string>, body: init.body });
-    if (url.includes("/object/sign/")) return Response.json({ signedURL: "/object/sign/meally-images/x?token=T" });
+    if (url.includes("/object/authenticated/")) return new Response(new Uint8Array([9]), { headers: { "content-type": "image/jpeg" } });
     return new Response("ok");
   }) as unknown as typeof fetch;
   const store = () => createSupabaseImageStore({ url: "https://abc.supabase.co/", serviceKey: "SRK", fetch: fake });
@@ -97,8 +97,8 @@ describe("Supabase image store", () => {
     await s.put("hh", "img", 320, new Uint8Array([1]), "image/webp");
     expect(calls[0]).toMatchObject({ method: "POST", url: "https://abc.supabase.co/storage/v1/object/meally-images/hh/img-320" });
     expect(calls[0]!.headers).toMatchObject({ Authorization: "Bearer SRK", "x-upsert": "true", "Content-Type": "image/webp" });
-    expect(await s.urlFor("hh", "img", 800)).toBe("https://abc.supabase.co/storage/v1/object/sign/meally-images/x?token=T");
-    expect(JSON.parse(calls[1]!.body as string)).toEqual({ expiresIn: 60 });
+    expect(await s.get("hh", "img", 800)).toEqual({ bytes: new Uint8Array([9]), contentType: "image/jpeg" });
+    expect(calls[1]).toMatchObject({ method: "GET", url: "https://abc.supabase.co/storage/v1/object/authenticated/meally-images/hh/img-800" });
     await s.delete("hh", "img");
     expect(calls[2]).toMatchObject({ method: "DELETE", url: "https://abc.supabase.co/storage/v1/object/meally-images" });
     expect(JSON.parse(calls[2]!.body as string).prefixes).toEqual(["hh/img-320", "hh/img-800", "hh/img-1600"]);
@@ -108,7 +108,7 @@ describe("Supabase image store", () => {
   /** JPEG signature; the declared type is wrong on purpose, because the server sniffs the bytes. */
   const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16])], "a.jpg", { type: "application/octet-stream" });
 
-  it("takes pre-sized uploads, redirects to a signed URL, and keeps households apart", async () => {
+  it("takes pre-sized uploads, serves the bytes with a stable cacheable URL, and keeps households apart", async () => {
     calls.length = 0;
     const t = await mk((p) => ({ ...p, images: store() }));
     const A = await t.su("setup", "a@example.com");
@@ -129,8 +129,10 @@ describe("Supabase image store", () => {
     const recipe = (await ok.json()) as { imageUrl: string };
     expect(calls.filter((c) => c.method === "POST" && c.url.includes("/object/meally-images/"))).toHaveLength(3);
     const own = await t.app.request(recipe.imageUrl, { headers: { cookie: A } });
-    expect(own.status).toBe(302);
-    expect(own.headers.get("location")).toContain("token=T");
+    expect(own.status).toBe(200);
+    expect(own.headers.get("content-type")).toBe("image/jpeg");
+    expect(own.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(new Uint8Array(await own.arrayBuffer())).toEqual(new Uint8Array([9]));
     expect((await t.app.request(recipe.imageUrl, { headers: { cookie: B } })).status).toBe(404);
 
     // Safari cannot encode WebP, so it sends JPEG parts; each is stored with its sniffed type.

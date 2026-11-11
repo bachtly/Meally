@@ -57,9 +57,6 @@ export function createDiskImageStore(dataDir: string): ImageStore {
     async delete(householdId, imageId) {
       await Promise.all(imageSizes.map((s) => fs.rm(imagePath(dataDir, householdId, imageId, s), { force: true })));
     },
-    async urlFor() {
-      return null;
-    },
   };
   return store;
 }

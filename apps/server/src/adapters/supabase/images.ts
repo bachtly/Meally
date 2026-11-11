@@ -4,7 +4,6 @@ import { ApiError } from "../../lib/errors.js";
 import type { ImageStore, StoredImage } from "../../ports/index.js";
 
 export const IMAGE_BUCKET = "meally-images";
-export const SIGNED_URL_SECONDS = 60;
 
 export interface SupabaseImageOptions {
   /** `SUPABASE_URL`, e.g. https://<ref>.supabase.co (injected into Edge Functions). */
@@ -23,7 +22,8 @@ export const objectPath = (householdId: string, imageId: string, size: ImageSize
 
 /**
  * Private Supabase Storage bucket through the plain REST API (no SDK). The server checks household
- * ownership and then redirects to a 60 s signed URL, so tenant isolation stays in our code.
+ * ownership and then streams the bytes from the authenticated endpoint, so tenant isolation stays in our code and
+ * the image URL is stable (cacheable by the browser and the service worker).
  * Browsers resize before upload (the edge has no sharp), so `putOriginal` is not supported.
  * The three sizes upload in parallel; if any fails, the rest are removed once every upload has settled.
  */
@@ -74,18 +74,6 @@ export function createSupabaseImageStore(opts: SupabaseImageOptions): ImageStore
         body: JSON.stringify({ prefixes }),
       });
       if (!res.ok && res.status !== 404) fail("delete", res.status);
-    },
-    async urlFor(householdId, imageId, size) {
-      const res = await doFetch(`${base}/object/sign/${bucket}/${enc(objectPath(householdId, imageId, size))}`, {
-        method: "POST",
-        headers: headers({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS }),
-      });
-      if (res.status === 404 || res.status === 400) return null;
-      if (!res.ok) fail("signing", res.status);
-      const { signedURL } = (await res.json()) as { signedURL?: string };
-      if (!signedURL) return null;
-      return signedURL.startsWith("http") ? signedURL : `${base}${signedURL.startsWith("/") ? "" : "/"}${signedURL}`;
     },
   };
   return store;

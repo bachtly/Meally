@@ -66,7 +66,7 @@ run in the function. Options: (1) transformations: paid, not portable; (2) resiz
 free, portable; (3) proxy through the function: burns CPU and memory.
 **Recommendation:** an `ImageStore` port (`put`, `get`, `delete`, `url`). Node adapter keeps disk + sharp. Supabase
 adapter stores browser-produced 320/800/1600 WebP variants in a private bucket via signed upload URLs (large bodies
-never hit the function); `/images/:id/:size` 302s to a short-lived signed URL. The Node server keeps accepting a raw
+never hit the function); `/images/:id/:size` streams the bytes from the authenticated Storage endpoint (it 302ed to a 60 s signed URL until 2026-11-11; that URL changed on every load, so images could never be cached on the device). The Node server keeps accepting a raw
 upload and resizing with sharp, so the API works for both.
 
 ### 2.4 Scheduled work
@@ -146,7 +146,7 @@ under 20 MB.
 - D1 Postgres everywhere via Drizzle pg-core; Supabase via `DATABASE_URL`; PGlite self-host default, compose Postgres as fallback. Evidence: Drizzle PGlite driver; two dialects double every PR; Turso leaves Supabase Postgres unused.
 - D2 FTS becomes generated `tsvector` + GIN with `websearch_to_tsquery`; search tests re-baselined. Evidence: FTS5 does not exist in Postgres.
 - D3 postgres-js with `prepare: false` through the Supavisor transaction pooler. Evidence: [Supabase KB](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL).
-- D4 `ImageStore` port; browser resize + private bucket + signed URLs on Supabase; sharp stays on Node. Evidence: native addons unconfirmed; transformations Pro-only.
+- D4 `ImageStore` port; browser resize + private bucket on Supabase, served as bytes by the function (was: signed-URL redirect); sharp stays on Node. Evidence: native addons unconfirmed; transformations Pro-only.
 - D5 `Scheduler` port; pg_cron + pg_net calls `/internal/jobs/:name` with a shared secret; idempotent handlers. Evidence: [schedule docs](https://supabase.com/docs/guides/functions/schedule-functions.md); `waitUntil` does not extend wall clock.
 - D6 `Events` port; Supabase adapter polls with ETag; Broadcast is a later optional adapter. Evidence: idle/wall limits; own auth rules out private channels.
 - D7 Keep own sessions; `PasswordHasher` port, versioned hashes, PBKDF2-SHA256 on edge, scrypt on Node, rehash on login. Evidence: 128 MB scrypt vs 256 MB / 2 s limit; OWASP lists PBKDF2.

@@ -88,11 +88,11 @@ imageRoutes.get("/:id/:size", async (c) => {
   const id = c.req.param("id");
   const img = await findImage(c.get("db"), householdId, id);
   if (!img) throw new ApiError(404, "not_found", "Image not found");
-  const signed = await c.get("platform").images.urlFor(householdId, id, size);
-  if (signed) return c.redirect(signed, 302);
   const data = await c.get("platform").images.get(householdId, id, size);
   if (!data) throw new ApiError(404, "not_found", "Image not found");
-  // An image never changes and ids are never reused, so it is cacheable for a year (per browser only).
+  // Bytes, not a redirect to a signed Storage URL: the URL would change on every load, so neither the browser nor the
+  // service worker could keep the image. An image never changes and ids are never reused, so cache it for a year
+  // (per browser only; the service worker keeps it too).
   return c.body(data.bytes as Uint8Array<ArrayBuffer>, 200, {
     "Content-Type": data.contentType,
     "Cache-Control": "private, max-age=31536000, immutable",
