@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { DndContext, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Ellipsis, GripVertical, Plus, Settings2 } from "lucide-react";
 import { mealTypes, type MealPlanEntry, type MealType } from "@meally/shared";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, Skeleton, useToast, cn } from "../../ui";
@@ -29,7 +29,13 @@ export function PlanPage() {
   const entries = range.data ?? [];
   const at = (date: string, mt: MealType) => entries.filter((e) => e.date === date && e.mealType === mt).sort((a, b) => a.position - b.position);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  // Mouse drags after a small move. Touch drags after a long press so a swipe on a handle still scrolls the page
+  // (dnd-kit sensors docs: Touch sensor with delay + tolerance, `touch-action: manipulation` on the handle).
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
   function onDragEnd(ev: DragEndEvent) {
     if (!ev.over) return;
     const [date, mealType] = String(ev.over.id).split("|") as [string, MealType];
@@ -47,7 +53,7 @@ export function PlanPage() {
             <span className="text-sm font-medium" aria-current={d === today ? "date" : undefined}>
               {dayLabel(d, { weekday: "short", day: "numeric" })}
             </span>
-            <IconButton aria-label={`Add to ${dayLabel(d)}`} className="!size-8" onClick={() => setAdd({ date: d })}>
+            <IconButton aria-label={`Add to ${dayLabel(d)}`} onClick={() => setAdd({ date: d })}>
               <Plus className="size-4" aria-hidden />
             </IconButton>
           </div>
@@ -66,7 +72,7 @@ export function PlanPage() {
               {dayLabel(d)}
               {d === today && <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-xs text-accent-contrast">Today</span>}
             </h2>
-            <Button variant="ghost" size="sm" aria-label={`Add to ${dayLabel(d)}`} onClick={() => setAdd({ date: d })}>
+            <Button variant="ghost" size="sm" className="min-h-11" aria-label={`Add to ${dayLabel(d)}`} onClick={() => setAdd({ date: d })}>
               <Plus className="size-4" aria-hidden /> Add
             </Button>
           </div>
@@ -178,12 +184,16 @@ function Row({ mt, days, today, at, onAdd }: { mt: MealType; days: string[]; tod
   );
 }
 
+/** Shown on hover/focus where the device can hover; always shown on touch (no hover, or any coarse pointer). */
+const CELL_ADD =
+  "mt-1 hidden min-h-11 w-full rounded text-muted hover:bg-sunken focus-visible:block group-hover:block group-focus-within:block any-pointer-coarse:block [@media(hover:none)]:block";
+
 function Cell({ id, today, label, onAdd, children }: { id: string; today: boolean; label: string; onAdd: () => void; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div ref={setNodeRef} role="group" aria-label={label} className={cn("group min-h-24 bg-raised p-1", today && "bg-sunken", isOver && "outline outline-2 -outline-offset-2 outline-accent")}>
       {children}
-      <button type="button" onClick={onAdd} aria-label={`Add ${label}`} className="mt-1 hidden min-h-8 w-full rounded text-muted hover:bg-sunken focus-visible:block group-hover:block group-focus-within:block">
+      <button type="button" onClick={onAdd} aria-label={`Add ${label}`} className={CELL_ADD}>
         <Plus className="mx-auto size-4" aria-hidden />
       </button>
     </div>
@@ -200,23 +210,23 @@ function Entry({ e, days, draggable }: { e: MealPlanEntry; days: string[]; dragg
   return (
     <div ref={drag.setNodeRef} style={style} className={cn("relative my-1 flex items-center gap-2 rounded-md border border-line bg-raised p-1", draggable && "flex-col items-stretch gap-1", drag.isDragging && "z-10 opacity-80 shadow-md")}>
       {draggable && (
-        <button type="button" aria-label={`Drag ${name}`} className="absolute left-0.5 top-0.5 flex size-7 cursor-grab items-center justify-center rounded text-muted hover:bg-sunken" {...drag.listeners} {...drag.attributes}>
+        <button type="button" aria-label={`Drag ${name}`} className="absolute left-0.5 top-0.5 flex size-7 cursor-grab touch-manipulation items-center justify-center rounded text-muted hover:bg-sunken any-pointer-coarse:size-11" {...drag.listeners} {...drag.attributes}>
           <GripVertical className="size-4" aria-hidden />
         </button>
       )}
       {e.recipe ? (
-        <Link to={`/recipes/${e.recipe.slug}`} className={cn("flex min-w-0 flex-1 items-center gap-2", draggable && "flex-col items-stretch gap-1 pt-7")}>
+        <Link to={`/recipes/${e.recipe.slug}`} className={cn("flex min-w-0 flex-1 items-center gap-2", draggable && "flex-col items-stretch gap-1 pt-7 any-pointer-coarse:pt-11")}>
           <RecipeThumb name={name} imageUrl={e.recipe.imageUrl} sizes="40px" className={cn("shrink-0 rounded", draggable ? "h-12 w-full" : "size-10")} />
           <span className={cn("min-w-0 text-sm", draggable ? "line-clamp-2 px-1" : "truncate")}>{name}</span>
         </Link>
       ) : (
-        <span className={cn("min-w-0 flex-1 truncate px-2 text-sm italic", draggable && "pt-7")}>
+        <span className={cn("min-w-0 flex-1 truncate px-2 text-sm italic", draggable && "pt-7 any-pointer-coarse:pt-11")}>
           {name}
         </span>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <IconButton aria-label={`Actions for ${name}`} className={cn("!size-9", draggable && "!absolute right-0.5 top-0.5 !size-7")}>
+          <IconButton aria-label={`Actions for ${name}`} className={cn(draggable && "!absolute right-0.5 top-0.5 !size-7 any-pointer-coarse:!size-11")}>
             <Ellipsis className="size-4" aria-hidden />
           </IconButton>
         </DropdownMenuTrigger>

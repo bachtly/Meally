@@ -135,3 +135,18 @@ it("has no axe violations", async () => {
   await screen.findByRole("link", { name: /Tomato soup/ });
   expect(await axe(container)).toHaveNoViolations();
 });
+
+it("keeps the week grid usable on touch (add buttons not hover-only, 44px targets)", async () => {
+  vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("min-width: 1024px"), media: q, addEventListener: () => {}, removeEventListener: () => {} }));
+  renderPlan();
+  await screen.findByRole("link", { name: /Tomato soup/ });
+  const cellAdd = screen.getAllByRole("button", { name: /^Add Breakfast on /, hidden: true })[0]!;
+  // Hover reveal only where the device can hover; always shown on touch.
+  expect(cellAdd).toHaveClass("group-hover:block", "any-pointer-coarse:block", "[@media(hover:none)]:block", "min-h-11");
+  expect(cellAdd).not.toHaveClass("min-h-8");
+  const dayAdd = screen.getAllByRole("button", { name: /^Add to / })[0]!;
+  expect(dayAdd).toHaveClass("size-11");
+  expect(dayAdd.className).not.toMatch(/size-8/);
+  const handle = screen.getByRole("button", { name: "Drag Tomato soup" });
+  expect(handle).toHaveClass("touch-manipulation", "any-pointer-coarse:size-11");
+});
