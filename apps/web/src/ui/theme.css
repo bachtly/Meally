@@ -16,6 +16,7 @@
   --focus-ring: oklch(0.52 0.17 40);
   --shadow-sm: 0 1px 2px oklch(0.2 0.02 60 / 0.08);
   --shadow-md: 0 8px 24px oklch(0.2 0.02 60 / 0.14);
+  --scrim: oklch(0.2 0.02 60 / 0.5);
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
@@ -38,6 +39,7 @@
     --focus-ring: oklch(0.8 0.14 55);
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
+    --scrim: oklch(0 0 0 / 0.6);
   }
 }
 
@@ -57,6 +59,7 @@
   --focus-ring: oklch(0.8 0.14 55);
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
+  --scrim: oklch(0 0 0 / 0.6);
 }
 
 @theme inline {
@@ -72,6 +75,7 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-ring: var(--focus-ring);
+  --color-scrim: var(--scrim);
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
@@ -80,3 +84,13 @@
 html { background: var(--surface); color: var(--text); font-family: var(--font-sans); }
 body { margin: 0; min-height: 100dvh; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Overlay enter/exit. Only used behind `motion-safe:`, so reduced motion gets none. */
+@keyframes overlay-in { from { opacity: 0; } }
+@keyframes overlay-out { to { opacity: 0; } }
+@keyframes dialog-in { from { opacity: 0; scale: 0.96; } }
+@keyframes dialog-out { to { opacity: 0; scale: 0.96; } }
+@keyframes sheet-up-in { from { transform: translateY(100%); } }
+@keyframes sheet-up-out { to { transform: translateY(100%); } }
+@keyframes sheet-side-in { from { transform: translateX(100%); } }
+@keyframes sheet-side-out { to { transform: translateX(100%); } }

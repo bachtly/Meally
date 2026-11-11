@@ -25,7 +25,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         if (!o) setSearch("");
         onOpenChange(o);
       }}
-      overlayClassName="fixed inset-0 z-40 bg-black/50"
+      overlayClassName="fixed inset-0 z-40 bg-scrim"
       contentClassName="fixed left-1/2 top-24 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 overflow-hidden rounded-lg border border-line bg-raised text-ink shadow-md"
     >
       <Command.Input placeholder="Go to…" className="min-h-12 w-full border-b border-line bg-transparent px-4 text-base outline-none" />
