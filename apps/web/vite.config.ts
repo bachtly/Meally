@@ -14,7 +14,7 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt",
       injectRegister: false, // registration is flag-gated at runtime (src/pwa/register.ts)
-      includeAssets: ["icon.svg", "apple-touch-icon.png"],
+      includeAssets: ["favicon.png", "logo.png", "apple-touch-icon.png"],
       manifest: {
         name: "Meally",
         short_name: "Meally",
@@ -22,8 +22,8 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         display: "standalone",
-        theme_color: "#b3471f",
-        background_color: "#fbf9f5",
+        theme_color: "#fcf8f2",
+        background_color: "#fceee3",
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
