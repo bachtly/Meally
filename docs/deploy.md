@@ -34,7 +34,13 @@ bash scripts/deploy.sh --dry-run   # prints the plan, calls nothing
 bash scripts/deploy.sh
 ```
 
-Or run the **Deploy (Supabase + Cloudflare Pages)** workflow by hand (`workflow_dispatch`) with the same values as repo secrets.
+In CI, the **Deploy (Supabase + Cloudflare Pages)** workflow runs this script with the same values as repo secrets:
+
+- **Automatically after every merge to `main`**, once the CI workflow has passed on that commit. A red `main` is not
+  deployed. If two merges land close together, only the newest commit deploys (an older run sees `main` has moved and
+  skips). Deploys run one at a time and a running one is never cancelled.
+- **By hand** from Actions > Deploy > Run workflow (`workflow_dispatch`), for example to redeploy without a code change.
+
 Every step is safe to repeat. What it does:
 
 1. `npm ci`, `npm run build:edge -w apps/server`, copy the bundle to `supabase/functions/meally/meally.js` (gitignored).
