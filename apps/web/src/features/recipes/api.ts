@@ -1,3 +1,5 @@
+import { buildImageForm } from "./upload";
+import { metaQuery } from "../../lib/meta";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Recipe, RecipeInput, RecipeListResponse } from "@meally/shared";
 import { api } from "../../lib/api";
@@ -54,9 +56,8 @@ export function useSaveRecipe(slug?: string) {
       });
       let imageFailed = false;
       if (image) {
-        const body = new FormData();
-        body.append("file", image);
         try {
+          const body = await buildImageForm(image, (await qc.fetchQuery(metaQuery)).presizedImages);
           recipe = await api<Recipe>(`/recipes/${encodeURIComponent(recipe.slug)}/image`, { method: "POST", body });
         } catch {
           imageFailed = true;

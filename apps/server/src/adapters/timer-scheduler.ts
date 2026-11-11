@@ -40,6 +40,7 @@ export function createNodeScheduler(log: (msg: string) => void = (m) => console.
 
   return {
     define: (name, handler) => void handlers.set(name, handler),
+    has: (name) => handlers.has(name),
     every(name, ms, opts) {
       interval(name, ms);
       if (opts?.firstInMs !== undefined) timeout(() => fire(name), opts.firstInMs);

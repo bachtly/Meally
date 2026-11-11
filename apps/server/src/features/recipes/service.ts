@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { storeImage, type ImageInput } from "./image-input.js";
 import type { ImageStore } from "../../ports/index.js";
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Nutrition, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
@@ -308,9 +309,9 @@ export async function listRecipes(
 // ---- images ----
 
 /** Stores a new image and points the recipe at it. */
-export async function setRecipeImage(db: Db, store: ImageStore, householdId: string, slug: string, input: Buffer): Promise<string> {
+export async function setRecipeImage(db: Db, store: ImageStore, householdId: string, slug: string, input: ImageInput | Buffer): Promise<string> {
   const row = await findRow(db, householdId, slug);
-  const id = await store.putOriginal(householdId, input);
+  const id = await storeImage(store, householdId, input);
   await db.transaction(async (tx) => {
     await tx.insert(images).values({ id, householdId, createdAt: new Date() });
     await tx

@@ -5,15 +5,15 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { Webhook, WebhookDelivery, WebhookEvent, WebhookWithSecret } from "@meally/shared";
 import type { z } from "@meally/shared";
 import type { webhookInputSchema } from "@meally/shared";
-import type { Db } from "../../db/index.js";
-import { households, webhookDeliveries, webhooks } from "../../db/schema/index.js";
+import { queryRows, type Db } from "../../db/core.js";
+import { households, webhookDeliveries, webhookRetries, webhooks } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import type { Fetcher } from "../import-url/fetch.js";
 import type { FlagsService } from "../features/service.js";
 import { listEntries } from "../mealplan/service.js";
 import { registerWebhookEmitter } from "./events.js";
 
-/** In-memory retries: 3 attempts, exponential backoff with full jitter, capped. Durable retries come with the cron work. */
+/** Durable retries (webhook_retries table, run by the `webhooks.retry` job): 3 attempts, exponential backoff with full jitter, capped. */
 export const MAX_RETRIES = 3;
 export const RETRY_BASE_MS = 60_000;
 export const RETRY_CAP_MS = 30 * 60_000;
@@ -164,14 +164,10 @@ export function digestDue(now: Date, h: { dailyAt: string; tz: string; lastDiges
 }
 
 const RETRY_JOB = "webhooks.retry";
-const DIGEST_JOB = "webhooks.digest";
-interface RetryPayload {
-  hookId: string;
-  event: string;
-  body: string;
-  n: number;
-}
-
+const DIGEST_JOB = "mealplan.digest";
+/** A claimed retry is leased this long; a crashed worker's retry becomes due again afterwards. */
+const RETRY_LEASE_MS = 5 * 60_000;
+const RETRY_BATCH = 20;
 export interface DispatcherDeps {
   db: Db;
   /** Runs retries and the digest tick; defaults to a private Node scheduler. */
@@ -251,20 +247,45 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
     return res;
   }
 
-  function scheduleRetry(hookId: string, event: string, body: string, n: number) {
+  async function scheduleRetry(hookId: string, event: string, body: string, n: number) {
     if (n >= MAX_RETRIES) return;
-    const delay = retryDelayMs(n, random);
-    scheduler.runAfter(RETRY_JOB, delay, { hookId, event, body, n } satisfies RetryPayload);
+    await db.insert(webhookRetries).values({
+      id: randomUUID(),
+      webhookId: hookId,
+      event,
+      payload: body,
+      attempt: n,
+      nextAt: new Date(now().getTime() + retryDelayMs(n, random)),
+    });
   }
 
-  /** A repeated retry just sends one more signed delivery with a fresh id. */
-  async function retry({ hookId, event, body, n }: RetryPayload) {
-    const [hook] = await db.select().from(webhooks).where(eq(webhooks.id, hookId)).limit(1);
-    if (!hook || !hook.enabled) return;
-    const res = await attempt(hook, event, body);
-    if (!res.ok) scheduleRetry(hookId, event, body, n + 1);
+  /**
+   * Sends every due retry. Rows are claimed with UPDATE ... RETURNING over FOR UPDATE SKIP LOCKED (lease
+   * by pushing next_at out), so two overlapping runs never send the same retry twice.
+   */
+  async function runRetries(): Promise<number> {
+    const at = now();
+    const claimed = await queryRows<{ id: string; webhook_id: string; event: string; payload: string; attempt: number }>(
+      db,
+      sql`UPDATE webhook_retries SET next_at = ${new Date(at.getTime() + RETRY_LEASE_MS).toISOString()}::timestamptz
+        WHERE id IN (SELECT id FROM webhook_retries WHERE next_at <= ${at.toISOString()}::timestamptz ORDER BY next_at LIMIT ${RETRY_BATCH} FOR UPDATE SKIP LOCKED)
+        RETURNING id, webhook_id, event, payload, attempt`,
+    );
+    for (const r of claimed) {
+      try {
+        const [hook] = await db.select().from(webhooks).where(eq(webhooks.id, r.webhook_id)).limit(1);
+        if (hook?.enabled) {
+          const res = await attempt(hook, r.event, r.payload);
+          if (!res.ok) await scheduleRetry(hook.id, r.event, r.payload, r.attempt + 1);
+        }
+        await db.delete(webhookRetries).where(eq(webhookRetries.id, r.id));
+      } catch {
+        /* the lease expires and the retry runs again */
+      }
+    }
+    return claimed.length;
   }
-  scheduler.define(RETRY_JOB, (p) => retry(p as RetryPayload));
+  scheduler.define(RETRY_JOB, async () => void (await runRetries()));
   scheduler.define(DIGEST_JOB, () => tick());
 
   async function household(id: string) {
@@ -276,7 +297,7 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
   async function deliver(hook: Row, event: string, data: unknown, retry: boolean): Promise<DeliveryResult> {
     const body = JSON.stringify({ event, occurredAt: now().toISOString(), household: await household(hook.householdId), data });
     const res = await attempt(hook, event, body);
-    if (!res.ok && retry) scheduleRetry(hook.id, event, body, 0);
+    if (!res.ok && retry) await scheduleRetry(hook.id, event, body, 0);
     return res;
   }
 
@@ -294,7 +315,9 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
       if (!r.events.includes("mealplan.today")) continue;
       const { due, date } = digestDue(at, r);
       if (!due) continue;
-      await db.update(webhooks).set({ lastDigestOn: date }).where(eq(webhooks.id, r.id));
+      // Claim today's digest atomically so overlapping runs send it once.
+      const claimed = await queryRows(db, sql`UPDATE webhooks SET last_digest_on = ${date} WHERE id = ${r.id} AND last_digest_on IS DISTINCT FROM ${date} RETURNING id`);
+      if (!claimed.length) continue;
       const entries = await listEntries(db, r.householdId, date, date);
       const slim = entries.map((e) => ({
         mealType: e.mealType,
@@ -309,8 +332,10 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
     emit: (hh: string, event: string, data: unknown) => void emit(hh, event, data).catch(() => {}),
     emitAndWait: emit,
     tick,
+    runRetries,
     start() {
       scheduler.every(DIGEST_JOB, 60_000);
+      scheduler.every(RETRY_JOB, 60_000);
     },
     stop() {
       scheduler.stop();
