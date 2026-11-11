@@ -17,6 +17,9 @@ listed (created, expiry, views) and revoked at any time. The link is shown once,
 | D5 | A link targets one recipe, a hand-picked **set** (1–100, ordered) or a **cookbook**. Sets store recipe ids and show each recipe's current version; a deleted recipe drops out. Cookbook links are fully live (up to 200 recipes); a smart cookbook re-runs its filter as the sharer. | Snapshot copies at share time; a separate collection feature. | [S5], [S6] |
 | D6 | "Shared by" is the sharer's name **snapshotted** on the link at creation, on by default (`showName: false` hides it). An optional note (≤ 280). Never a user id. | Live lookup of the profile; anonymous only. | [S7] |
 | D7 | A recipe inside a set or cookbook link is addressed by its **slug**, checked against what the link currently shows. Slugs are derived from names already on the page and stay stable when a live cookbook reorders. | An index `n` (shifts in a live cookbook); recipe ids (internal). | (judgement) |
+| D9 | **Save to my recipes copies** a recipe into the viewer's household: fields, ingredients, steps and the image bytes (a new image id under their household). Tags, ratings and the sharer's food ids are not copied; with `foods-units` on, ingredients relink to the viewer's catalogue. The copy keeps `source_url` and records `saved_from_name` and `saved_at`. | A saved reference that follows the sharer. | [S5], [S7] |
+| D10 | **Dedupe by origin**: the copy stores the source recipe id (`origin_recipe_id`, internal, never returned). Saving again returns the existing copy. The viewer's own household gets 409. | Allow duplicates. | (judgement) |
+| D11 | **At most 10 recipes per save request**; the web app saves a larger set in batches with progress, and the first batch can create a hand-picked cookbook that later batches fill. Keeps each request well inside the edge function's limits without a job queue. | One request for up to 200 with a background job. | (judgement) |
 | D8 | A smart cookbook filtered by favourites or rating shows **nothing** once the sharer's account is gone, instead of the unfiltered library. | Fall back to no filter. | (judgement) |
 
 A slug-based public recipe would be guessable and permanent; a capability URL ties access to a secret that can be
@@ -36,6 +39,10 @@ expires_at, revoked_at, view_count. A check constraint ties the target columns t
   sharedBy, note, dates, views), never tokens.
 - `GET /api/v1/recipes/:slug/shares` lists active links (id, createdAt, expiresAt, viewCount), never tokens.
 - `DELETE /api/v1/shares/:id` revokes.
+- `GET /api/v1/shares/received/:token` → `ShareStatus` (`sameHousehold`, `saved`: link slug → the viewer's copy).
+- `POST /api/v1/shares/received/:token/save {slugs: 1..10, cookbook?: {name} | {slug}}` → `{saved, cookbookSlug}`
+  (201). 404 for a dead link or a slug the link doesn't show, 409 for the sharer's own household.
+- Recipes gain `savedFrom: {name, at} | null`. Columns `recipes.saved_from_name`, `saved_at`, `origin_recipe_id`.
 - `GET /api/v1/public/shares/:token` (`PublicShare`: kind, title, note, sharedBy, count, recipe for recipe links,
   items), `GET /api/v1/public/shares/:token/recipes/:slug` and `…/:slug/image/:size`. No auth, 60 requests per minute
   per IP. A cookbook link answers 404 while `cookbooks` is off.

@@ -34,10 +34,16 @@ export const recipes = pgTable(
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+    /** Saved from a share link: the sharer's name as the link showed it (null when hidden) and when it was saved. */
+    savedFromName: text("saved_from_name"),
+    savedAt: timestamp("saved_at", { withTimezone: true, mode: "date" }),
+    /** The shared recipe this is a copy of, in another household. Internal (dedupe only); no FK, never returned. */
+    originRecipeId: text("origin_recipe_id"),
   },
   (t) => [
     uniqueIndex("recipes_household_slug_uq").on(t.householdId, t.slug),
     index("recipes_household_updated_idx").on(t.householdId, t.updatedAt),
+    index("recipes_household_origin_idx").on(t.householdId, t.originRecipeId),
   ],
 );
 
