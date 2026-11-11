@@ -54,16 +54,18 @@ export function useSaveRecipe(slug?: string) {
         method: slug ? "PUT" : "POST",
         body: JSON.stringify(input),
       });
-      let imageFailed = false;
+      /** Why the photo failed (the recipe itself is saved), so the person sees the real cause. */
+      let imageError: string | null = null;
       if (image) {
         try {
           const body = await buildImageForm(image, (await qc.fetchQuery(metaQuery)).presizedImages);
           recipe = await api<Recipe>(`/recipes/${encodeURIComponent(recipe.slug)}/image`, { method: "POST", body });
-        } catch {
-          imageFailed = true;
+        } catch (e) {
+          console.error("Photo upload failed", e);
+          imageError = e instanceof Error && e.message ? e.message : "Unknown error";
         }
       }
-      return { recipe, imageFailed };
+      return { recipe, imageError };
     },
     onSuccess: ({ recipe }) => {
       qc.setQueryData(["recipes", "detail", recipe.slug], recipe);

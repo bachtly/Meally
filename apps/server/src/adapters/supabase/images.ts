@@ -15,13 +15,17 @@ export interface SupabaseImageOptions {
   fetch?: typeof fetch;
 }
 
-/** Object path: `<householdId>/<imageId>-<size>.webp`. */
-export const objectPath = (householdId: string, imageId: string, size: ImageSize) => `${householdId}/${imageId}-${size}.webp`;
+/**
+ * Object path: `<householdId>/<imageId>-<size>`. No extension: a size may be WebP or JPEG (Safari cannot
+ * encode WebP), and Storage keeps the real Content-Type with the object and serves it on signed URLs.
+ */
+export const objectPath = (householdId: string, imageId: string, size: ImageSize) => `${householdId}/${imageId}-${size}`;
 
 /**
  * Private Supabase Storage bucket through the plain REST API (no SDK). The server checks household
  * ownership and then redirects to a 60 s signed URL, so tenant isolation stays in our code.
  * Browsers resize before upload (the edge has no sharp), so `putOriginal` is not supported.
+ * The three sizes upload in parallel; if any fails, the rest are removed once every upload has settled.
  */
 export function createSupabaseImageStore(opts: SupabaseImageOptions): ImageStore {
   const base = `${opts.url.replace(/\/+$/, "")}/storage/v1`;
@@ -40,11 +44,11 @@ export function createSupabaseImageStore(opts: SupabaseImageOptions): ImageStore
     },
     async putSized(householdId, sizes) {
       const id = randomUUID();
-      try {
-        for (const size of imageSizes) await store.put(householdId, id, size, sizes[size], "image/webp");
-      } catch (e) {
+      const results = await Promise.allSettled(imageSizes.map((size) => store.put(householdId, id, size, sizes[size].bytes, sizes[size].contentType)));
+      const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      if (failed) {
         await store.delete(householdId, id).catch(() => {});
-        throw e;
+        throw failed.reason;
       }
       return id;
     },

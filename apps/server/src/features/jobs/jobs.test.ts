@@ -95,16 +95,18 @@ describe("Supabase image store", () => {
     calls.length = 0;
     const s = store();
     await s.put("hh", "img", 320, new Uint8Array([1]), "image/webp");
-    expect(calls[0]).toMatchObject({ method: "POST", url: "https://abc.supabase.co/storage/v1/object/meally-images/hh/img-320.webp" });
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://abc.supabase.co/storage/v1/object/meally-images/hh/img-320" });
     expect(calls[0]!.headers).toMatchObject({ Authorization: "Bearer SRK", "x-upsert": "true", "Content-Type": "image/webp" });
     expect(await s.urlFor("hh", "img", 800)).toBe("https://abc.supabase.co/storage/v1/object/sign/meally-images/x?token=T");
     expect(JSON.parse(calls[1]!.body as string)).toEqual({ expiresIn: 60 });
     await s.delete("hh", "img");
     expect(calls[2]).toMatchObject({ method: "DELETE", url: "https://abc.supabase.co/storage/v1/object/meally-images" });
-    expect(JSON.parse(calls[2]!.body as string).prefixes).toEqual(["hh/img-320.webp", "hh/img-800.webp", "hh/img-1600.webp"]);
+    expect(JSON.parse(calls[2]!.body as string).prefixes).toEqual(["hh/img-320", "hh/img-800", "hh/img-1600"]);
   });
 
   const webp = () => new File([new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80, 1])], "a.webp", { type: "image/webp" });
+  /** JPEG signature; the declared type is wrong on purpose, because the server sniffs the bytes. */
+  const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16])], "a.jpg", { type: "application/octet-stream" });
 
   it("takes pre-sized uploads, redirects to a signed URL, and keeps households apart", async () => {
     calls.length = 0;
@@ -130,5 +132,31 @@ describe("Supabase image store", () => {
     expect(own.status).toBe(302);
     expect(own.headers.get("location")).toContain("token=T");
     expect((await t.app.request(recipe.imageUrl, { headers: { cookie: B } })).status).toBe(404);
+
+    // Safari cannot encode WebP, so it sends JPEG parts; each is stored with its sniffed type.
+    calls.length = 0;
+    const safari = await up({ w320: jpeg(), w800: jpeg(), w1600: jpeg() });
+    expect(safari.status).toBe(201);
+    const puts = calls.filter((c) => c.method === "POST" && c.url.includes("/object/meally-images/"));
+    expect(puts).toHaveLength(3);
+    expect(puts.every((c) => c.headers["Content-Type"] === "image/jpeg")).toBe(true);
+    expect((await up({ w320: jpeg(), w800: webp(), w1600: jpeg() })).status).toBe(201);
+  });
+
+  it("removes the other sizes when one upload fails", async () => {
+    const seen: { url: string; method: string; body?: unknown }[] = [];
+    const flaky = (async (input: string, init: RequestInit = {}) => {
+      const url = String(input);
+      seen.push({ url, method: init.method ?? "GET", body: init.body });
+      if (url.endsWith("-800")) return new Response("boom", { status: 500 });
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+    const s = createSupabaseImageStore({ url: "https://abc.supabase.co", serviceKey: "SRK", fetch: flaky });
+    const part = { bytes: new Uint8Array([0xff, 0xd8, 0xff]), contentType: "image/jpeg" as const };
+    await expect(s.putSized("hh", { 320: part, 800: part, 1600: part })).rejects.toMatchObject({ status: 502 });
+    expect(seen.filter((c) => c.method === "POST")).toHaveLength(3);
+    const del = seen.find((c) => c.method === "DELETE");
+    expect(JSON.parse(del!.body as string).prefixes).toHaveLength(3);
+    expect(seen.at(-1)!.method).toBe("DELETE"); // cleanup runs after every upload settled
   });
 });

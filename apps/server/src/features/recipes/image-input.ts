@@ -1,23 +1,27 @@
 import type { Context } from "hono";
 import { imageSizes, type ImageSize } from "@meally/shared";
 import { ApiError } from "../../lib/errors.js";
-import type { ImageStore } from "../../ports/index.js";
+import type { ImageStore, SizedImage, SizedImageType } from "../../ports/index.js";
 import type { AppEnv } from "../../lib/context.js";
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-/** Pre-sized WebP parts are small; 2 MB each is far above a 1600 px WebP. */
+/** Pre-sized parts are small; 2 MB each is far above a 1600 px WebP or JPEG. */
 export const MAX_SIZED_BYTES = 2 * 1024 * 1024;
 
-export type ImageInput = { kind: "original"; bytes: Buffer } | { kind: "sized"; sizes: Record<ImageSize, Uint8Array> };
+export type ImageInput = { kind: "original"; bytes: Buffer } | { kind: "sized"; sizes: Record<ImageSize, SizedImage> };
 
 const ascii = (b: Uint8Array, from: number, to: number) => String.fromCharCode(...b.subarray(from, to));
 const isWebp = (b: Uint8Array) => b.length > 12 && ascii(b, 0, 4) === "RIFF" && ascii(b, 8, 12) === "WEBP";
+const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+/** The format from the file signature, so a mislabelled or hostile part cannot pick its own content type. */
+export const sniffSized = (b: Uint8Array): SizedImageType | null => (isWebp(b) ? "image/webp" : isJpeg(b) ? "image/jpeg" : null);
 const bad = (msg: string, status: 400 | 413 | 415 = 400) =>
   new ApiError(status, status === 413 ? "too_large" : status === 415 ? "unsupported_media" : "invalid_body", msg);
 
 /**
- * Reads a multipart image upload: either a single `file` original, or the three pre-sized WebP parts
- * `w320`, `w800` and `w1600`. Pre-sized parts are only accepted when the image store asks for them.
+ * Reads a multipart image upload: either a single `file` original, or the three pre-sized parts
+ * `w320`, `w800` and `w1600` (WebP, or JPEG from browsers that cannot encode WebP). Pre-sized parts
+ * are only accepted when the image store asks for them.
  */
 export async function readImageUpload(c: Context<AppEnv>): Promise<ImageInput> {
   const store = c.get("platform").images;
@@ -25,15 +29,18 @@ export async function readImageUpload(c: Context<AppEnv>): Promise<ImageInput> {
   const parts = imageSizes.map((s) => form?.[`w${s}`]);
   if (parts.some((p) => p !== undefined)) {
     if (!store.acceptsPresized) throw bad("Send the image as the 'file' field");
-    const sizes = {} as Record<ImageSize, Uint8Array>;
-    for (const [i, size] of imageSizes.entries()) {
-      const part = parts[i];
+    const files = parts.map((part) => {
       if (!(part instanceof File)) throw bad(`Attach all of ${imageSizes.map((s) => `w${s}`).join(", ")}`);
       if (part.size > MAX_SIZED_BYTES) throw bad("Resized image is too large", 413);
-      if (part.type !== "image/webp") throw bad("Resized images must be WebP", 415);
-      const bytes = new Uint8Array(await part.arrayBuffer());
-      if (!isWebp(bytes)) throw bad("Resized images must be WebP", 415);
-      sizes[size] = bytes;
+      return part;
+    });
+    const read = await Promise.all(files.map(async (f) => new Uint8Array(await f.arrayBuffer())));
+    const sizes = {} as Record<ImageSize, SizedImage>;
+    for (const [i, size] of imageSizes.entries()) {
+      const bytes = read[i]!;
+      const contentType = sniffSized(bytes);
+      if (!contentType) throw bad("Resized images must be WebP or JPEG", 415);
+      sizes[size] = { bytes, contentType };
     }
     return { kind: "sized", sizes };
   }
