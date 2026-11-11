@@ -204,7 +204,7 @@ export function RecipeLibrary() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/recipes/new" className={`${linkButton} min-h-9 bg-accent px-3 text-sm text-accent-contrast hover:bg-accent-hover`}>
+            <Link to="/recipes/new" className={`inline-flex min-h-9 items-center justify-center rounded-md bg-accent px-3 text-sm font-medium pointer-coarse:min-h-11 text-accent-contrast hover:bg-accent-hover`}>
               New recipe
             </Link>
           )}
@@ -221,7 +221,7 @@ export function RecipeLibrary() {
             type="button"
             aria-pressed={favourites}
             onClick={toggleFavourites}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${favourites ? "border-accent bg-accent text-accent-contrast" : "border-line bg-raised hover:bg-sunken"}`}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium pointer-coarse:min-h-11 ${favourites ? "border-accent bg-accent text-accent-contrast" : "border-line bg-raised hover:bg-sunken"}`}
           >
             <Heart className={`size-4 ${favourites ? "fill-current" : ""}`} aria-hidden />
             Favourites

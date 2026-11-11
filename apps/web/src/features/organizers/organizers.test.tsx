@@ -114,12 +114,17 @@ it("recipe page shows chips that link to the filtered library", async () => {
   expect(link).toHaveAttribute("href", "/recipes?category=dinner");
   expect(screen.getByRole("link", { name: "Vegan" })).toHaveAttribute("href", "/recipes?tag=vegan");
   expect(screen.getByRole("link", { name: "Tool: Blender" })).toHaveAttribute("href", "/recipes?tool=blender");
+  // Compact on desktop, 44px tall on touch screens.
+  expect(link).toHaveClass("pointer-coarse:min-h-11");
 });
 
 it("library filters update the URL and the list query", async () => {
   const user = userEvent.setup();
   renderAt("/recipes?q=soup");
-  await user.click(await screen.findByRole("button", { name: "Dinner" }));
+  const pill = await screen.findByRole("button", { name: "Dinner" });
+  expect(pill).toHaveClass("pointer-coarse:min-h-11");
+  expect(screen.getByRole("group", { name: "Filter by category" })).toHaveClass("[scrollbar-width:none]");
+  await user.click(pill);
   expect(screen.getByTestId("where")).toHaveTextContent("/recipes?q=soup&category=dinner");
   await user.click(screen.getByRole("button", { name: /Filters/ }));
   const sheet = await screen.findByRole("dialog");
@@ -130,6 +135,7 @@ it("library filters update the URL and the list query", async () => {
   expect(screen.getByTestId("where")).toHaveTextContent("/recipes?q=soup&category=dinner&tag=vegan&tag=quick");
   await waitFor(() => expect(calls.some((c) => c.url.includes("tag=vegan&tag=quick") && c.url.includes("category=dinner"))).toBe(true));
   expect(await axe(screen.getByRole("main"))).toHaveNoViolations();
+  expect(screen.getByRole("button", { name: "Remove filter tag: Vegan" })).toHaveClass("pointer-coarse:min-h-11");
   await user.click(screen.getByRole("button", { name: "Remove filter tag: Vegan" }));
   expect(screen.getByTestId("where")).toHaveTextContent("/recipes?q=soup&category=dinner&tag=quick");
   await user.click(screen.getByRole("button", { name: "Clear all" }));

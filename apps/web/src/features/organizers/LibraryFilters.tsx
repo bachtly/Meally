@@ -72,7 +72,7 @@ export function LibraryFilters() {
 
   return (
     <div className="mb-4 flex flex-col gap-2">
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Filter by category">
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filter by category">
         <Button variant="secondary" size="sm" className="shrink-0" onClick={() => setOpen(true)}>
           <SlidersHorizontal className="size-4" aria-hidden />
           Filters{sheetCount > 0 && ` (${sheetCount})`}
@@ -85,7 +85,7 @@ export function LibraryFilters() {
               type="button"
               aria-pressed={on}
               onClick={() => toggle("categories", c.slug)}
-              className={cn("min-h-9 shrink-0 rounded-full border px-3 text-sm", on ? "border-accent bg-accent text-accent-contrast" : "border-line bg-raised hover:bg-sunken")}
+              className={cn("min-h-9 shrink-0 rounded-full border px-3 text-sm pointer-coarse:min-h-11", on ? "border-accent bg-accent text-accent-contrast" : "border-line bg-raised hover:bg-sunken")}
             >
               {c.name}
             </button>
@@ -101,10 +101,10 @@ export function LibraryFilters() {
                   type="button"
                   aria-label={`Remove filter ${ORGANIZER_LABELS[t].singular}: ${nameOf(t, slug)}`}
                   onClick={() => toggle(t, slug)}
-                  className="inline-flex min-h-8 items-center gap-1 rounded-full bg-sunken pl-3 pr-2 text-sm hover:bg-line"
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-sunken pl-3 pr-2.5 text-sm hover:bg-line active:bg-line pointer-coarse:min-h-11"
                 >
                   {nameOf(t, slug)}
-                  <X className="size-3.5" aria-hidden />
+                  <X className="size-4" aria-hidden />
                 </button>
               </li>
             )),
