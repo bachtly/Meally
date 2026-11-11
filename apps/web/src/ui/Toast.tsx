@@ -6,15 +6,20 @@ interface ToastItem {
   id: number;
   message: string;
   tone: Tone;
+  action?: ToastAction;
 }
-const ToastContext = createContext<(message: string, tone?: Tone) => void>(() => {});
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+const ToastContext = createContext<(message: string, tone?: Tone, action?: ToastAction) => void>(() => {});
 let nextId = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
-  const push = useCallback((message: string, tone: Tone = "info") => {
+  const push = useCallback((message: string, tone: Tone = "info", action?: ToastAction) => {
     const id = nextId++;
-    setItems((s) => [...s, { id, message, tone }]);
+    setItems((s) => [...s, { id, message, tone, action }]);
     setTimeout(() => setItems((s) => s.filter((t) => t.id !== id)), 4000);
   }, []);
   return (
@@ -36,6 +41,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             )}
           >
             {t.message}
+            {t.action && (
+              <button type="button" className="ml-3 min-h-11 font-medium text-accent underline" onClick={t.action.onClick}>
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

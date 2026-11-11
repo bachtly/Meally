@@ -1,20 +1,68 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route, RouterProvider } from "react-router";
 import { FeatureRoute } from "../features/features/Feature";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { RequireAuth, SetupPage, SignInPage, SignUpPage } from "../features/auth/AuthPages";
+import { PwaProvider } from "../pwa/Pwa";
 import { AppShell } from "./AppShell";
 import { Gallery } from "./pages/Gallery";
-import { MorePage, PlanPage, RecipesPage, ShoppingPage } from "./pages/Placeholders";
+import { RecipeLibrary } from "../features/recipes/RecipeLibrary";
+import { RecipePage } from "../features/recipes/RecipePage";
+import { RecipeEditPage, RecipeNewPage } from "../features/recipes/RecipeEditor";
+import { RecipeImportPage } from "../features/import-url/ImportPage";
+import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
+import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
+import { PlanPage } from "../features/meal-plan/PlanPage";
+import { SettingsPage } from "../features/households/SettingsPage";
+import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
+import { CookbookPage } from "../features/cookbooks/CookbookPage";
+import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
+import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
+import { FoodsPage } from "../features/foods/FoodsPage";
+import { OrganizersPage } from "../features/organizers/OrganizersPage";
+import { PrintPage } from "../features/print/PrintPage";
+import { CookPage } from "../features/cook-mode/CookPage";
+import { PublicRecipePage } from "../features/share/PublicRecipePage";
+import { ActivityPage } from "../features/timeline/ActivityPage";
+import { AdminPage } from "../features/admin/AdminPage";
+import { MorePage } from "./pages/Placeholders";
 
-const queryClient = new QueryClient();
+// offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
+const queryClient = new QueryClient({ defaultOptions: { queries: { networkMode: "offlineFirst" } } });
+let router: ReturnType<typeof createBrowserRouter> | undefined;
 
-export function AppRoutes() {
-  return (
-    <Routes>
+/** Routes are data-router objects so the editor can use `useBlocker`. */
+export const appRoutes = createRoutesFromElements(
+  <>
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
+      <Route path="/s/:token" element={<PublicRecipePage />} />
+      <Route
+        element={
+          <RequireAuth>
+            <Outlet />
+          </RequireAuth>
+        }
+      >
+        <Route
+          path="/recipes/:slug/cook"
+          element={
+            <FeatureRoute on="cook-mode">
+              <CookPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/recipes/:slug/print"
+          element={
+            <FeatureRoute on="print">
+              <PrintPage />
+            </FeatureRoute>
+          }
+        />
+      </Route>
       <Route
         element={
           <RequireAuth>
@@ -22,7 +70,19 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<RecipesPage />} />
+        <Route path="/" element={<Navigate to="/recipes" replace />} />
+        <Route path="/recipes" element={<RecipeLibrary />} />
+        <Route path="/recipes/new" element={<RecipeNewPage />} />
+        <Route
+          path="/recipes/import"
+          element={
+            <FeatureRoute on="import-url">
+              <RecipeImportPage />
+            </FeatureRoute>
+          }
+        />
+        <Route path="/recipes/:slug" element={<RecipePage />} />
+        <Route path="/recipes/:slug/edit" element={<RecipeEditPage />} />
         <Route
           path="/plan"
           element={
@@ -35,24 +95,89 @@ export function AppRoutes() {
           path="/shopping"
           element={
             <FeatureRoute on="shopping-lists">
-              <ShoppingPage />
+              <ShoppingListsPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/shopping/:id"
+          element={
+            <FeatureRoute on="shopping-lists">
+              <ShoppingListPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/activity"
+          element={
+            <FeatureRoute on="timeline">
+              <ActivityPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/foods"
+          element={
+            <FeatureRoute on="foods-units">
+              <FoodsPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/organizers"
+          element={
+            <FeatureRoute on="organizers">
+              <OrganizersPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/cookbooks"
+          element={
+            <FeatureRoute on="cookbooks">
+              <CookbooksPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/cookbooks/:slug"
+          element={
+            <FeatureRoute on="cookbooks">
+              <CookbookPage />
             </FeatureRoute>
           }
         />
         <Route path="/more" element={<MorePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route
+          path="/settings/import"
+          element={
+            <FeatureRoute on="import-files">
+              <ImportFilesPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/invite/:token"
+          element={
+            <FeatureRoute on="households">
+              <AcceptInvitePage />
+            </FeatureRoute>
+          }
+        />
         {import.meta.env.DEV && <Route path="/ui" element={<Gallery />} />}
       </Route>
-    </Routes>
-  );
-}
+  </>,
+);
 
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FeaturesProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <PwaProvider>
+          <RouterProvider router={(router ??= createBrowserRouter(appRoutes))} />
+        </PwaProvider>
       </FeaturesProvider>
     </QueryClientProvider>
   );

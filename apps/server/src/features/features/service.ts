@@ -4,30 +4,30 @@ import type { Db } from "../../db/index.js";
 import { featureFlags } from "../../db/schema/index.js";
 
 export interface FlagsService {
-  getFeatures(): ResolvedFeatures;
+  getFeatures(): Promise<ResolvedFeatures>;
   /** `null` clears the override. Env-locked flags still resolve from env. */
-  setOverride(key: FeatureKey, enabled: boolean | null): void;
+  setOverride(key: FeatureKey, enabled: boolean | null): Promise<void>;
 }
 
 export function createFlagsService(db: Db, env: Record<string, string | undefined> = process.env): FlagsService {
   let cache: ResolvedFeatures | null = null;
   return {
-    getFeatures() {
+    async getFeatures() {
       if (!cache) {
         const overrides: Record<string, boolean> = {};
-        for (const row of db.select().from(featureFlags).all()) overrides[row.key] = row.enabled;
+        for (const row of await db.select().from(featureFlags)) overrides[row.key] = row.enabled;
         cache = resolveFeatures({ env, overrides });
       }
       return cache;
     },
-    setOverride(key, enabled) {
-      if (enabled === null) db.delete(featureFlags).where(eq(featureFlags.key, key)).run();
+    async setOverride(key, enabled) {
+      if (enabled === null) await db.delete(featureFlags).where(eq(featureFlags.key, key));
       else {
         const updatedAt = new Date();
-        db.insert(featureFlags)
+        await db
+          .insert(featureFlags)
           .values({ key, enabled, updatedAt })
-          .onConflictDoUpdate({ target: featureFlags.key, set: { enabled, updatedAt } })
-          .run();
+          .onConflictDoUpdate({ target: featureFlags.key, set: { enabled, updatedAt } });
       }
       cache = null;
     },

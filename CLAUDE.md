@@ -6,8 +6,15 @@ Read `docs/design/03-architecture.md` before writing code.
 
 - **Don't copy Mealie or RecipeSage.** No code, CSS, strings or assets from either project. Reimplement the behaviour
   in our own design. You can read their public docs to understand a feature. Don't paste from their source.
-- **One small PR per roadmap row** (`docs/design/roadmap.md`). Branch off the latest `origin/main`. Use Conventional
-  Commit titles (`feat(web): …`, `feat(server): …`, `docs: …`).
+- **One small PR per roadmap row** (`docs/design/roadmap.md`). Use Conventional Commit titles (`feat(web): …`,
+  `feat(server): …`, `docs: …`).
+- **PRs are stacked.** Branch off the previous PR's branch (not `main`) and open the PR with that branch as its base.
+  Start the body with "Stacked on #N; review/merge in order." Merge in order, bottom first; GitHub retargets the next
+  PR when its base merges.
+- **Migration collisions.** Two branches can generate the same migration number. After a rebase, delete your generated
+  migration and its snapshot and journal entry, then run `npm run db:generate -w apps/server` again.
+- **Never commit data dirs** (`data/`, `.vdata/`, anything under `DATA_DIR`) or test output (`playwright-report/`,
+  `test-results/`). Check `git status` before committing.
 - **Every feature PR adds `docs/design/features/<key>.md`**, written from `_template.md`. Do a quick web search for
   each decision (1–3 sources) and cite them.
 - **Every non-core feature is behind its flag**: server routes use `requireFeature('<key>')`, and the web app uses
@@ -18,10 +25,13 @@ Read `docs/design/03-architecture.md` before writing code.
 ## Commands (from the repo root)
 
 - `npm install`
+- `npm run e2e` runs the Playwright flows (needs `npx playwright install chromium` once). CI runs it as its own job.
 - `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. All four must pass before you push. CI runs the
   same four.
 - `npm run db:generate -w apps/server` after changing anything in `apps/server/src/db/schema/`. Commit the generated
-  migration.
+  migration. The database is Postgres (PGlite or `DATABASE_URL`); migrations are plain SQL, and `0001_recipe_search`
+  is hand-written (the `search_vector` column is not in the Drizzle schema). Tests use `openTestDb()` from
+  `src/db/testing.ts`; set `DATABASE_URL` to run them on a real Postgres.
 
 ## UI rules
 

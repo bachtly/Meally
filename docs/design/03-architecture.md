@@ -6,12 +6,12 @@ The research behind each decision is in [01-research.md](01-research.md).
 
 ```
 apps/web        React 19 + Vite SPA (TypeScript, Tailwind CSS v4, TanStack Query, React Router)
-apps/server     Hono on Node 24, Drizzle ORM, SQLite (better-sqlite3); serves /api and the built web app
+apps/server     Hono on Node 24, Drizzle ORM, Postgres (embedded PGlite by default, or `DATABASE_URL`); serves /api and the built web app
 packages/shared zod schemas, API types, feature-flag registry, ingredient parser, unit conversion
 ```
 
-One Docker image runs the server, and the server also serves the built SPA. All data is under `/data`: `meally.db`
-plus `images/`.
+One Docker image runs the server, and the server also serves the built SPA. All data is under `/data`: `pgdata/`
+(embedded Postgres) plus `images/`. With `DATABASE_URL` the database lives in your own Postgres.
 
 ## Decisions
 
@@ -19,13 +19,26 @@ plus `images/`.
 |---|---|---|
 | A1 | TypeScript monorepo with npm workspaces | One language end to end. Types and zod schemas are shared between client and server. npm comes with Node, so there's nothing extra to install. |
 | A2 | Hono server on Node | Small, fast, built on web standards, with typed routes. It has middleware for cookies, CORS and secure headers. |
-| A3 | SQLite through Drizzle, migrations with drizzle-kit | Nothing extra to run (G5). WAL mode copes with concurrent users. FTS5 gives search (its table and triggers go in a hand-written SQL migration, since drizzle-kit can't model them). Keep write transactions short. Drizzle also supports Postgres if we add it later. |
-| A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. Use N=2^17, r=8, p=1 and raise `maxmem` (OWASP's scrypt setting). API tokens (F22) use the same table design. |
+| A3 | Postgres through Drizzle, migrations with drizzle-kit. Default driver is embedded PGlite (`@electric-sql/pglite`, WASM, persisted in `$DATA_DIR/pgdata`); with `DATABASE_URL` it uses postgres-js (`prepare: false`, so poolers work) | Nothing extra to run (G5), and one dialect everywhere so a hosted deployment (Supabase) uses the same schema and queries. Search is a `tsvector` column with a GIN index, maintained by the recipes service. |
+| A4 | Our own session auth: scrypt hashes (`node:crypto`), an httpOnly SameSite=Lax session cookie with the token hashed in the DB | Few dependencies, easy to audit. API tokens (F22) use the same table design. Use N=2^17, r=8, p=1 and raise `maxmem` (OWASP's scrypt setting). |
 | A5 | React 19 + Vite + TanStack Query + React Router | A mainstream stack that's fast to build. Query handles cache, retries and optimistic updates. |
 | A6 | Tailwind CSS v4 with our own components on Radix primitives (shadcn-style, written in this repo) | Modern look with accessible dialogs, menus and popovers, and no heavy UI kit. |
 | A7 | Design tokens as CSS variables (OKLCH), light and dark themes, `prefers-color-scheme` with a manual override | Consistent theming and AA contrast. |
 | A8 | Vitest for unit and API tests, Testing Library for components, Playwright for a few end-to-end flows | Fast and familiar. |
 | A9 | Images stored on disk and resized with `sharp` to WebP at 3 sizes | Lighter than storing blobs in the DB. Cards load quickly. |
+
+## Changed decisions
+
+- A3: the SQLite driver changed from better-sqlite3 to libsql. Reason: better-sqlite3 has no prebuilt binary for Node 24 on
+  Windows, so install failed without a C++ toolchain. The driver is async, so every db call is awaited.
+
+## Changed decisions (Postgres)
+
+- A3 (again): SQLite/libsql was replaced by Postgres everywhere (PR 2 of the Supabase design). FTS5 became a `tsvector`
+  column queried with `websearch_to_tsquery('simple', ...)` plus a prefix match on the last word. Booleans, JSON and
+  timestamps use native `boolean`, `jsonb` and `timestamptz`. There is no SQLite data migration. In-app backups snapshot
+  PGlite's data directory and are off with `DATABASE_URL` (use `pg_dump`). Tests run on in-memory PGlite, and CI also
+  runs them against a Postgres 16 service.
 
 ## Feature flags
 
@@ -59,6 +72,22 @@ apps/web/src/
 packages/shared/src/
   features.ts, schemas/<feature>.ts, ingredients/, units/
 ```
+
+## Ports
+
+Features reach the host only through four interfaces in `apps/server/src/ports/`, bundled as a `Platform`
+(`{name, images, events, scheduler, hasher}`) that `createApp` puts on the context (`c.get("platform")`):
+
+- `ImageStore`: `putOriginal` (processes an upload, returns the image id), `put`, `get`, `delete`, `urlFor` (null when
+  the server proxies bytes) and an optional `localDir` that backups read.
+- `Events`: `publish` / `subscribe(channel, cb)` and `supportsStreaming` (SSE routes need it).
+- `Scheduler`: named jobs (`define`, `every`, `daily`, `runAfter`, `runJob`). Handlers must be idempotent.
+- `PasswordHasher`: `hash`, `verify` returning `{ok, needsRehash}`; hash strings are versioned (`scrypt$...`).
+
+`apps/server/src/adapters/node/` implements them (disk plus sharp, in-process bus, timers, scrypt), and
+`createNodePlatform` builds the default used by `index.ts` and tests. Backups, the restore CLI, the process lock and
+import upload temp files stay Node-only. A test (`platform-guard.test.ts`) fails if other code imports `node:fs` or
+`sharp` directly.
 
 ## API conventions
 

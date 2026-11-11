@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
-import { AppRoutes } from "../../app/App";
+import { appRoutes } from "../../app/App";
 
 afterEach(() => {
   cleanup();
@@ -30,9 +30,7 @@ function setup(path: string, signedIn = false) {
   vi.stubGlobal("fetch", fetchMock);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [path] })} />
     </QueryClientProvider>,
   );
   return fetchMock;

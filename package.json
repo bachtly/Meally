@@ -14,9 +14,11 @@
     "lint": "oxlint",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build -w apps/web && npm run build -w apps/server"
+    "build": "npm run build -w apps/web && npm run build -w apps/server",
+    "e2e": "playwright test -c e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "concurrently": "^10.0.7",
     "oxlint": "^1.93.0",
     "typescript": "^7.0.2",

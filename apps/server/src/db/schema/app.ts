@@ -1,6 +1,6 @@
-import { sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { pgTable, text } from "drizzle-orm/pg-core";
 
-export const appMeta = sqliteTable("app_meta", {
+export const appMeta = pgTable("app_meta", {
   key: text("key").primaryKey(),
   value: text("value"),
 });

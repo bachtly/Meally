@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { getConnInfo } from "@hono/node-server/conninfo";
@@ -10,6 +10,7 @@ import {
   signupModes,
   z,
   type AuthStatus,
+  type InviteLookup,
   type MeResponse,
   type SignupMode,
 } from "@meally/shared";
@@ -18,20 +19,20 @@ import { households, instanceSettings, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
-import { hashPassword, verifyPassword } from "./password.js";
+import { consumeInvite, findValidInvite } from "../households/service.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
-const SIGNUP_KEY = "signup_mode";
+export const SIGNUP_KEY = "signup_mode";
 export const DEFAULT_SIGNUP_MODE: SignupMode = "invite";
 
-export function resolveSignupMode(db: Db, locked: SignupMode | null): SignupMode {
+export async function resolveSignupMode(db: Db, locked: SignupMode | null): Promise<SignupMode> {
   if (locked) return locked;
-  const row = db.select().from(instanceSettings).where(eq(instanceSettings.key, SIGNUP_KEY)).get();
+  const [row] = await db.select().from(instanceSettings).where(eq(instanceSettings.key, SIGNUP_KEY)).limit(1);
   const parsed = z.enum(signupModes).safeParse(row?.value);
   return parsed.success ? parsed.data : DEFAULT_SIGNUP_MODE;
 }
 
-const needsSetup = (db: Pick<Db, "select">) => (db.select({ n: count() }).from(users).get()?.n ?? 0) === 0;
+const needsSetup = async (db: Pick<Db, "select">) => ((await db.select({ n: count() }).from(users))[0]?.n ?? 0) === 0;
 
 async function body<S extends z.ZodTypeAny>(c: Context<AppEnv>, schema: S): Promise<z.infer<S>> {
   const raw = await c.req.json().catch(() => null);
@@ -40,7 +41,7 @@ async function body<S extends z.ZodTypeAny>(c: Context<AppEnv>, schema: S): Prom
   return parsed.data;
 }
 
-function clientIp(c: Context<AppEnv>): string {
+export function clientIp(c: Context<AppEnv>): string {
   if (c.get("auth").trustProxy) {
     const fwd = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
     if (fwd) return fwd;
@@ -64,30 +65,48 @@ function limit(c: Context<AppEnv>, kind: "login" | "register") {
 async function createAccount(
   c: Context<AppEnv>,
   input: { email: string; name: string; password: string },
-  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean },
+  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean; inviteToken?: string },
 ) {
   const db = c.get("db");
-  const passwordHash = await hashPassword(input.password, c.get("auth").scryptLogN);
+  const passwordHash = await c.get("platform").hasher.hash(input.password);
   const now = new Date();
-  const householdId = randomUUID();
+  let householdId: string = randomUUID();
+  let householdRole: "owner" | "member" = "owner";
+  let householdName = opts.householdName;
   const userId = randomUUID();
-  // better-sqlite3 transactions are synchronous, so the empty check and insert cannot interleave.
-  db.transaction((tx) => {
-    if (opts.requireEmpty && !needsSetup(tx)) {
+  await db.transaction(async (tx) => {
+    // Serialise sign-ups so the "first user" and unique-email checks cannot interleave across connections.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(727001)`);
+    if (opts.requireEmpty && !(await needsSetup(tx))) {
       throw new ApiError(409, "setup_done", "Setup has already been completed");
     }
-    if (tx.select().from(users).where(eq(users.email, input.email)).get()) {
+    if ((await tx.select().from(users).where(eq(users.email, input.email)).limit(1)).length > 0) {
       throw new ApiError(409, "email_taken", "An account with this email already exists");
     }
-    tx.insert(households).values({ id: householdId, name: opts.householdName, createdAt: now }).run();
-    tx.insert(users)
-      .values({ id: userId, email: input.email, name: input.name, passwordHash, role: opts.role, householdId, createdAt: now })
-      .run();
+    if (opts.inviteToken) {
+      const joined = await consumeInvite(tx, opts.inviteToken, input.email);
+      householdId = joined.householdId;
+      householdRole = joined.role;
+      const [h] = await tx.select().from(households).where(eq(households.id, householdId)).limit(1);
+      householdName = h!.name;
+    } else {
+      await tx.insert(households).values({ id: householdId, name: householdName, createdAt: now });
+    }
+    await tx.insert(users).values({
+      id: userId,
+      email: input.email,
+      name: input.name,
+      passwordHash,
+      role: opts.role,
+      householdId,
+      householdRole,
+      createdAt: now,
+    });
   });
-  setSessionCookie(c, createSession(db, userId, c.req.header("user-agent")));
+  setSessionCookie(c, await createSession(db, userId, c.req.header("user-agent")));
   const res: MeResponse = {
-    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId },
-    household: { id: householdId, name: opts.householdName },
+    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId, householdRole },
+    household: { id: householdId, name: householdName },
   };
   return c.json(res, 201);
 }
@@ -96,18 +115,18 @@ async function createAccount(
 let dummyHash: Promise<string> | undefined;
 
 export const authRoutes = new Hono<AppEnv>()
-  .get("/status", (c) => {
+  .get("/status", async (c) => {
     const db = c.get("db");
     const status: AuthStatus = {
-      needsSetup: needsSetup(db),
-      signupMode: resolveSignupMode(db, c.get("auth").lockedSignupMode),
+      needsSetup: await needsSetup(db),
+      signupMode: await resolveSignupMode(db, c.get("auth").lockedSignupMode),
     };
     return c.json(status);
   })
   .post("/setup", async (c) => {
     limit(c, "register");
     const input = await body(c, setupSchema);
-    if (!needsSetup(c.get("db"))) throw new ApiError(409, "setup_done", "Setup has already been completed");
+    if (!(await needsSetup(c.get("db")))) throw new ApiError(409, "setup_done", "Setup has already been completed");
     return createAccount(c, input, {
       role: "admin",
       householdName: input.householdName ?? `${input.name}'s household`,
@@ -117,34 +136,52 @@ export const authRoutes = new Hono<AppEnv>()
   .post("/register", async (c) => {
     limit(c, "register");
     const db = c.get("db");
-    if (needsSetup(db)) throw new ApiError(409, "setup_required", "Complete first-run setup first");
-    const mode = resolveSignupMode(db, c.get("auth").lockedSignupMode);
+    if (await needsSetup(db)) throw new ApiError(409, "setup_required", "Complete first-run setup first");
+    const mode = await resolveSignupMode(db, c.get("auth").lockedSignupMode);
     if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
-    if (mode === "invite") throw new ApiError(403, "invite_required", "An invitation is required to sign up");
     const input = await body(c, registerSchema);
-    return createAccount(c, input, { role: "member", householdName: `${input.name}'s household` });
+    // A valid invite token works in every mode except closed; invite mode requires one.
+    // Invites belong to the households feature, so with the flag off the token is ignored.
+    const useInvite = !!input.inviteToken && (await c.get("flags").getFeatures()).households.enabled;
+    if (mode === "invite" && !useInvite) throw new ApiError(403, "invite_required", "An invitation is required to sign up");
+    return createAccount(c, input, {
+      role: "member",
+      householdName: `${input.name}'s household`,
+      inviteToken: useInvite ? input.inviteToken : undefined,
+    });
+  })
+  .get("/invite/:token", async (c) => {
+    const r = c.get("auth").inviteLimiter.hit(clientIp(c));
+    if (!r.ok) {
+      c.header("Retry-After", String(r.retryAfterSec));
+      throw new ApiError(429, "rate_limited", "Too many attempts. Try again later.");
+    }
+    const on = (await c.get("flags").getFeatures()).households.enabled;
+    const found = on ? await findValidInvite(c.get("db"), c.req.param("token")) : null;
+    const res: InviteLookup = { householdName: found?.householdName ?? "", valid: !!found };
+    return c.json(res);
   })
   .post("/login", async (c) => {
     limit(c, "login");
     const input = await body(c, loginSchema);
     const db = c.get("db");
-    const user = db.select().from(users).where(eq(users.email, input.email)).get();
-    dummyHash ??= hashPassword("meally-dummy", c.get("auth").scryptLogN);
-    const ok = await verifyPassword(input.password, user?.passwordHash ?? (await dummyHash));
+    const [user] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
+    dummyHash ??= c.get("platform").hasher.hash("meally-dummy");
+    const { ok } = await c.get("platform").hasher.verify(input.password, user?.passwordHash ?? (await dummyHash));
     if (!user || !ok) throw new ApiError(401, "invalid_credentials", "Incorrect email or password");
-    setSessionCookie(c, createSession(db, user.id, c.req.header("user-agent")));
-    const household = db.select().from(households).where(eq(households.id, user.householdId)).get()!;
-    const res: MeResponse = { user: toSessionUser(user), household: { id: household.id, name: household.name } };
+    setSessionCookie(c, await createSession(db, user.id, c.req.header("user-agent")));
+    const [household] = await db.select().from(households).where(eq(households.id, user.householdId)).limit(1);
+    const res: MeResponse = { user: toSessionUser(user), household: { id: household!.id, name: household!.name } };
     return c.json(res);
   })
-  .post("/logout", (c) => {
+  .post("/logout", async (c) => {
     const token = getCookie(c, SESSION_COOKIE);
-    if (token) deleteSession(c.get("db"), token);
+    if (token) await deleteSession(c.get("db"), token);
     clearSessionCookie(c);
     return c.json({ ok: true });
   })
-  .get("/me", requireAuth, (c) => {
-    const household = c.get("db").select().from(households).where(eq(households.id, c.get("householdId"))).get()!;
-    const res: MeResponse = { user: c.get("user"), household: { id: household.id, name: household.name } };
+  .get("/me", requireAuth, async (c) => {
+    const [household] = await c.get("db").select().from(households).where(eq(households.id, c.get("householdId"))).limit(1);
+    const res: MeResponse = { user: c.get("user"), household: { id: household!.id, name: household!.name } };
     return c.json(res);
   });

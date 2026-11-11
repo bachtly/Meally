@@ -19,9 +19,23 @@ Meally fixes two problems with the apps it learns from:
 
 ## Features
 
-Every feature after the core can be switched on or off ([feature flags](docs/design/03-architecture.md#feature-flags)).
-[`docs/design/02-features.md`](docs/design/02-features.md) maps each Mealie and RecipeSage feature to its place in
-Meally.
+Everything after the core can be switched off with a [feature flag](docs/design/03-architecture.md#feature-flags)
+(flag key in brackets). [`docs/design/02-features.md`](docs/design/02-features.md) maps each Mealie and RecipeSage
+feature to its place in Meally.
+
+- **Recipes:** library with search, recipe editor with live ingredient parsing, images, favourites and ratings
+  (`ratings`), tags, categories and tools (`organizers`), cookbooks (`cookbooks`), nutrition facts (`nutrition`).
+- **Importing:** from a URL (`import-url`), from other apps and files (`import-files`), ingredient parser
+  (`ingredient-parser`), foods and units (`foods-units`).
+- **Cooking:** scale servings and convert units (`scaling`), cook mode with step timers (`cook-mode`), print view
+  (`print`), timeline and comments (`timeline`).
+- **Planning:** meal planner with suggestions and a calendar feed (`meal-plan`), shopping lists with live updates
+  (`shopping-lists`).
+- **Sharing:** households and invites (`households`), public share links (`share-links`).
+- **Running it:** export and backups (`backups`), installable offline app (`pwa`), API tokens (`api-tokens`) and
+  [API docs](docs/api.md), webhooks (`webhooks`), admin console, AI helpers (`ai`, off by default).
+
+**Status:** Meally is early. It is built as a stack of small, reviewable pull requests, so expect rough edges.
 
 ## Self-hosting
 
@@ -29,7 +43,8 @@ Meally.
 docker run -d -p 8080:8080 -v meally-data:/data ghcr.io/bachtly/meally:latest
 ```
 
-Configuration is done through environment variables, listed in [`docs/self-hosting.md`](docs/self-hosting.md).
+Docker Compose, reverse proxy examples, a public-instance checklist, every environment variable, backups and
+upgrades are in [`docs/self-hosting.md`](docs/self-hosting.md).
 
 ## Development
 
@@ -37,6 +52,7 @@ Configuration is done through environment variables, listed in [`docs/self-hosti
 npm install
 npm run dev      # server on :8080, web on :5173
 npm test
+npm run e2e      # Playwright end-to-end tests (first: npx playwright install chromium)
 ```
 
 The project layout and conventions are in [`CLAUDE.md`](CLAUDE.md) and

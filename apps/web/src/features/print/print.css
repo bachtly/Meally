@@ -1,0 +1,38 @@
+/* Print layout. Screen: a plain white sheet with a toolbar. Print: the same sheet without the toolbar. */
+.print-page {
+  background: #fff;
+  color: #000;
+  min-height: 100dvh;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11.5pt;
+  line-height: 1.45;
+  padding: 1rem;
+}
+.print-page main { max-width: 42rem; margin: 0 auto; }
+.print-page a { color: #0b4f8a; }
+.print-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+  max-width: 42rem; margin: 0 auto 1.5rem; font-family: system-ui, sans-serif; font-size: 0.9rem;
+}
+.print-toolbar button { margin-left: auto; }
+.print-page h1 { font-size: 22pt; line-height: 1.15; margin: 0 0 0.3em; }
+.print-page h2 { font-size: 14pt; margin: 1.2em 0 0.4em; border-bottom: 1px solid #000; break-after: avoid; }
+.print-lede { font-style: italic; margin: 0 0 0.4em; }
+.print-meta { margin: 0 0 0.8em; font-size: 10.5pt; }
+.print-photo { display: block; max-height: 9cm; max-width: 100%; margin: 0.5em 0; object-fit: cover; }
+.print-page ul, .print-page ol { margin: 0; padding-left: 1.4em; }
+.print-page ul { list-style: none; padding: 0; }
+.print-page li { margin-bottom: 0.35em; break-inside: avoid; }
+.print-page ol li { margin-bottom: 0.7em; padding-left: 0.2em; }
+.print-section { display: block; margin-top: 0.4em; font-variant: small-caps; }
+.print-cols { column-count: 2; column-gap: 2rem; }
+.print-source { margin-top: 1.5em; font-size: 10pt; word-break: break-all; }
+.print-notes { white-space: pre-line; }
+
+@page { margin: 15mm; }
+@media print {
+  .print-toolbar { display: none !important; }
+  .print-page { padding: 0; min-height: 0; font-size: 11pt; }
+  .print-page main { max-width: none; }
+  .print-page a { color: #000; text-decoration: none; }
+}

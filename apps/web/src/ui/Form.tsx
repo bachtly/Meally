@@ -1,7 +1,7 @@
 import {
   cloneElement,
+  type ComponentProps,
   useId,
-  type InputHTMLAttributes,
   type LabelHTMLAttributes,
   type ReactElement,
   type TextareaHTMLAttributes,
@@ -11,7 +11,7 @@ import { cn } from "./cn";
 const control =
   "w-full min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-base text-ink placeholder:text-muted aria-[invalid=true]:border-danger";
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: ComponentProps<"input">) {
   return <input {...rest} className={cn(control, className)} />;
 }
 export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {

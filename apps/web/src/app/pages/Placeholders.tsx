@@ -1,45 +1,44 @@
-import { BookOpen, CalendarDays, ShoppingCart } from "lucide-react";
+import { useSession } from "../../features/auth/useSession";
 import { Link } from "react-router";
 import { HealthPage } from "../../features/health/HealthPage";
-import { EmptyState, ThemeToggle } from "../../ui";
-
-export function RecipesPage() {
-  return (
-    <>
-      <h1 className="mb-4 text-2xl font-semibold">Recipes</h1>
-      <EmptyState icon={<BookOpen className="size-10" />} title="No recipes yet">
-        Recipes you add will show up here.
-      </EmptyState>
-    </>
-  );
-}
-
-export function PlanPage() {
-  return (
-    <>
-      <h1 className="mb-4 text-2xl font-semibold">Plan</h1>
-      <EmptyState icon={<CalendarDays className="size-10" />} title="Nothing planned">
-        Your week will show up here.
-      </EmptyState>
-    </>
-  );
-}
-
-export function ShoppingPage() {
-  return (
-    <>
-      <h1 className="mb-4 text-2xl font-semibold">Shopping</h1>
-      <EmptyState icon={<ShoppingCart className="size-10" />} title="No lists yet">
-        Your shopping lists will show up here.
-      </EmptyState>
-    </>
-  );
-}
+import { InstallItem } from "../../pwa/Pwa";
+import { Feature } from "../../features/features/Feature";
+import { ThemeToggle } from "../../ui";
 
 export function MorePage() {
+  const { user } = useSession();
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">More</h1>
+      <Link to="/settings" className="text-accent underline">
+        Settings
+      </Link>
+      {user?.role === "admin" && (
+        <Link to="/admin" className="text-accent underline">
+          Admin
+        </Link>
+      )}
+      <Feature on="cookbooks">
+        <Link to="/cookbooks" className="text-accent underline">
+          Cookbooks
+        </Link>
+      </Feature>
+      <Feature on="timeline">
+        <Link to="/activity" className="text-accent underline">
+          Activity
+        </Link>
+      </Feature>
+      <Feature on="organizers">
+        <Link to="/organizers" className="text-accent underline">
+          Tags, categories and tools
+        </Link>
+      </Feature>
+      <Feature on="foods-units">
+        <Link to="/foods" className="text-accent underline">
+          Foods and units
+        </Link>
+      </Feature>
+      <InstallItem />
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Appearance</h2>
         <ThemeToggle />

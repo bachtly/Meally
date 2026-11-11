@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { axe } from "vitest-axe";
 import * as matchers from "vitest-axe/matchers";
 import { afterEach, expect, it, vi } from "vitest";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
-import { AppRoutes } from "./App";
+import { appRoutes } from "./App";
 
 expect.extend(matchers);
 
@@ -31,16 +31,14 @@ function renderAt(path: string, shopping = true) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <FeaturesProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
+        <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [path] })} />
       </FeaturesProvider>
     </QueryClientProvider>,
   );
 }
 
 it("renders the shell with nav items", async () => {
-  renderAt("/");
+  renderAt("/recipes");
   const navs = await screen.findAllByRole("navigation");
   expect(navs).toHaveLength(2);
   expect(await within(navs[0]!).findByRole("link", { name: "Shopping" })).toBeInTheDocument();
@@ -49,7 +47,7 @@ it("renders the shell with nav items", async () => {
 });
 
 it("hides a nav item when its flag is off", async () => {
-  renderAt("/", false);
+  renderAt("/recipes", false);
   const navs = await screen.findAllByRole("navigation");
   await within(navs[0]!).findByRole("link", { name: "Plan" });
   expect(within(navs[0]!).queryByRole("link", { name: "Shopping" })).not.toBeInTheDocument();

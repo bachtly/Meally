@@ -20,6 +20,7 @@ export function useSession() {
     },
     staleTime: 60_000,
     retry: false,
+    retryOnMount: false, // offline: don't re-pend (and unmount the app) on every observer mount; reconnect refetches
   });
   useEffect(() => {
     const onOut = () => qc.setQueryData(SESSION_KEY, null);
