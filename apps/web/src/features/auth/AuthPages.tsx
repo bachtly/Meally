@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react
 import { loginSchema, registerSchema, setupSchema, type InviteLookup, type MeResponse } from "@meally/shared";
 import type { ZodType } from "zod";
 import { api, ApiRequestError, postJson } from "../../lib/api";
-import { Button, Field, Input, Skeleton } from "../../ui";
+import { Button, EmptyState, Field, Input, Skeleton } from "../../ui";
 import { useAuthStatus, useSession } from "./useSession";
 
 function AuthCard({ title, children }: { title: string; children: ReactNode }) {
@@ -210,9 +210,10 @@ export function SetupPage() {
 
 /** Wraps routes that need a session; redirects to sign in and remembers where the user was going. */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { me, isLoading, isError } = useSession();
+  const { me, isLoading, isError, retry } = useSession();
   const location = useLocation();
-  if (isLoading) {
+  // A stored session renders at once while /auth/me revalidates; the skeleton only shows on a first sign-in check.
+  if (isLoading && !me) {
     return (
       <div className="p-6" aria-busy="true">
         <Skeleton className="h-8 w-48" />
@@ -220,6 +221,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     );
   }
   // Offline cold start: the session check fails with a network error, not a 401. Let cached pages render.
-  if (!me && !(isError && !navigator.onLine)) return <Navigate to="/signin" replace state={{ from: location.pathname + location.search }} />;
+  if (!me && isError && navigator.onLine) {
+    return (
+      <EmptyState title="Can't reach Meally" action={<Button onClick={retry}>Try again</Button>}>
+        Check your connection, then try again.
+      </EmptyState>
+    );
+  }
+  if (!me && !isError) return <Navigate to="/signin" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
