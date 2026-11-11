@@ -1,6 +1,27 @@
 @import "tailwindcss";
 @import "./ui/theme.css";
 
+/* Device safe areas (notch, home indicator). They are non-zero only because index.html sets viewport-fit=cover.
+   --header-h is the app header's height; AppShell keeps it exact with a ResizeObserver. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --header-h: calc(3.75rem + var(--sat));
+}
+
+/* Touch polish. Controls have their own focus and active states, so drop the grey tap flash; manipulation removes
+   the double-tap-to-zoom delay without blocking pinch zoom. */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  a, button, input, select, textarea, label, summary, [role="button"], [role="tab"], [role="checkbox"], [role="menuitem"] {
+    touch-action: manipulation;
+  }
+}
+
 /* Photo-less recipe cards: --h is a warm hue (20-90) derived from the name. Text keeps AA contrast. */
 .recipe-tint {
   background: oklch(0.93 0.05 var(--h));
