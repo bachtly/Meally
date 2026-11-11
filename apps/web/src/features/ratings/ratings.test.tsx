@@ -66,6 +66,11 @@ it("toggles the card heart optimistically and shows the star value", async () =>
   expect(screen.getByLabelText("Rated 4 of 5")).toBeInTheDocument();
   await userEvent.click(heart);
   expect(heart).toHaveAttribute("aria-pressed", "true"); // before the server answers
+  // The fill follows the theme token, so the in-app theme toggle recolours it (Tailwind `dark:` follows the OS only).
+  expect(heart).toHaveClass("size-11");
+  const icon = heart.querySelector("svg")!;
+  expect(icon).toHaveClass("fill-current", "text-danger");
+  expect(icon.getAttribute("class")).not.toMatch(/(dark:|text-red-)/);
   await waitFor(() => expect(puts).toEqual([{ favourite: true }]));
 });
 

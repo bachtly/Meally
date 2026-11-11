@@ -94,6 +94,7 @@ it("shows upload errors", async () => {
   renderAt("/settings/import");
   await userEvent.upload(await screen.findByLabelText("Recipe file"), new File(["x"], "a.zip"));
   await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+  expect(screen.getByRole("alert")).toHaveClass("text-danger");
 });
 
 it("is hidden when the flag is off", async () => {
