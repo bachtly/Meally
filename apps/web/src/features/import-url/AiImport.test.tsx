@@ -10,7 +10,7 @@ import { appRoutes } from "../../app/App";
 
 expect.extend(matchers);
 
-function renderImport(opts: { configured: boolean; role?: string; aiOn?: boolean }) {
+function renderImport(opts: { configured: boolean; role?: string; aiOn?: boolean; path?: string }) {
   const info = (enabled: boolean) => ({ enabled, locked: false, source: "default", label: "x", description: "y" });
   const bodies: unknown[] = [];
   vi.stubGlobal(
@@ -31,7 +31,7 @@ function renderImport(opts: { configured: boolean; role?: string; aiOn?: boolean
   const view = render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <FeaturesProvider>
-        <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: ["/recipes/import"] })} />
+        <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [opts.path ?? "/recipes/import"] })} />
       </FeaturesProvider>
     </QueryClientProvider>,
   );
@@ -66,4 +66,10 @@ it("hides the AI tabs when the flag is off", async () => {
   renderImport({ configured: true, aiOn: false });
   await screen.findByLabelText("Recipe link");
   expect(screen.queryByRole("tab", { name: "From text" })).toBeNull();
+});
+
+it("opens the tab named by ?from=", async () => {
+  renderImport({ configured: true, path: "/recipes/import?from=text" });
+  expect(await screen.findByRole("tab", { name: "From text", selected: true })).toBeInTheDocument();
+  expect(await screen.findByLabelText("Recipe text")).toBeInTheDocument();
 });

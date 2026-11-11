@@ -4,8 +4,8 @@ import { BookMarked } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
-import { Feature } from "../features/Feature";
 import { useFeature } from "../features/FeaturesProvider";
+import { useImportOptions } from "../import-url/importOptions";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
 import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
 import { HeartButton } from "../ratings/HeartButton";
@@ -68,7 +68,8 @@ export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: R
 export function RecipeLibrary() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const canImport = useFeature("import-url");
+  const importOptions = useImportOptions();
+  const canImport = importOptions.length > 0;
   const q = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: RecipeSort = SORTS.some((s) => s.value === sortParam) ? (sortParam as RecipeSort) : "updated";
@@ -140,11 +141,11 @@ export function RecipeLibrary() {
             <Link to="/recipes/new" className={`${linkButton} bg-accent text-accent-contrast hover:bg-accent-hover`}>
               New recipe
             </Link>
-            <Feature on="import-url">
+            {canImport && (
               <Link to="/recipes/import" className={`${linkButton} border border-line bg-raised hover:bg-sunken`}>
-                Import from URL
+                {importOptions.length > 1 ? "Import a recipe" : "Import from a link"}
               </Link>
-            </Feature>
+            )}
           </div>
         }
       >
@@ -200,7 +201,11 @@ export function RecipeLibrary() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => navigate("/recipes/new")}>Write from scratch</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/recipes/import")}>Import from URL</DropdownMenuItem>
+                {importOptions.map((o) => (
+                  <DropdownMenuItem key={o.source} onSelect={() => navigate(o.to)}>
+                    {o.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
