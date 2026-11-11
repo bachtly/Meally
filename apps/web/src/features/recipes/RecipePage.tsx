@@ -357,7 +357,7 @@ export function RecipePage() {
           </Button>
         </div>
       </Dialog>
-      {shareOn && <ShareDialog slug={r.slug} name={r.name} open={shareOpen} onOpenChange={setShareOpen} />}
+      {shareOn && <ShareDialog target={{ kind: "recipe", slug: r.slug, name: r.name }} open={shareOpen} onOpenChange={setShareOpen} />}
       {cookbooksOn && <AddToCookbook open={bookOpen} onOpenChange={setBookOpen} recipeSlug={r.slug} />}
       {planOn && <AddSheet open={planOpen} onOpenChange={setPlanOpen} date={localToday()} recipe={{ id: r.id, name: r.name }} />}
     </article>

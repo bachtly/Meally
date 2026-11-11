@@ -54,6 +54,13 @@ so a link can never read another recipe's file.
 
 ## UI
 
+One share dialog for a recipe, a set or a cookbook: optional name (sets), note, "Show my name" switch with a preview
+("Shown as "Shared by Ada""), expiry, then the link once with Copy and native share. The library has **Select** (cards
+become toggle buttons, a sticky bar shows the count and **Share N**, up to 100); cookbooks have **Share** in the header;
+**Settings, Shared links** lists every active link with what it is, the name shown, expiry, views and Revoke.
+
+F16 (single recipe):
+
 Share dialog (create with expiry, copy, native share when available, list with revoke; loading and error states).
 Public page `/s/:token` outside the shell and outside auth, with the servings stepper when `scaling` is on, a print
 button, and a "This link no longer works" state.

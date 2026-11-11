@@ -8,10 +8,11 @@ import { ExportBackupsSection } from "../backups/ExportBackupsSection";
 import { HouseholdSection } from "./HouseholdSection";
 import { TokensSection } from "../tokens/TokensSection";
 import { WebhooksSection } from "../webhooks/WebhooksSection";
+import { SharedLinksSection } from "../share/SharedLinksSection";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={`s-${title}`}>
+    <section id={id} className="flex scroll-mt-20 flex-col gap-3" aria-labelledby={`s-${title}`}>
       <h2 id={`s-${title}`} className="text-lg font-semibold">
         {title}
       </h2>
@@ -56,6 +57,11 @@ export function SettingsPage() {
           <Link to="/settings/import" className="text-accent underline">
             Import from Paprika, Mealie, RecipeSage and more
           </Link>
+        </Section>
+      </Feature>
+      <Feature on="share-links">
+        <Section title="Shared links" id="shared-links">
+          <SharedLinksSection />
         </Section>
       </Feature>
       {/* Export is core. Only instance backups are flagged (off on Postgres/Supabase). */}

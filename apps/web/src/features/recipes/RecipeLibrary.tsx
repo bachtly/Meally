@@ -1,4 +1,4 @@
-import { ArrowDownUp, BookOpen, ChevronDown, Heart, SearchX, Star } from "lucide-react";
+import { ArrowDownUp, BookOpen, Check, CheckSquare, ChevronDown, Heart, SearchX, Share2, Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { BookMarked } from "lucide-react";
 import { useState } from "react";
@@ -6,11 +6,13 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
 import { useFeature } from "../features/FeaturesProvider";
 import { useImportOptions } from "../import-url/importOptions";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton } from "../../ui";
+import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton, useToast } from "../../ui";
 import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
 import { HeartButton } from "../ratings/HeartButton";
 import { CookbookDialog } from "../cookbooks/CookbookDialog";
 import { useRecipes, type RecipeSort } from "./api";
+import { ShareDialog } from "../share/ShareDialog";
+import { SHARE_SET_MAX } from "@meally/shared";
 import { formatMinutes, imageSrcSet } from "./format";
 import { RecipeThumb } from "./RecipeThumb";
 
@@ -24,11 +26,14 @@ const SORTS: { value: RecipeSort; label: string }[] = [
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
 export const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5";
 
-export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: ReactNode }) {
+/** In select mode the card is a toggle button instead of a link. */
+export type CardSelect = { selected: boolean; onToggle: () => void };
+
+export function RecipeCard({ recipe, extra, select }: { recipe: RecipeSummary; extra?: ReactNode; select?: CardSelect }) {
   const time = formatMinutes(recipe.totalMinutes);
-  return (
-    <li className="relative">
-      <Link to={`/recipes/${recipe.slug}`} className="group block overflow-hidden rounded-lg border border-line bg-raised">
+  const cardClass = cn("group block w-full overflow-hidden rounded-lg border bg-raised text-left", select?.selected ? "border-accent ring-2 ring-accent" : "border-line");
+  const inner = (
+    <>
         <div className="aspect-[4/3] bg-sunken">
           {recipe.imageUrl ? (
             <img
@@ -56,6 +61,29 @@ export function RecipeCard({ recipe, extra }: { recipe: RecipeSummary; extra?: R
           </p>
           {recipe.madeCount ? <p className="text-xs text-muted">Made {recipe.madeCount}×</p> : null}
         </div>
+    </>
+  );
+  if (select)
+    return (
+      <li className="relative">
+        <button type="button" aria-pressed={select.selected} aria-label={`Select ${recipe.name}`} onClick={select.onToggle} className={cardClass}>
+          {inner}
+        </button>
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute left-2 top-2 flex size-7 items-center justify-center rounded-full border-2",
+            select.selected ? "border-accent bg-accent text-accent-contrast" : "border-raised bg-raised/80",
+          )}
+        >
+          {select.selected && <Check className="size-4" />}
+        </span>
+      </li>
+    );
+  return (
+    <li className="relative">
+      <Link to={`/recipes/${recipe.slug}`} className={cardClass}>
+        {inner}
       </Link>
       {recipe.favourite !== undefined && (
         <HeartButton slug={recipe.slug} name={recipe.name} favourite={recipe.favourite} className="absolute right-0 top-0 rounded-bl-lg bg-raised/80 backdrop-blur" />
@@ -82,6 +110,24 @@ export function RecipeLibrary() {
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
   const cookbooksOn = useFeature("cookbooks");
   const [saving, setSaving] = useState(false);
+  const shareOn = useFeature("share-links");
+  const toast = useToast();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const toggle = (slug: string) =>
+    setSelected((cur) => {
+      if (cur.includes(slug)) return cur.filter((s) => s !== slug);
+      if (cur.length >= SHARE_SET_MAX) {
+        toast(`You can share up to ${SHARE_SET_MAX} recipes at once`, "danger");
+        return cur;
+      }
+      return [...cur, slug];
+    });
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected([]);
+  };
   const hasFilters = !!q.trim() || favourites || (organizersOn && filterCount > 0);
   const minRatingParam = Number(params.get("minRating"));
   const sortLabel = SORTS.find((s) => s.value === sort)!.label;
@@ -157,7 +203,7 @@ export function RecipeLibrary() {
       <>
         <ul className={GRID}>
           {items.map((r) => (
-            <RecipeCard key={r.id} recipe={r} />
+            <RecipeCard key={r.id} recipe={r} select={selecting ? { selected: selected.includes(r.slug), onToggle: () => toggle(r.slug) } : undefined} />
           ))}
         </ul>
         {query.hasNextPage && (
@@ -176,6 +222,12 @@ export function RecipeLibrary() {
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Recipes</h1>
         <div className="flex items-center gap-2">
+          {shareOn && items.length > 0 && !selecting && (
+            <Button variant="secondary" size="sm" onClick={() => setSelecting(true)}>
+              <CheckSquare className="size-4" aria-hidden />
+              Select
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="sm" aria-label={`Sort: ${sortLabel}`}>
@@ -215,6 +267,30 @@ export function RecipeLibrary() {
           )}
         </div>
       </div>
+      {selecting && (
+        <div role="region" aria-label="Selection" className="sticky top-(--header-h) z-20 -mx-1 mb-3 flex items-center justify-between gap-2 rounded-lg border border-line bg-raised px-3 py-2 shadow-sm">
+          <p className="text-sm font-medium" aria-live="polite">
+            {selected.length === 0 ? "Tap recipes to select them" : `${selected.length} selected`}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={stopSelecting}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={selected.length === 0} onClick={() => setSharing(true)}>
+              <Share2 className="size-4" aria-hidden />
+              Share{selected.length > 0 ? ` ${selected.length}` : ""}
+            </Button>
+          </div>
+        </div>
+      )}
+      {sharing && (
+        <ShareDialog
+          target={{ kind: "set", slugs: selected }}
+          open={sharing}
+          onOpenChange={setSharing}
+          onCreated={stopSelecting}
+        />
+      )}
       {q.trim() && (
         <p className="mb-3 text-sm text-muted">
           Showing results for &ldquo;{q}&rdquo;
