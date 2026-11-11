@@ -16,8 +16,12 @@ export interface StoredImage {
  * platform without sharp would call after resizing elsewhere.
  */
 export interface ImageStore {
+  /** True when clients should resize in the browser and upload ready-made WebP sizes (no sharp on this platform). */
+  readonly acceptsPresized: boolean;
   /** Processes an uploaded original into every size and returns the new image id. */
   putOriginal(householdId: string, original: Uint8Array): Promise<string>;
+  /** Stores a complete set of ready-made WebP sizes under a new image id and returns it. */
+  putSized(householdId: string, sizes: Record<ImageSize, Uint8Array>): Promise<string>;
   put(householdId: string, imageId: string, size: ImageSize, bytes: Uint8Array, contentType: string): Promise<void>;
   get(householdId: string, imageId: string, size: ImageSize): Promise<StoredImage | null>;
   /** Removes every size of the image. Missing files are not an error. */
@@ -43,6 +47,8 @@ export interface Events {
  * and a one-off may be delivered again after a restart.
  */
 export interface Scheduler {
+  /** True when a handler is registered for the name. */
+  has(name: string): boolean;
   /** Registers the handler for a job name. Re-registering replaces it. */
   define(name: string, handler: (payload?: unknown) => void | Promise<void>): void;
   /** Runs the job every `ms`; `firstInMs` also runs it once after that delay. */

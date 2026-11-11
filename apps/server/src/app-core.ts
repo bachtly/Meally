@@ -27,6 +27,7 @@ import { publicRoutes, shareRoutes } from "./features/share/routes.js";
 import { webhookRoutes } from "./features/webhooks/routes.js";
 import { createDispatcher } from "./features/webhooks/service.js";
 import { tokenRoutes } from "./features/tokens/routes.js";
+import { jobRoutes, defineCoreJobs } from "./features/jobs/routes.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 
 export const version = "0.0.0";
@@ -77,6 +78,7 @@ export function createCoreApp(opts: CoreAppOptions) {
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
   const webhooks = createDispatcher({ db, fetcher, flags, scheduler: platform.scheduler, allowPrivate: allowPrivateUrls(env) });
+  defineCoreJobs(platform.scheduler, db);
   if (opts.webhookScheduler) webhooks.start();
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
@@ -105,9 +107,14 @@ export function createCoreApp(opts: CoreAppOptions) {
     c.set("aiFetch", aiFetch);
     await next();
   });
+  // Machine-to-machine: authenticated by the jobs secret, so no cookie CSRF check applies.
+  api.route("/internal", jobRoutes);
   api.use("*", csrfProtection);
   api.route("/auth", authRoutes);
   api.route("/features", featureRoutes);
+  api.get("/meta", (c) =>
+    c.json({ streaming: platform.events.supportsStreaming, presizedImages: platform.images.acceptsPresized, platform: platform.name }),
+  );
   api.route("/public", publicRoutes);
   api.route("/", shareRoutes);
   api.route("/", timelineRoutes);

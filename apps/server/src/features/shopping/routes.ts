@@ -1,3 +1,4 @@
+import { jsonWithEtag } from "../../lib/etag.js";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
@@ -70,7 +71,7 @@ shoppingRoutes
     await svc.deleteAisle(...ctx(c), c.req.param("id"));
     return c.body(null, 204);
   })
-  .get("/lists", async (c) => c.json({ items: await svc.listLists(...ctx(c)) }))
+  .get("/lists", async (c) => jsonWithEtag(c, { items: await svc.listLists(...ctx(c)) }))
   .post("/lists", async (c) =>
     c.json(
       await svc.createList(
@@ -81,7 +82,7 @@ shoppingRoutes
     ),
   )
   .get("/lists/:id", async (c) =>
-    c.json(await svc.getListWithItems(...ctx(c), c.req.param("id"))),
+    jsonWithEtag(c, await svc.getListWithItems(...ctx(c), c.req.param("id"))),
   )
   .patch("/lists/:id", async (c) =>
     c.json(

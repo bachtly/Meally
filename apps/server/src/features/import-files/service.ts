@@ -177,6 +177,6 @@ type JobPayload = Omit<Ctx, "db" | "images">;
 
 /** Registers the import job; runs are chained so one import runs at a time. */
 export function defineImportJob(scheduler: Scheduler, db: Db, images: ImageStore) {
-  scheduler.define(IMPORT_JOB, (p) => enqueue(() => runJob({ db, images, ...(p as JobPayload) })));
+  scheduler.define(IMPORT_JOB, (p) => (p ? enqueue(() => runJob({ db, images, ...(p as JobPayload) })) : undefined)); // a bare cron call has nothing to do
 }
 export const scheduleImport = (scheduler: Scheduler, payload: JobPayload) => scheduler.runAfter(IMPORT_JOB, 0, payload);

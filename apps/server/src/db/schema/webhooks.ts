@@ -41,3 +41,21 @@ export const webhookDeliveries = pgTable(
   },
   (t) => [index("webhook_deliveries_hook_idx").on(t.webhookId, t.createdAt)],
 );
+
+/** Durable webhook retries: claimed by the `webhooks.retry` job (lease via next_at), deleted when done. */
+export const webhookRetries = pgTable(
+  "webhook_retries",
+  {
+    id: text("id").primaryKey(),
+    webhookId: text("webhook_id")
+      .notNull()
+      .references(() => webhooks.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    /** The exact JSON body to re-send. */
+    payload: text("payload").notNull(),
+    /** Retries already scheduled before this one (0 = first retry). */
+    attempt: integer("attempt").notNull(),
+    nextAt: timestamp("next_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("webhook_retries_due_idx").on(t.nextAt)],
+);

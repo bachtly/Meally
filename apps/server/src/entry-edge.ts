@@ -25,7 +25,7 @@ export function normalizeBasePath(raw: string | undefined): string {
 export function createEdgeApp(env: Env = readEnv(), db = openPostgres(requireUrl(env)).db) {
   const n = Number(env.MEALLY_PBKDF2_ITERATIONS);
   const iterations = Number.isInteger(n) && n >= 1000 ? n : DEFAULT_PBKDF2_ITERATIONS;
-  return createCoreApp({ db, env, platform: createEdgePlatform({ pbkdf2Iterations: iterations }), basePath: normalizeBasePath(env.MEALLY_BASE_PATH) });
+  return createCoreApp({ db, env, platform: createEdgePlatform({ pbkdf2Iterations: iterations, env }), basePath: normalizeBasePath(env.MEALLY_BASE_PATH) });
 }
 
 function requireUrl(env: Env): string {

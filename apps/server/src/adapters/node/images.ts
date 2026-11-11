@@ -10,6 +10,17 @@ export const imagePath = (dataDir: string, householdId: string, id: string, size
 /** Disk store under `<dataDir>/images/<household>/<id>-<size>.webp`; originals are resized with sharp. */
 export function createDiskImageStore(dataDir: string): ImageStore {
   const store: ImageStore = {
+    acceptsPresized: false,
+    async putSized(householdId, sizes) {
+      const id = randomUUID();
+      try {
+        await Promise.all(imageSizes.map((size) => store.put(householdId, id, size, sizes[size], "image/webp")));
+      } catch (e) {
+        await store.delete(householdId, id);
+        throw e;
+      }
+      return id;
+    },
     localDir: path.join(dataDir, "images"),
     async putOriginal(householdId, original) {
       const { default: sharp } = await import("sharp");
