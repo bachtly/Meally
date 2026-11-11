@@ -107,3 +107,7 @@ from Settings. In Admin, backups and file import show as unavailable.
   "Failed query".
 - **Vercel production URL.** It's `https://<project>-<suffix>.vercel.app` when `<project>.vercel.app` is taken. The
   script reads it back and resets `MEALLY_PUBLIC_URL`.
+- **Custom domain.** Production runs at `https://meally.bachtly.com`. The domain is added to the Vercel project, and
+  Vercel DNS manages `bachtly.com`. `MEALLY_PUBLIC_URL` must equal the browser origin, because the CSRF check
+  accepts that one origin, so POSTs from `*.vercel.app` URLs get 403. The deploy script prefers a custom-domain alias
+  over `*.vercel.app` when it reads the production URL back.

@@ -22,6 +22,7 @@ export SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD
 REF="$SUPABASE_PROJECT_REF"
 PROJECT="${VERCEL_PROJECT_NAME:-meally}"
 PUBLIC_URL="${MEALLY_PUBLIC_URL:-https://$PROJECT.vercel.app}"
+# A custom domain on the Vercel project (e.g. meally.bachtly.com) wins over *.vercel.app in step 9.
 ITER="${MEALLY_PBKDF2_ITERATIONS:-100000}"
 SB="npx --yes supabase@2"
 VC="npx --yes vercel"
@@ -91,7 +92,7 @@ if [ "$DRY" = 1 ]; then
   echo "[dry-run] GET https://api.vercel.com/v9/projects/$PROJECT, set MEALLY_PUBLIC_URL, redeploy function if it changed"
   FINAL_URL="$PUBLIC_URL"
 else
-  FINAL_URL="$(curl -fsS -H "Authorization: Bearer $TOKEN_V" "https://api.vercel.com/v9/projects/$PROJECT" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const p = JSON.parse(s); const a = p.targets?.production?.alias?.[0] ?? p.alias?.[0]?.domain; process.stdout.write(a ? "https://" + a : ""); });')"
+  FINAL_URL="$(curl -fsS -H "Authorization: Bearer $TOKEN_V" "https://api.vercel.com/v9/projects/$PROJECT" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const p = JSON.parse(s); const all = [...(p.targets?.production?.alias ?? []), ...(p.alias ?? []).map((x) => x.domain)].filter(Boolean); const a = all.find((d) => !d.endsWith(".vercel.app")) ?? all[0]; process.stdout.write(a ? "https://" + a : ""); });')"
   [ -n "$FINAL_URL" ] || { echo "Could not read the Vercel production URL; keeping $PUBLIC_URL" >&2; FINAL_URL="$PUBLIC_URL"; }
   if [ "$FINAL_URL" != "$PUBLIC_URL" ]; then
     echo "Production URL is $FINAL_URL (was $PUBLIC_URL); updating MEALLY_PUBLIC_URL and redeploying the function"
