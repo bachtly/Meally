@@ -4,14 +4,16 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react
 import { loginSchema, registerSchema, setupSchema, type InviteLookup, type MeResponse } from "@meally/shared";
 import type { ZodType } from "zod";
 import { api, ApiRequestError, postJson } from "../../lib/api";
-import { Button, EmptyState, Field, Input, Skeleton } from "../../ui";
+import { Brand, Button, EmptyState, Field, Input, Skeleton } from "../../ui";
 import { useAuthStatus, useSession } from "./useSession";
 
 function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-accent/20 via-surface to-surface px-4 py-10">
       <main className="w-full max-w-sm rounded-xl border border-line bg-raised p-6 shadow-lg">
-        <p className="text-2xl font-semibold text-accent">Meally</p>
+        <p>
+          <Brand size="lg" />
+        </p>
         <h1 className="mb-5 mt-1 text-lg font-medium text-ink">{title}</h1>
         {children}
       </main>

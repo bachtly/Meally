@@ -1,22 +1,23 @@
 @import "@fontsource-variable/inter";
 
+/* Koi palette: olive from the logo cat's scarf, bronze and cream. Chosen 2026-11-11; see docs/design/features/design-system.md. */
 :root {
   color-scheme: light;
-  --surface: oklch(0.985 0.004 85);
-  --surface-raised: oklch(1 0 0);
-  --surface-sunken: oklch(0.955 0.006 85);
-  --text: oklch(0.22 0.01 60);
-  --text-muted: oklch(0.46 0.012 60);
-  --border: oklch(0.88 0.008 80);
-  --accent: oklch(0.52 0.17 40);
-  --accent-hover: oklch(0.46 0.16 40);
-  --accent-contrast: oklch(0.99 0.005 85);
-  --danger: oklch(0.5 0.19 27);
-  --success: oklch(0.48 0.12 150);
-  --focus-ring: oklch(0.52 0.17 40);
-  --shadow-sm: 0 1px 2px oklch(0.2 0.02 60 / 0.08);
-  --shadow-md: 0 8px 24px oklch(0.2 0.02 60 / 0.14);
-  --scrim: oklch(0.2 0.02 60 / 0.5);
+  --surface: oklch(0.985 0.008 75);
+  --surface-raised: oklch(1 0.002 75);
+  --surface-sunken: oklch(0.955 0.014 75);
+  --text: oklch(0.22 0.015 90);
+  --text-muted: oklch(0.47 0.02 90);
+  --border: oklch(0.88 0.016 80);
+  --accent: oklch(0.5 0.1 122);
+  --accent-hover: oklch(0.44 0.1 122);
+  --accent-contrast: oklch(1 0 0);
+  --danger: oklch(0.5 0.19 25);
+  --success: oklch(0.48 0.1 162);
+  --focus-ring: oklch(0.5 0.1 122);
+  --shadow-sm: 0 1px 2px oklch(0.3 0.03 90 / 0.06), 0 4px 14px oklch(0.3 0.03 90 / 0.08);
+  --shadow-md: 0 8px 24px oklch(0.3 0.03 90 / 0.14);
+  --scrim: oklch(0.2 0.02 90 / 0.5);
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
@@ -25,19 +26,19 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --surface: oklch(0.18 0.01 60);
-    --surface-raised: oklch(0.23 0.012 60);
-    --surface-sunken: oklch(0.15 0.01 60);
-    --text: oklch(0.95 0.006 85);
-    --text-muted: oklch(0.74 0.01 80);
-    --border: oklch(0.33 0.012 60);
-    --accent: oklch(0.74 0.15 55);
-    --accent-hover: oklch(0.8 0.14 55);
-    --accent-contrast: oklch(0.2 0.03 50);
-    --danger: oklch(0.72 0.17 27);
-    --success: oklch(0.74 0.14 150);
-    --focus-ring: oklch(0.8 0.14 55);
-    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --surface: oklch(0.18 0.012 95);
+    --surface-raised: oklch(0.23 0.016 95);
+    --surface-sunken: oklch(0.15 0.01 95);
+    --text: oklch(0.95 0.01 85);
+    --text-muted: oklch(0.75 0.02 90);
+    --border: oklch(0.33 0.016 95);
+    --accent: oklch(0.78 0.13 120);
+    --accent-hover: oklch(0.83 0.12 120);
+    --accent-contrast: oklch(0.2 0.04 120);
+    --danger: oklch(0.73 0.17 25);
+    --success: oklch(0.78 0.12 162);
+    --focus-ring: oklch(0.83 0.12 120);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4), 0 6px 16px oklch(0 0 0 / 0.35);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
     --scrim: oklch(0 0 0 / 0.6);
   }
@@ -45,19 +46,19 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --surface: oklch(0.18 0.01 60);
-  --surface-raised: oklch(0.23 0.012 60);
-  --surface-sunken: oklch(0.15 0.01 60);
-  --text: oklch(0.95 0.006 85);
-  --text-muted: oklch(0.74 0.01 80);
-  --border: oklch(0.33 0.012 60);
-  --accent: oklch(0.74 0.15 55);
-  --accent-hover: oklch(0.8 0.14 55);
-  --accent-contrast: oklch(0.2 0.03 50);
-  --danger: oklch(0.72 0.17 27);
-  --success: oklch(0.74 0.14 150);
-  --focus-ring: oklch(0.8 0.14 55);
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --surface: oklch(0.18 0.012 95);
+  --surface-raised: oklch(0.23 0.016 95);
+  --surface-sunken: oklch(0.15 0.01 95);
+  --text: oklch(0.95 0.01 85);
+  --text-muted: oklch(0.75 0.02 90);
+  --border: oklch(0.33 0.016 95);
+  --accent: oklch(0.78 0.13 120);
+  --accent-hover: oklch(0.83 0.12 120);
+  --accent-contrast: oklch(0.2 0.04 120);
+  --danger: oklch(0.73 0.17 25);
+  --success: oklch(0.78 0.12 162);
+  --focus-ring: oklch(0.83 0.12 120);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4), 0 6px 16px oklch(0 0 0 / 0.35);
   --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
   --scrim: oklch(0 0 0 / 0.6);
 }

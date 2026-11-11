@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { useFeaturesState } from "../features/features/FeaturesProvider";
 import { useSession } from "../features/auth/useSession";
-import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, ToastProvider } from "../ui";
+import { Brand, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, ToastProvider } from "../ui";
 import { CommandPalette } from "./CommandPalette";
 import { HeaderSearch } from "./HeaderSearch";
 import { OfflineBanner } from "../pwa/Pwa";
@@ -50,7 +50,7 @@ export function AppShell() {
     <ToastProvider>
       <div className="min-h-dvh lg:pl-60 print:pl-0">
         <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 pt-[calc(1rem+var(--sat))] pb-[calc(1rem+var(--sab))] pl-[max(1rem,var(--sal))] lg:flex">
-          <div className="px-3 text-xl font-semibold text-accent">Meally</div>
+          <Brand className="px-3 text-xl" />
           <nav aria-label="Sidebar" className="flex flex-col gap-1">
             {items.map(({ to, label, icon: Icon }) => (
               <NavLink
@@ -74,7 +74,7 @@ export function AppShell() {
           ref={headerRef}
           className="print:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 py-2 pt-[calc(0.5rem+var(--sat))] pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] backdrop-blur lg:pl-4"
         >
-          <span className="text-lg font-semibold text-accent lg:invisible">Meally</span>
+          <Brand className="lg:invisible" />
           <HeaderSearch ref={searchRef} />
           <div className="flex items-center gap-1">
             <IconButton aria-label="Search and commands" className="lg:hidden" onClick={() => setPaletteOpen(true)}>
