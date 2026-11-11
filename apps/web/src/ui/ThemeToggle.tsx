@@ -46,7 +46,7 @@ export function ThemeToggle() {
             applyTheme(value);
           }}
           className={cn(
-            "inline-flex min-h-10 items-center gap-1.5 rounded-sm px-3 text-sm",
+            "inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 text-sm",
             choice === value ? "bg-accent text-accent-contrast" : "text-ink hover:bg-sunken",
           )}
         >
