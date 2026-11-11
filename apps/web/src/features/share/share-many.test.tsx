@@ -62,7 +62,7 @@ const posted = (path: string) => JSON.parse(calls.find((c) => c.method === "POST
 
 it("selects several recipes in the library and shares them as one link, with a name and note", async () => {
   const view = renderAt("/recipes");
-  await userEvent.click(await screen.findByRole("button", { name: "Select" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Select recipes" }));
   expect(screen.getByText("Tap recipes to select them")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Select Lemon pasta" }));
   await userEvent.click(screen.getByRole("button", { name: "Select Toast" }));
@@ -85,7 +85,7 @@ it("selects several recipes in the library and shares them as one link, with a n
 
 it("cancelling select mode restores the links, and the share button waits for a selection", async () => {
   renderAt("/recipes");
-  await userEvent.click(await screen.findByRole("button", { name: "Select" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Select recipes" }));
   expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
   await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(screen.getByRole("link", { name: /Dal/ })).toBeInTheDocument();

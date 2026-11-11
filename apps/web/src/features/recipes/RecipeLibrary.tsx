@@ -6,7 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RecipeSummary } from "@meally/shared";
 import { useFeature } from "../features/FeaturesProvider";
 import { useImportOptions } from "../import-url/importOptions";
-import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Skeleton, useToast } from "../../ui";
+import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { LibraryFilters, useOrganizerFilters } from "../organizers/LibraryFilters";
 import { HeartButton } from "../ratings/HeartButton";
 import { CookbookDialog } from "../cookbooks/CookbookDialog";
@@ -219,25 +219,25 @@ export function RecipeLibrary() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-2">
+      {/* Select and Sort are icon-only so the row fits a phone; it wraps if it still doesn't. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Recipes</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           {shareOn && items.length > 0 && !selecting && (
-            <Button variant="secondary" size="sm" onClick={() => setSelecting(true)}>
-              <CheckSquare className="size-4" aria-hidden />
-              Select
-            </Button>
+            <IconButton variant="secondary" aria-label="Select recipes" title="Select recipes" onClick={() => setSelecting(true)}>
+              <CheckSquare className="size-5" aria-hidden />
+            </IconButton>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" aria-label={`Sort: ${sortLabel}`}>
-                <ArrowDownUp className="size-4" aria-hidden />
-                {sortLabel}
-              </Button>
+              <IconButton variant="secondary" aria-label={`Sort: ${sortLabel}`} title={`Sort: ${sortLabel}`}>
+                <ArrowDownUp className="size-5" aria-hidden />
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {SORTS.filter((s) => (ratingsOn || s.value !== "rating") && (timelineOn || s.value !== "last-made")).map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setSort(s.value)}>
+                  <Check className={cn("size-4", s.value !== sort && "invisible")} aria-hidden />
                   {s.label}
                 </DropdownMenuItem>
               ))}
