@@ -92,7 +92,7 @@ if [ "$DRY" = 1 ]; then
   echo "[dry-run] GET https://api.vercel.com/v9/projects/$PROJECT, set MEALLY_PUBLIC_URL, redeploy function if it changed"
   FINAL_URL="$PUBLIC_URL"
 else
-  FINAL_URL="$(curl -fsS -H "Authorization: Bearer $TOKEN_V" "https://api.vercel.com/v9/projects/$PROJECT" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const p = JSON.parse(s); const all = [...(p.targets?.production?.alias ?? []), ...(p.alias ?? []).map((x) => x.domain)].filter(Boolean); const a = all.find((d) => !d.endsWith(".vercel.app")) ?? all[0]; process.stdout.write(a ? "https://" + a : ""); });')"
+  FINAL_URL="$(curl -fsS -H "Authorization: Bearer $TOKEN_V" "https://api.vercel.com/v9/projects/$PROJECT/domains" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const ds = (JSON.parse(s).domains ?? []).filter((d) => d.verified && !d.redirect).map((d) => d.name); const a = ds.find((d) => !d.endsWith(".vercel.app")) ?? ds[0]; process.stdout.write(a ? "https://" + a : ""); });')"
   [ -n "$FINAL_URL" ] || { echo "Could not read the Vercel production URL; keeping $PUBLIC_URL" >&2; FINAL_URL="$PUBLIC_URL"; }
   if [ "$FINAL_URL" != "$PUBLIC_URL" ]; then
     echo "Production URL is $FINAL_URL (was $PUBLIC_URL); updating MEALLY_PUBLIC_URL and redeploying the function"
