@@ -10,6 +10,7 @@ import { useChecks } from "../recipes/useChecks";
 import { ingredientsForStep, scaledIngredients } from "./helpers";
 import { alarm, useTimers } from "./useTimers";
 import { useWakeLock } from "./useWakeLock";
+import { useHoldUpdates } from "../../pwa/updates";
 
 /** Step text with each detected duration turned into a tappable chip. */
 function StepText({ text, onTimer }: { text: string; onTimer: (label: string, seconds: number) => void }) {
@@ -44,6 +45,7 @@ export function CookPage() {
   const timelineOn = useFeature("timeline");
   const { checks, toggle } = useChecks(slug);
   const [i, setI] = useState(0);
+  useHoldUpdates(true); // never reload mid-recipe: step, checks and running timers live in memory
   const [drawer, setDrawer] = useState(false);
   const wake = useWakeLock();
   const { timers, now, start, cancel } = useTimers(slug, (t) => {

@@ -2,6 +2,7 @@ import { ImagePlus } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { nutritionFields } from "@meally/shared";
 import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { useHoldUpdates } from "../../pwa/updates";
 import type { Recipe } from "@meally/shared";
 import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, EmptyState, Field, Input, Skeleton, Textarea, useToast } from "../../ui";
@@ -95,6 +96,7 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
   const dirty = snapshot(form, !!photo) !== baseline.current;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  useHoldUpdates(dirty); // a background app update would reload the page and lose these edits
   const patch = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirtyRef.current && !allowLeave.current && currentLocation.pathname !== nextLocation.pathname);
