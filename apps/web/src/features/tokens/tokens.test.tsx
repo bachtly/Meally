@@ -56,7 +56,10 @@ it("shows the new token once with a warning, and passes axe", async () => {
   const dlg = await screen.findByRole("dialog");
   await userEvent.type(within(dlg).getByLabelText("Name"), "CLI");
   await userEvent.click(within(dlg).getByRole("button", { name: "Create" }));
-  expect(await screen.findByDisplayValue("mly_secretvalue")).toBeInTheDocument();
+  const field = await screen.findByDisplayValue("mly_secretvalue");
+  // 16px text so iOS does not zoom when the read-only field selects itself on focus; wraps at phone width.
+  expect(field).toHaveClass("text-base", "break-all");
+  expect(field).not.toHaveClass("text-sm");
   expect(screen.getByRole("alert")).toHaveTextContent(/not be able to see it again/);
   expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   expect(await axe(screen.getByRole("dialog"))).toHaveNoViolations();

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
@@ -22,6 +22,7 @@ function setup(role: "owner" | "member", items: unknown[] = []) {
       if (u.endsWith("/auth/me")) return Response.json(me);
       if (u.endsWith("/features")) return Response.json({ features: { webhooks: { enabled: true } } });
       if (u.endsWith("/webhooks/w1/test")) return Response.json({ ok: true, statusCode: 200, error: null, durationMs: 3 });
+      if (u.endsWith("/webhooks/w1") && init?.method === "DELETE") return new Response(null, { status: 204 });
       if (u.endsWith("/webhooks")) return Response.json({ items });
       return Response.json({});
     }),
@@ -58,4 +59,27 @@ it("tells members only owners can manage webhooks", async () => {
   const calls = setup("member");
   expect(await screen.findByText(/Only household owners/)).toBeInTheDocument();
   expect(calls.some((c) => c.url.endsWith("/webhooks"))).toBe(false);
+});
+
+it("deletes only after confirming in the app's dialog, not window.confirm", async () => {
+  const native = vi.fn(() => true);
+  vi.stubGlobal("confirm", native);
+  const calls = setup("owner", [hook]);
+  await userEvent.click(await screen.findByRole("button", { name: "Delete Home server" }));
+  const dlg = await screen.findByRole("dialog", { name: "Delete Home server?" });
+  expect(native).not.toHaveBeenCalled();
+  await userEvent.click(within(dlg).getByRole("button", { name: "Cancel" }));
+  expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  await userEvent.click(screen.getByRole("button", { name: "Delete Home server" }));
+  await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+  await vi.waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/webhooks/w1"))).toBe(true));
+});
+
+it("uses 16px text and URL keyboard hints in the form so iOS does not zoom", async () => {
+  setup("owner");
+  await userEvent.click(await screen.findByRole("button", { name: "Add webhook" }));
+  const url = screen.getByLabelText("URL");
+  expect(url).toHaveAttribute("inputmode", "url");
+  expect(url).toHaveAttribute("autocapitalize", "none");
+  expect(url).toHaveClass("text-base");
 });

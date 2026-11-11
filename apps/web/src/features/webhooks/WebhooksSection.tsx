@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 import { useState } from "react";
 import { webhookEvents, type Webhook, type WebhookDelivery, type WebhookWithSecret } from "@meally/shared";
 import { api, ApiRequestError, postJson } from "../../lib/api";
-import { Button, Dialog, Field, Input, Sheet, Skeleton, useToast } from "../../ui";
+import { Button, Dialog, Field, Input, Sheet, Skeleton, Textarea, useToast } from "../../ui";
 import { useSession } from "../auth/useSession";
 
 const KEY = ["webhooks"] as const;
@@ -45,8 +45,9 @@ function Secret({ secret }: { secret: string }) {
       <label className="text-sm font-medium" htmlFor="wh-secret">
         Signing secret
       </label>
-      <div className="flex gap-2">
-        <input id="wh-secret" readOnly value={secret} onFocus={(e) => e.target.select()} className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-raised px-3 font-mono text-sm" />
+      {/* Wraps so the whole secret stays readable on a phone; 16px text stops iOS zooming on focus. */}
+      <Textarea id="wh-secret" readOnly rows={2} value={secret} onFocus={(e) => e.target.select()} spellCheck={false} className="resize-none break-all font-mono" />
+      <div className="flex justify-end">
         <Button type="button" variant="secondary" onClick={copy}>
           <Copy className="size-4" aria-hidden />
           Copy
@@ -97,10 +98,10 @@ function EditDialog({ hook, open, onOpenChange }: { hook: Webhook | null; open: 
           }}
         >
           <Field label="Name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
+            <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required autoComplete="off" />
           </Field>
           <Field label="URL">
-            <Input type="url" value={url} onChange={(e) => setUrl(e.target.value)} required placeholder="https://example.com/hook" />
+            <Input type="url" inputMode="url" autoComplete="off" autoCapitalize="none" spellCheck={false} value={url} onChange={(e) => setUrl(e.target.value)} required placeholder="https://example.com/hook" />
           </Field>
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-sm font-medium">Events</legend>
@@ -117,7 +118,7 @@ function EditDialog({ hook, open, onOpenChange }: { hook: Webhook | null; open: 
                 <Input type="time" value={dailyAt} onChange={(e) => setDailyAt(e.target.value)} required />
               </Field>
               <Field label="Time zone">
-                <Input value={tz} onChange={(e) => setTz(e.target.value)} required placeholder="Europe/Berlin" />
+                <Input value={tz} onChange={(e) => setTz(e.target.value)} required autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="Europe/Berlin" />
               </Field>
             </div>
           )}
@@ -170,6 +171,7 @@ export function WebhooksSection() {
   const toast = useToast();
   const [editing, setEditing] = useState<{ hook: Webhook | null } | null>(null);
   const [viewing, setViewing] = useState<Webhook | null>(null);
+  const [deleting, setDeleting] = useState<Webhook | null>(null);
   const isOwner = user?.householdRole === "owner";
   const q = useQuery({ queryKey: KEY, enabled: isOwner, queryFn: () => api<{ items: Webhook[] }>("/webhooks").then((r) => r.items) });
   const test = useMutation({
@@ -217,7 +219,7 @@ export function WebhooksSection() {
                   <Button variant="ghost" size="sm" aria-label={`Edit ${w.name}`} onClick={() => setEditing({ hook: w })}>
                     Edit
                   </Button>
-                  <Button variant="ghost" size="sm" aria-label={`Delete ${w.name}`} onClick={() => confirm(`Delete ${w.name}?`) && remove.mutate(w.id)}>
+                  <Button variant="ghost" size="sm" aria-label={`Delete ${w.name}`} onClick={() => setDeleting(w)}>
                     Delete
                   </Button>
                 </div>
@@ -231,6 +233,22 @@ export function WebhooksSection() {
       </div>
       {editing && <EditDialog key={editing.hook?.id ?? "new"} hook={editing.hook} open onOpenChange={(o) => !o && setEditing(null)} />}
       <Deliveries hook={viewing} onClose={() => setViewing(null)} />
+      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)} title={`Delete ${deleting?.name ?? ""}?`} description="Meally stops calling this URL right away.">
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setDeleting(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              remove.mutate(deleting!.id);
+              setDeleting(null);
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

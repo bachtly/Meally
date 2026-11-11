@@ -44,7 +44,7 @@ export function ShareDialog({ slug, name, open, onOpenChange }: { slug: string; 
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-sm font-medium">
             Link expires after
-            <select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="min-h-11 rounded-md border border-line bg-raised px-3">
+            <select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="min-h-11 rounded-md border border-line bg-raised px-3 text-base font-normal">
               {EXPIRY.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -61,7 +61,7 @@ export function ShareDialog({ slug, name, open, onOpenChange }: { slug: string; 
             <label className="text-sm font-medium" htmlFor="share-url">
               Your link (shown only once)
             </label>
-            <input id="share-url" readOnly value={url} onFocus={(e) => e.target.select()} className="min-h-11 rounded-md border border-line bg-raised px-3 text-sm" />
+            <input id="share-url" type="url" readOnly value={url} onFocus={(e) => e.target.select()} className="min-h-11 w-full min-w-0 rounded-md border border-line bg-raised px-3 text-base" />
             <div className="flex gap-2">
               <Button variant="secondary" onClick={copy}>
                 <Copy className="size-4" aria-hidden />
