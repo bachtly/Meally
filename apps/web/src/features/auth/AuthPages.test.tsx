@@ -7,6 +7,7 @@ import { appRoutes } from "../../app/App";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -64,4 +65,42 @@ it("shows the user menu with name and sign out", async () => {
   expect(await screen.findByText("Ada")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("menuitem", { name: /sign out/i }));
   await waitFor(() => expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument());
+});
+
+it("renders from the stored session while /auth/me is still pending", async () => {
+  localStorage.setItem("meally:session", JSON.stringify(me));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string) => (String(url).endsWith("/auth/me") ? new Promise<Response>(() => {}) : Promise.resolve(Response.json({ features: {}, items: [] })))),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: ["/plan"] })} />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
+});
+
+it("drops a stored session the server rejects and goes to sign in", async () => {
+  localStorage.setItem("meally:session", JSON.stringify(me));
+  setup("/plan");
+  expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  expect(localStorage.getItem("meally:session")).toBeNull();
+});
+
+it("shows a retry state, not sign in, when the session check fails online", async () => {
+  vi.stubGlobal("fetch", vi.fn((url: string) => (String(url).endsWith("/auth/me") ? Promise.reject(new TypeError("Load failed")) : Promise.resolve(Response.json({ features: {} })))));
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: ["/plan"] })} />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("heading", { name: "Can't reach Meally" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+});
+
+it("stores the session after signing in", async () => {
+  setup("/", true);
+  await screen.findByRole("button", { name: "Account menu" });
+  expect(JSON.parse(localStorage.getItem("meally:session")!)).toMatchObject({ user: { name: "Ada" } });
 });
