@@ -1,6 +1,6 @@
 import { BookMarked, CalendarPlus, ChefHat, Clock, Ellipsis, ExternalLink, Pencil, Printer, RotateCcw, Share2, Trash2, Users } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { adjustIngredient, type UnitChoice } from "@meally/shared";
 import { ServingsStepper, UnitsToggle } from "./ScalingControls";
 import { ApiRequestError } from "../../lib/api";
@@ -21,6 +21,7 @@ import { Feature } from "../features/Feature";
 import { useChecks } from "./useChecks";
 import { ShareDialog } from "../share/ShareDialog";
 import { RecipeChips } from "../organizers/RecipeChips";
+import { InstallCard } from "../../pwa/Pwa";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -36,6 +37,7 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export function RecipePage() {
+  const location = useLocation();
   const { slug = "" } = useParams();
   const query = useRecipe(slug);
   const del = useDeleteRecipe();
@@ -91,6 +93,7 @@ export function RecipePage() {
   }
 
   const r = query.data;
+  const justSaved = !!(location.state as { justSaved?: boolean } | null)?.justSaved;
   const host = hostname(r.sourceUrl);
   const original = r.servings;
   const wanted = Number(params.get("servings"));
@@ -112,6 +115,14 @@ export function RecipePage() {
 
   return (
     <article className={cn("mx-auto max-w-5xl", r.steps.length > 0 && "pb-20 lg:pb-0")}>
+      {justSaved && (
+        <div className="mb-4 flex flex-col gap-3">
+          <p role="status" className="rounded-md bg-sunken px-3 py-2 text-sm font-medium">
+            Saved to your recipes. It's your copy now: edit it however you like.
+          </p>
+          <InstallCard />
+        </div>
+      )}
       {r.imageUrl && (
         <img
           src={r.imageUrl}
@@ -182,6 +193,18 @@ export function RecipePage() {
             </DropdownMenu>
           </div>
         </div>
+        {r.savedFrom && (
+          <p className="mt-1 text-sm text-muted">
+            {r.savedFrom.name ? (
+              <>
+                Shared by <span className="font-medium text-ink">{r.savedFrom.name}</span>
+              </>
+            ) : (
+              "Saved from a shared link"
+            )}{" "}
+            · saved {new Date(r.savedFrom.at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+          </p>
+        )}
         {r.me && <div className="print:hidden"><StarRating slug={r.slug} rating={r.me.rating} household={r.householdRating} /></div>}
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}
         <RecipeChips categories={r.categories} tags={r.tags} tools={r.tools} />

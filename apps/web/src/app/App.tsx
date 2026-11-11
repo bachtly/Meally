@@ -22,7 +22,7 @@ import { FoodsPage } from "../features/foods/FoodsPage";
 import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
-import { PublicRecipePage } from "../features/share/PublicRecipePage";
+import { SharePage, ShareLayout, ShareRecipePage } from "../features/share/SharePage";
 import { ActivityPage } from "../features/timeline/ActivityPage";
 import { AdminPage } from "../features/admin/AdminPage";
 import { MorePage } from "./pages/Placeholders";
@@ -38,7 +38,10 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/setup" element={<SetupPage />} />
-      <Route path="/s/:token" element={<PublicRecipePage />} />
+      <Route element={<ShareLayout />}>
+        <Route path="/s/:token" element={<SharePage />} />
+        <Route path="/s/:token/:slug" element={<ShareRecipePage />} />
+      </Route>
       <Route
         element={
           <RequireAuth>

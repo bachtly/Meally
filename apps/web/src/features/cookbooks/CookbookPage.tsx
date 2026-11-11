@@ -1,6 +1,7 @@
 import { Pencil, Share2, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { InstallCard } from "../../pwa/Pwa";
 import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { GRID, RecipeCard } from "../recipes/RecipeLibrary";
@@ -12,6 +13,7 @@ import { useCookbook, useCookbookMutations, useCookbookRecipes } from "./api";
 
 export function CookbookPage() {
   const { slug } = useParams();
+  const justSaved = !!(useLocation().state as { justSaved?: boolean } | null)?.justSaved;
   const navigate = useNavigate();
   const toast = useToast();
   const cb = useCookbook(slug);
@@ -48,6 +50,11 @@ export function CookbookPage() {
 
   return (
     <>
+      {justSaved && (
+        <div className="mb-4">
+          <InstallCard />
+        </div>
+      )}
       <header className="mb-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
