@@ -14,7 +14,7 @@ export class ApiError extends Error {
 export const errorHandler: ErrorHandler = (err, c) => {
   if (err instanceof ApiError) return c.json({ error: err.code, message: err.message }, err.status);
   if (err instanceof HTTPException) return c.json({ error: "http_error", message: err.message }, err.status);
-  console.error(err);
+  console.error(err, (err as { cause?: unknown })?.cause ?? "");
   return c.json({ error: "internal_error", message: "Something went wrong" }, 500);
 };
 

@@ -88,3 +88,22 @@ from Settings. In Admin, backups and file import show as unavailable.
 - Vercel rewrites: https://vercel.com/docs/routing/rewrites
 - Vercel external rewrites: https://vercel.com/kb/guide/vercel-reverse-proxy-rewrites-external
 - Supabase CLI reference (`link --project-ref`, `db push`, `secrets set --env-file`, `functions deploy --no-verify-jwt`): https://supabase.com/docs/reference/cli
+
+## Lessons from the first deploy (2026-11-11)
+
+- **`Deno.env.set` throws `NotSupported` on the Supabase Edge Runtime.** `supabase/functions/meally/index.ts`
+  passes defaults to `createEdgeApp(env)` instead of setting env vars.
+- **postgres-js 4.x fails on the Edge Runtime** with `ERR_NOT_IMPLEMENTED` from `node:net` connect. The server pins
+  `postgres@3.4.9`, which is the 3.4 line Supabase's guide uses
+  ([Supabase: connect to Postgres](https://supabase.com/docs/guides/functions/connect-to-postgres)). The edge bundle
+  imports the same version as `npm:postgres@3.4.9`.
+- **Reading function logs without the dashboard.** Query the Management API logs endpoint against the single `logs`
+  table filtered by `source`. Use `function_logs` for console output and `function_edge_logs` for requests
+  ([Supabase: advanced log filtering](https://supabase.com/docs/guides/telemetry/advanced-log-filtering)):
+  `GET /v1/projects/<ref>/analytics/endpoints/logs?sql=select timestamp, event_message from logs where source =
+  'function_logs' order by timestamp desc limit 20&iso_timestamp_start=…&iso_timestamp_end=…` (the range must be
+  24 hours or less).
+- **Error causes.** The error handler logs `err.cause`, because Drizzle wraps driver errors in a generic
+  "Failed query".
+- **Vercel production URL.** It's `https://<project>-<suffix>.vercel.app` when `<project>.vercel.app` is taken. The
+  script reads it back and resets `MEALLY_PUBLIC_URL`.

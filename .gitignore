@@ -12,3 +12,6 @@ test-results/
 dist-edge/
 /vercel.json
 .vercel/
+
+.vercel
+.env*
