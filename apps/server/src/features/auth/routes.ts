@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { count, eq, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
-import { getConnInfo } from "@hono/node-server/conninfo";
 import {
   loginSchema,
   registerSchema,
@@ -46,11 +45,9 @@ export function clientIp(c: Context<AppEnv>): string {
     const fwd = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
     if (fwd) return fwd;
   }
-  try {
-    return getConnInfo(c).remote.address ?? "unknown";
-  } catch {
-    return "unknown";
-  }
+  // Node (@hono/node-server) binds `incoming`; Deno.serve passes `remoteAddr`. Read both without importing either.
+  const e = c.env as { incoming?: { socket?: { remoteAddress?: string } }; remoteAddr?: { hostname?: string } } | undefined;
+  return e?.incoming?.socket?.remoteAddress ?? e?.remoteAddr?.hostname ?? "unknown";
 }
 
 function limit(c: Context<AppEnv>, kind: "login" | "register") {
@@ -167,8 +164,11 @@ export const authRoutes = new Hono<AppEnv>()
     const db = c.get("db");
     const [user] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
     dummyHash ??= c.get("platform").hasher.hash("meally-dummy");
-    const { ok } = await c.get("platform").hasher.verify(input.password, user?.passwordHash ?? (await dummyHash));
+    const hasher = c.get("platform").hasher;
+    const { ok, needsRehash } = await hasher.verify(input.password, user?.passwordHash ?? (await dummyHash));
     if (!user || !ok) throw new ApiError(401, "invalid_credentials", "Incorrect email or password");
+    // Rehash on login: move the stored hash to this platform's preferred scheme and cost.
+    if (needsRehash) await db.update(users).set({ passwordHash: await hasher.hash(input.password) }).where(eq(users.id, user.id));
     setSessionCookie(c, await createSession(db, user.id, c.req.header("user-agent")));
     const [household] = await db.select().from(households).where(eq(households.id, user.householdId)).limit(1);
     const res: MeResponse = { user: toSessionUser(user), household: { id: household!.id, name: household!.name } };

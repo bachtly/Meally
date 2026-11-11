@@ -1,4 +1,10 @@
-import net from "node:net";
+/** 4 or 6 for an IP literal, 0 otherwise (a runtime-neutral `net.isIP`). */
+export function isIP(s: string): 0 | 4 | 6 {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (m) return m.slice(1).every((o) => Number(o) <= 255 && (o === "0" || !o.startsWith("0"))) ? 4 : 0;
+  if (!s.includes(":") || !/^[0-9a-fA-F:.%\w]+$/.test(s)) return 0;
+  return groups6(s) ? 6 : 0;
+}
 
 /** Expands an IPv6 literal to eight 16-bit groups, or null when malformed. */
 function groups6(ip: string): number[] | null {
@@ -40,7 +46,7 @@ function blockedV4(ip: string): boolean {
 
 /** True for any address a public server should never be made to contact. Unparseable input is blocked. */
 export function isBlockedIp(ip: string): boolean {
-  const kind = net.isIP(ip);
+  const kind = isIP(ip);
   if (kind === 4) return blockedV4(ip);
   if (kind !== 6) return true;
   const g = groups6(ip);

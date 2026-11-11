@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import type { Scheduler } from "../../ports/index.js";
-import { createNodeScheduler } from "../../adapters/node/scheduler.js";
+import { createNodeScheduler } from "../../adapters/timer-scheduler.js";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Webhook, WebhookDelivery, WebhookEvent, WebhookWithSecret } from "@meally/shared";
 import type { z } from "@meally/shared";

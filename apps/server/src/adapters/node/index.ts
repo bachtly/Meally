@@ -3,6 +3,7 @@ import { createDiskImageStore } from "./images.js";
 import { NodeEvents } from "./events.js";
 import { createNodeScheduler } from "./scheduler.js";
 import { createScryptHasher } from "./hasher.js";
+import { nodeInfo } from "./info.js";
 
 export { imagePath, createDiskImageStore } from "./images.js";
 export { NodeEvents } from "./events.js";
@@ -16,5 +17,6 @@ export function createNodePlatform(opts: { dataDir: string; scryptLogN?: number 
     events: new NodeEvents(),
     scheduler: createNodeScheduler(),
     hasher: createScryptHasher(opts.scryptLogN),
+    info: nodeInfo,
   };
 }

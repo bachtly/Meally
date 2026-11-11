@@ -3,7 +3,7 @@ import type { ImageStore } from "../../ports/index.js";
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, Nutrition, Recipe, RecipeData, RecipeListResponse, RecipeSummary } from "@meally/shared";
 import { isNutritionEmpty } from "@meally/shared";
-import { ms, type Db } from "../../db/index.js";
+import { ms, type Db } from "../../db/core.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { getMe, householdRating } from "../ratings/service.js";

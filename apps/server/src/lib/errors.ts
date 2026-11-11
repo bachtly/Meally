@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 
 export class ApiError extends Error {
   constructor(
-    public status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 502 | 503 | 504,
+    public status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 501 | 502 | 503 | 504,
     public code: string,
     message: string,
   ) {

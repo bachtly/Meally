@@ -76,18 +76,38 @@ packages/shared/src/
 ## Ports
 
 Features reach the host only through four interfaces in `apps/server/src/ports/`, bundled as a `Platform`
-(`{name, images, events, scheduler, hasher}`) that `createApp` puts on the context (`c.get("platform")`):
+(`{name, images, events, scheduler, hasher, info?}`) that `createApp` puts on the context (`c.get("platform")`):
 
 - `ImageStore`: `putOriginal` (processes an upload, returns the image id), `put`, `get`, `delete`, `urlFor` (null when
   the server proxies bytes) and an optional `localDir` that backups read.
 - `Events`: `publish` / `subscribe(channel, cb)` and `supportsStreaming` (SSE routes need it).
 - `Scheduler`: named jobs (`define`, `every`, `daily`, `runAfter`, `runJob`). Handlers must be idempotent.
-- `PasswordHasher`: `hash`, `verify` returning `{ok, needsRehash}`; hash strings are versioned (`scrypt$...`).
+- `PasswordHasher`: `hash`, `verify` returning `{ok, needsRehash}`; hash strings are versioned (`scrypt$...`,
+  `pbkdf2-sha256$<iterations>$<salt>$<hash>`). Every platform verifies both formats and hashes with its preferred one;
+  login stores a new hash when `needsRehash` is set (rehash-on-login).
 
 `apps/server/src/adapters/node/` implements them (disk plus sharp, in-process bus, timers, scrypt), and
 `createNodePlatform` builds the default used by `index.ts` and tests. Backups, the restore CLI, the process lock and
 import upload temp files stay Node-only. A test (`platform-guard.test.ts`) fails if other code imports `node:fs` or
 `sharp` directly.
+
+### Entries
+
+- **Node** (`src/index.ts`, `createApp` in `app.ts`): `createCoreApp` plus instance backups, file import, static web
+  files; scrypt preferred.
+- **Edge** (`src/entry-edge.ts`, bundled by `npm run build:edge` into `dist-edge/meally.js`): exports a `fetch`
+  handler built from `createCoreApp` (`app-core.ts`, which has no Node-only imports) with the skeleton platform in
+  `adapters/edge/` (PBKDF2 hasher, in-memory events with `supportsStreaming=false`, a scheduler that only runs jobs
+  through `runJob`, and an `ImageStore` that throws `not_configured` until the Supabase adapter lands). The database is
+  postgres-js from `DATABASE_URL`, kept as an external `npm:postgres` import; the schema is applied out of band.
+  `MEALLY_BASE_PATH` (for example `/meally`) mounts everything under a prefix; `MEALLY_PBKDF2_ITERATIONS` lowers the
+  cost (default 600000, the [OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+  figure for PBKDF2-HMAC-SHA256) if the edge CPU limit is tight. `edge-guard.test.ts` reads the esbuild metafile and
+  fails if `sharp`, PGlite, `node:fs`, `child_process` and the like enter the bundle (only `node:crypto`, `node:buffer`
+  and `npm:postgres` may stay external). Not on the edge yet: instance backups, file import, live shopping updates (SSE
+  answers 501 when `supportsStreaming` is false).
+- Household recipe export is core (not behind the `backups` flag) and reads images through `ImageStore`; only instance
+  backups are flagged, and `DATABASE_URL` turns just those off.
 
 ## API conventions
 

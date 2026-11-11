@@ -69,10 +69,21 @@ export interface PasswordHasher {
   verify(password: string, stored: string): Promise<VerifyResult>;
 }
 
+/** What the admin info page shows about the host. */
+export interface PlatformInfo {
+  runtime: string;
+  uptimeSeconds: number;
+  dbBytes: number;
+  imagesBytes: number;
+  dataDir: string;
+}
+
 export interface Platform {
   name: "node" | (string & {});
   images: ImageStore;
   events: Events;
   scheduler: Scheduler;
   hasher: PasswordHasher;
+  /** Host details for the admin page; platforms without a data directory omit it. */
+  info?(dataDir: string): Promise<PlatformInfo>;
 }

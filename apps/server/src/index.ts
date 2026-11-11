@@ -17,7 +17,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist =
   config.NODE_ENV === "production" ? (process.env.WEB_DIST ?? path.resolve(here, "../../web/dist")) : undefined;
 
-// In-app backups snapshot the embedded database only; with DATABASE_URL use pg_dump instead.
+// In-app instance backups snapshot the embedded database only; with DATABASE_URL use pg_dump instead.
+// Household recipe export is core (not flagged) and stays available.
 const env = config.DATABASE_URL ? { ...process.env, MEALLY_FEATURE_BACKUPS: "false" } : process.env;
 const flags = createFlagsService(db, env);
 const platform = createNodePlatform({ dataDir: config.DATA_DIR });

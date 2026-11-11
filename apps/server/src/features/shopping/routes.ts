@@ -146,6 +146,7 @@ shoppingRoutes
     });
   })
   .get("/lists/:id/events", async (c) => {
+    if (!c.get("platform").events.supportsStreaming) throw new ApiError(501, "not_configured", "Live updates are not available on this deployment");
     const [db, householdId] = ctx(c);
     const listId = c.req.param("id");
     await svc.assertList(db, householdId, listId);

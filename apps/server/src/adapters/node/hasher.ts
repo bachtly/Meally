@@ -1,14 +1,7 @@
 import type { PasswordHasher } from "../../ports/index.js";
-import { hashPassword, parseScrypt, verifyPassword } from "../../features/auth/password.js";
+import { createHasher } from "../hasher.js";
 
-/** scrypt with cost 2^logN; hashes made with a lower cost report `needsRehash`. */
+/** scrypt with cost 2^logN is preferred; pbkdf2 hashes (made on the edge) still verify and report `needsRehash`. */
 export function createScryptHasher(logN = 17): PasswordHasher {
-  return {
-    hash: (password) => hashPassword(password, logN),
-    async verify(password, stored) {
-      const ok = await verifyPassword(password, stored);
-      const p = parseScrypt(stored);
-      return { ok, needsRehash: ok && (!p || p.n < 2 ** logN) };
-    },
-  };
+  return createHasher({ kind: "scrypt", logN });
 }

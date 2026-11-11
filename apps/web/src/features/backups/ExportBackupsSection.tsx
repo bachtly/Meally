@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiRequestError, postJson } from "../../lib/api";
 import { Button, Skeleton, useToast } from "../../ui";
 import { useSession } from "../auth/useSession";
+import { useFeature } from "../features/FeaturesProvider";
 
 interface BackupItem {
   name: string;
@@ -97,6 +98,7 @@ function Backups() {
 
 export function ExportBackupsSection() {
   const { user } = useSession();
+  const backups = useFeature("backups");
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -107,7 +109,7 @@ export function ExportBackupsSection() {
           <LinkButton href="/api/v1/export/recipes?format=markdown">Markdown</LinkButton>
         </div>
       </div>
-      {user?.role === "admin" && <Backups />}
+      {backups && user?.role === "admin" && <Backups />}
     </div>
   );
 }
