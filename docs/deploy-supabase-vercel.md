@@ -42,7 +42,7 @@ Every step is safe to repeat. What it does:
    daily. The secret is read from `vault.decrypted_secrets`; nothing secret is in git.
 5. `supabase secrets set --env-file` (a temp file, so values never hit a command line): `MEALLY_JOBS_SECRET`,
    `MEALLY_PUBLIC_URL`, `MEALLY_PBKDF2_ITERATIONS`, `DATABASE_URL`, `MEALLY_PLATFORM=supabase`, and the forced flags
-   `MEALLY_FEATURE_BACKUPS=false`, `MEALLY_FEATURE_IMPORT_FILES=false`, `MEALLY_FEATURE_PWA=true`.
+   `MEALLY_FEATURE_BACKUPS=off`, `MEALLY_FEATURE_IMPORT_FILES=off`, `MEALLY_FEATURE_PWA=on`.
 6. `supabase functions deploy meally --no-verify-jwt` (also `verify_jwt = false` in `config.toml`; the app does its own auth).
 7. `vercel.json` is rendered from `vercel.template.json` (gitignored), then `vercel link --yes --project meally` and
    `vercel deploy --prod --yes`.

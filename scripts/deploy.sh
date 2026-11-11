@@ -66,9 +66,9 @@ set_secrets() {
       echo "MEALLY_PUBLIC_URL=$1"
       echo "MEALLY_PBKDF2_ITERATIONS=$ITER"
       echo "MEALLY_PLATFORM=supabase"
-      echo "MEALLY_FEATURE_BACKUPS=false"
-      echo "MEALLY_FEATURE_IMPORT_FILES=false"
-      echo "MEALLY_FEATURE_PWA=true"
+      echo "MEALLY_FEATURE_BACKUPS=off"
+      echo "MEALLY_FEATURE_IMPORT_FILES=off"
+      echo "MEALLY_FEATURE_PWA=on"
       echo "DATABASE_URL=$DB_URL"
     } > "$TMP/secrets.env"
   )
