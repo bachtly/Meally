@@ -86,6 +86,16 @@ describe("runtime caching rules", () => {
     expect(first(ctx("/api/v1/recipes?q=a"))).toEqual(["recipes-list"]);
     expect(first(ctx("/api/v1/images/abc/800"))).toEqual(["recipes"]);
   });
+  it("matchers still work when rebuilt from source, as Workbox does in sw.js", () => {
+    // Workbox writes each matcher into sw.js with toString(), so any helper it closes over is undefined there.
+    for (const [name, fn] of Object.entries(matchers)) {
+      const rebuilt = new Function(`"use strict"; return (${fn.toString()});`)() as typeof fn;
+      for (const p of ["/api/v1/recipes/pasta", "/api/v1/recipes", "/api/v1/images/a/320", "/api/v1/features", "/api/v1/auth/me"]) {
+        expect(() => rebuilt(ctx(p)), `${name} ${p}`).not.toThrow();
+        expect(rebuilt(ctx(p))).toBe(fn(ctx(p)));
+      }
+    }
+  });
   it("uses the specified strategies and limits", () => {
     const detail = runtimeCaching.find((r) => r.urlPattern === matchers.recipeDetail)!;
     expect(detail.handler).toBe("StaleWhileRevalidate");
