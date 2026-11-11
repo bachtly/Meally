@@ -75,10 +75,13 @@ let webpSupport: Promise<boolean> | undefined;
  * so the check looks at the blob type. Runs once per page load.
  */
 export function canEncodeWebp(): Promise<boolean> {
-  webpSupport ??= encode(makeCanvas(1, 1), "image/webp", 0.8).then(
-    (b) => b.type === "image/webp",
-    () => false,
-  );
+  webpSupport ??= (async () => {
+    // Chromium will not encode a canvas that has no context yet, so draw one pixel first.
+    const probe = makeCanvas(1, 1);
+    const ctx = probe.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+    ctx?.fillRect(0, 0, 1, 1);
+    return (await encode(probe, "image/webp", 0.8)).type === "image/webp";
+  })().catch(() => false);
   return webpSupport;
 }
 /** Test hook: forget the cached WebP check. */
@@ -103,13 +106,15 @@ export interface ResizedImage {
 export async function resizeImage(file: File): Promise<ResizedImage> {
   const type = (await canEncodeWebp()) ? "image/webp" : "image/jpeg";
   const bitmap = await decode(file);
+  // Read the size now: a closed ImageBitmap reports 0 × 0, and it is closed after the first draw.
+  const full = { width: bitmap.width, height: bitmap.height };
   const out = {} as Record<ImageSize, Blob>;
   let source: Source = bitmap;
-  let from = { width: bitmap.width, height: bitmap.height };
+  let from = full;
   let last: { width: number; height: number; blob: Blob } | undefined;
   try {
     for (const size of [...IMAGE_SIZES].sort((a, b) => b - a)) {
-      const { width, height } = fitWithin(bitmap.width, bitmap.height, size);
+      const { width, height } = fitWithin(full.width, full.height, size);
       if (last && last.width === width && last.height === height) {
         out[size] = last.blob;
         continue;

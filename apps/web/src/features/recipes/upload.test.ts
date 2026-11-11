@@ -24,9 +24,11 @@ interface Encoded {
 
 /** Fake canvas: encodes WebP or not (Safari falls back to PNG), and reports sizes via `bytes`. */
 function stubCanvas(opts: { webp: boolean; bytes?: (e: Encoded) => number; photo?: { width: number; height: number } }) {
-  const close = vi.fn();
   const photo = opts.photo ?? { width: 4000, height: 3000 };
-  vi.stubGlobal("createImageBitmap", async () => ({ ...photo, close }));
+  // Like a real ImageBitmap, a closed one reports 0 × 0.
+  const bitmap = { ...photo, close: vi.fn(() => Object.assign(bitmap, { width: 0, height: 0 })) };
+  const close = bitmap.close;
+  vi.stubGlobal("createImageBitmap", async () => bitmap);
   const drawn: number[] = [];
   const encoded: Encoded[] = [];
   vi.stubGlobal(
@@ -38,10 +40,14 @@ function stubCanvas(opts: { webp: boolean; bytes?: (e: Encoded) => number; photo
       ) {
         if (width > 1) drawn.push(width);
       }
+      hasContext = false;
       getContext() {
-        return { drawImage() {} };
+        this.hasContext = true;
+        return { drawImage() {}, fillRect() {} };
       }
       async convertToBlob({ type, quality }: { type: string; quality: number }) {
+        // Like Chromium: a canvas without a context cannot be encoded.
+        if (!this.hasContext) throw new DOMException("no context", "InvalidStateError");
         const out = type === "image/webp" && !opts.webp ? "image/png" : type;
         const e = { width: this.width, type: out, quality };
         if (this.width > 1) encoded.push(e);
@@ -87,11 +93,13 @@ it("falls back to JPEG where the browser cannot encode WebP (Safari)", async () 
 });
 
 it("encodes a small photo once for the sizes it already fits", async () => {
-  const { encoded } = stubCanvas({ webp: false, photo: { width: 672, height: 456 } });
+  const { encoded } = stubCanvas({ webp: true, photo: { width: 672, height: 456 } });
   const sized = await buildImageForm(new File(["x"], "ribs.jpg", { type: "image/jpeg" }), true);
-  expect(encoded.map((e) => e.width)).toEqual([672, 320]);
-  expect(sized.get("w1600")).toBeInstanceOf(File);
-  expect(sized.get("w800")).toBeInstanceOf(File);
+  expect(encoded.map((e) => [e.width, e.type])).toEqual([
+    [672, "image/webp"],
+    [320, "image/webp"],
+  ]);
+  expect((sized.get("w1600") as File).size).toBe((sized.get("w800") as File).size);
 });
 
 it("lowers quality only for a part that would go over the size limit", async () => {
