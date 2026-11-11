@@ -10,8 +10,7 @@ playwright-report/
 test-results/
 .vdata/
 dist-edge/
-/vercel.json
-.vercel/
-
-.vercel
+.terraform/
+apps/web/pages/upstream.gen.ts
+.wrangler/
 .env*

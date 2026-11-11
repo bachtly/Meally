@@ -11,17 +11,17 @@ const root = path.resolve(__dirname, "../../..");
 const REF = "abcdefghijklmnopqrst";
 const load = (f: string) => import(/* @vite-ignore */ pathToFileURL(path.join(root, "scripts", f)).href);
 
-describe("vercel.json template", () => {
-  it("renders the ref, keeps rewrite order and cache headers", async () => {
-    const { renderVercel } = await load("render-vercel.mjs");
-    const out = JSON.parse(renderVercel(fs.readFileSync(path.join(root, "vercel.template.json"), "utf8"), REF));
-    expect(out.outputDirectory).toBe("apps/web/dist");
-    expect(out.buildCommand).toBe("npm run build -w apps/web");
-    expect(out.rewrites[0]).toEqual({ source: "/api/(.*)", destination: `https://${REF}.supabase.co/functions/v1/meally/api/$1` });
-    expect(out.rewrites[1]).toEqual({ source: "/(.*)", destination: "/index.html" });
-    expect(JSON.stringify(out.headers)).toContain("/sw.js");
-    expect(JSON.stringify(out)).not.toContain("__SUPABASE_REF__");
-    expect(() => renderVercel("x", "BAD ref")).toThrow();
+describe("Pages proxy upstream", () => {
+  it("renders the function URL from the ref and rejects a bad ref", async () => {
+    const { renderUpstream } = await load("render-pages.mjs");
+    expect(renderUpstream(REF)).toContain(`export const UPSTREAM = "https://${REF}.supabase.co/functions/v1/meally";`);
+    expect(() => renderUpstream("BAD ref")).toThrow();
+  });
+  it("ships cache headers: no-cache for the shell and service worker, immutable hashed assets", () => {
+    const h = fs.readFileSync(path.join(root, "apps/web/public/_headers"), "utf8");
+    expect(h).toMatch(/\/sw\.js\r?\n\s+Cache-Control: no-cache/);
+    expect(h).toMatch(/\/index\.html\r?\n\s+Cache-Control: no-cache/);
+    expect(h).toMatch(/\/assets\/\*\r?\n\s+Cache-Control: public, max-age=31536000, immutable/);
   });
 });
 
@@ -37,15 +37,15 @@ describe("migration sync", () => {
 });
 
 describe("deploy.sh --dry-run", () => {
-  const env = { ...process.env, SUPABASE_ACCESS_TOKEN: "sbp_fake_secret", SUPABASE_PROJECT_REF: REF, SUPABASE_DB_PASSWORD: "pw-fake-secret", VERCEL_TOKEN: "vc-fake-secret", JOB_SECRET: "job-fake-secret" };
+  const env = { ...process.env, SUPABASE_ACCESS_TOKEN: "sbp_fake_secret", SUPABASE_PROJECT_REF: REF, SUPABASE_DB_PASSWORD: "pw-fake-secret", VERCEL_TOKEN: "vc-fake-secret", CLOUDFLARE_API_TOKEN: "cf-fake-secret", CLOUDFLARE_ACCOUNT_ID: "0123456789abcdef", JOB_SECRET: "job-fake-secret" };
   it("prints the plan, calls nothing and echoes no secret", () => {
     const r = spawnSync("bash", ["scripts/deploy.sh", "--dry-run"], { cwd: root, env, encoding: "utf8" });
     expect(r.status).toBe(0);
     const out = r.stdout.toLowerCase();
-    for (const s of ["install and build", "link the supabase", "migrations", "vault", "function secrets", "edge function", "vercel", "smoke test"]) expect(out).toContain(s);
+    for (const s of ["install and build", "link the supabase", "migrations", "vault", "function secrets", "edge function", "terraform", "pages", "smoke test"]) expect(out).toContain(s);
     expect(r.stdout).toContain("[dry-run]");
     expect(r.stdout + r.stderr).not.toMatch(/fake-secret/);
-    expect(fs.existsSync(path.join(root, "vercel.json"))).toBe(false);
+    expect(fs.existsSync(path.join(root, "apps/web/pages/upstream.gen.ts"))).toBe(false);
   });
   it("fails fast naming missing vars", () => {
     const r = spawnSync("bash", ["scripts/deploy.sh", "--dry-run"], { cwd: root, env: { PATH: process.env.PATH }, encoding: "utf8" });
@@ -54,9 +54,9 @@ describe("deploy.sh --dry-run", () => {
   });
 });
 
-describe("CSRF behind the Vercel proxy", () => {
+describe("CSRF behind the Pages proxy", () => {
   const h = openTestDb();
-  const PUBLIC = "https://meally.vercel.app";
+  const PUBLIC = "https://meally.bachtly.com";
   it("maps MEALLY_PUBLIC_URL to the cookie/CSRF origin", () => {
     expect(withPublicUrl({ MEALLY_PUBLIC_URL: PUBLIC }).BASE_URL).toBe(PUBLIC);
     expect(withPublicUrl({ BASE_URL: "http://x" }).BASE_URL).toBe("http://x");

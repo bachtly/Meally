@@ -40,6 +40,15 @@ One Docker image runs the server, and the server also serves the built SPA. All 
   PGlite's data directory and are off with `DATABASE_URL` (use `pg_dump`). Tests run on in-memory PGlite, and CI also
   runs them against a Postgres 16 service.
 
+## Changed decisions (hosting)
+
+- The hosted deployment serves the SPA from Cloudflare Pages, with Terraform in `infra/` owning the Pages project, the
+  custom domain and the CNAME at Vercel DNS. A Pages Function proxies `/api/*` to the Supabase Edge Function, so there
+  is still one origin. It replaces the Vercel project and rewrites. The Docker image still serves the SPA for
+  self-hosters. See [features/hosting-pages.md](features/hosting-pages.md) and [../deploy.md](../deploy.md).
+- Planned next: a read-only local copy in IndexedDB (Dexie), refreshed from the API, so screens open instantly and
+  read offline. Writes stay online and are confirmed by the server, then the copy refreshes. Roadmap rows 33 to 37.
+
 ## Feature flags
 
 - The registry lives in `packages/shared/src/features.ts`. Each entry has a `key`, `label`, `description`, `default`

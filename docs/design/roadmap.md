@@ -37,3 +37,9 @@ following [the template](features/_template.md).
 | 30 | feat: AI helpers | F25 | Open (#34) |
 | 31 | test: end-to-end flows, self-hosting guide | | This PR (#36) |
 | — | fix: polish meal plan, shopping aisles, cook entry point | | Open (#35) |
+| 32 | feat(deploy): web hosting on Cloudflare Pages with Terraform, `/api` proxy function | | This PR |
+| 33 | docs: design for a read-only local copy (Dexie), like daily-kaizen | F24 | Planned |
+| 34 | feat(web): local copy core (Dexie schema, refresh, clear on sign-out and household switch) | F24 | Planned |
+| 35 | feat(web): recipes and organisers read from the local copy | F2, F9 | Planned |
+| 36 | feat(web): meal plan and shopping lists read from the local copy | F12, F13 | Planned |
+| 37 | feat(web): writes confirm with the server, then refresh the local copy | F24 | Planned |
