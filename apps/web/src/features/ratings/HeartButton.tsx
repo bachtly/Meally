@@ -17,7 +17,7 @@ export function HeartButton({ slug, name, favourite, className }: { slug: string
       }}
       className={cn("flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2", className)}
     >
-      <Heart className={cn("size-5", favourite && "fill-current text-red-600 dark:text-red-400")} aria-hidden />
+      <Heart className={cn("size-5", favourite && "fill-current text-danger")} aria-hidden />
     </button>
   );
 }

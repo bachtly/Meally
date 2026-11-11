@@ -150,7 +150,7 @@ export function ImportFilesPage() {
 
       {progress !== null && <Bar label="Upload progress" value={progress} />}
       {error && (
-        <p role="alert" className="text-red-700 dark:text-red-400">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}
@@ -192,7 +192,7 @@ export function ImportFilesPage() {
         {jobs.isPending ? (
           <Skeleton className="h-12 w-full" />
         ) : jobs.isError ? (
-          <p className="text-sm text-red-700 dark:text-red-400">Could not load recent imports.</p>
+          <p className="text-sm text-danger">Could not load recent imports.</p>
         ) : jobs.data.items.length === 0 ? (
           <p className="text-sm text-muted">Nothing imported yet.</p>
         ) : (
