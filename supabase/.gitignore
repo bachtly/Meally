@@ -1,0 +1,4 @@
+.temp/
+.branches/
+functions/meally/meally.js
+migrations/*_drizzle_*.sql

@@ -1,0 +1,16 @@
+# Supabase project settings for Meally. `supabase link` supplies the project ref; nothing secret lives here.
+project_id = "meally"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+major_version = 17
+
+[functions.meally]
+# Meally authenticates itself (session cookies, API tokens, the jobs secret), so the gateway must not demand a JWT (D12).
+verify_jwt = false
+entrypoint = "./functions/meally/index.ts"
