@@ -48,7 +48,9 @@ export function AppShell() {
 
   return (
     <ToastProvider>
-      <div className="min-h-dvh lg:pl-60 print:pl-0">
+      {/* The page scrolls inside this fixed-height column, not the document. iOS 26 WebKit drifts `position: fixed`
+          bottom bars up the screen while the document scrolls, so the tab bar is a flex row at the end instead. */}
+      <div className="flex h-dvh flex-col lg:pl-60 print:block print:h-auto print:pl-0">
         <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 pt-[calc(1rem+var(--sat))] pb-[calc(1rem+var(--sab))] pl-[max(1rem,var(--sal))] lg:flex">
           <Brand className="px-3 text-xl" />
           <nav aria-label="Sidebar" className="flex flex-col gap-1">
@@ -70,6 +72,7 @@ export function AppShell() {
           </nav>
         </aside>
 
+        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain print:overflow-visible">
         <header
           ref={headerRef}
           className="print:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 py-2 pt-[calc(0.5rem+var(--sat))] pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] backdrop-blur lg:pl-4"
@@ -111,11 +114,12 @@ export function AppShell() {
         </header>
 
         <OfflineBanner />
-        <main className="mx-auto max-w-7xl pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] pb-[calc(7rem+var(--sab))] pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
+        <main className="mx-auto max-w-7xl pl-[max(1rem,var(--sal))] pr-[max(1rem,var(--sar))] pb-24 pt-6 lg:pb-10 print:p-0" aria-busy={isLoading || undefined}>
           <Outlet />
         </main>
+        </div>
 
-        <nav aria-label="Tab bar" className="print:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised pb-(--sab) pl-(--sal) pr-(--sar) lg:hidden">
+        <nav aria-label="Tab bar" className="print:hidden z-30 shrink-0 border-t border-line bg-raised pb-(--sab) pl-(--sal) pr-(--sar) lg:hidden">
           <ul className="flex">
             {items.filter((i) => !i.desktopOnly).map(({ to, label, icon: Icon }) => (
               <li key={to} className="flex-1">

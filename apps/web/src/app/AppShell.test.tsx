@@ -84,6 +84,16 @@ it("keeps the header and tab bar clear of device safe areas", async () => {
   expect(document.documentElement.style.getPropertyValue("--header-h")).toMatch(/px$/);
 });
 
+it("scrolls inside the shell so the tab bar never uses position: fixed (iOS 26 drift)", async () => {
+  renderAt("/recipes");
+  const tabBar = await screen.findByRole("navigation", { name: "Tab bar" });
+  expect(tabBar.className).not.toMatch(/fixed/);
+  const scroller = document.querySelector("[data-scroll-root]")!;
+  expect(scroller.className).toContain("overflow-y-auto");
+  expect(scroller.contains(document.querySelector("main"))).toBe(true);
+  expect(scroller.contains(tabBar)).toBe(false);
+});
+
 it("opts into safe-area insets in the viewport meta", () => {
   expect(html).toMatch(/name="viewport" content="[^"]*viewport-fit=cover/);
   expect(html).not.toMatch(/user-scalable=no|maximum-scale=1/);
