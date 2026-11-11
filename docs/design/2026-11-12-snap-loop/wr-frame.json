@@ -1,0 +1,12 @@
+{
+  "topic": "Private friends-only food photo sharing for home cooks, linked to recipes: how products, open source and standards solve it (friend graph and caps, web camera capture in a PWA, web push, migrating multi-tenant household ownership to per-user ownership with friend read access)",
+  "purpose": "feature design options and trade-offs",
+  "recency": "last 24 months",
+  "depth": "quick",
+  "types": ["solutions", "comparison", "best_practices"],
+  "paraphrases": [
+    "friends-only food photo sharing app linked to recipes 2026",
+    "PWA camera capture and web push notifications iOS Android 2026 best practices",
+    "friend graph data model mutual friendships cap permissions read access postgres"
+  ]
+}

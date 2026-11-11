@@ -49,7 +49,7 @@ the recipe behind a friend's dish.
 | Module / service | Path | Why it is touched |
 |---|---|---|
 | Auth and households | `apps/server/src/db/schema/auth.ts`, `docs/design/features/households.md` | Households replaced by friendships; data ownership moves from household to user |
-| Every household-scoped table (38 `householdId` columns) | `apps/server/src/db/schema/*.ts` | Ownership migration, isolation rule |
+| Every household-scoped table (16 `household_id` columns in 12 files) | `apps/server/src/db/schema/*.ts` | Ownership migration, isolation rule |
 | Images | `apps/server/src/db/schema/recipes.ts` (`images`) | Snap photos reuse the image pipeline |
 | Timeline | `apps/server/src/db/schema/timeline.ts`, `docs/design/features/timeline.md` | "Made it" events with photos overlap snaps; merge or relate |
 | Share links | `docs/design/features/share-links.md`, `apps/server/src/db/schema/share.ts` | Existing read-only recipe access pattern for non-owners |
@@ -75,7 +75,8 @@ the recipe behind a friend's dish.
 | Feed | The full-screen, newest-first list of snaps from you and your friends | new (today's household feed is `GET /api/v1/timeline`) |
 | Friend | Another user with an accepted friendship. Friends see each other's snaps and the recipes those snaps link to, read-only | new |
 | Friendship | A symmetric link between two users: pending, then accepted | new |
-| Friend cap | The maximum number of friends per user | new |
+| Friend cap | The maximum number of friends per user: an instance setting, default 20 | new |
+| Push subscription | One browser's Web Push endpoint and keys, stored for a user | new |
 | Linked recipe | The recipe a snap points to. It belongs to the snap's author | new (`recipes`) |
 | Eat-out snap | A snap of food not cooked by the author. It carries a dish name and optionally a place, and has no linked recipe at first | new |
 | Save to my recipes | Copy a friend's linked recipe into your own recipes, keeping an "adapted from" reference | new |
@@ -89,4 +90,3 @@ the recipe behind a friend's dish.
   optional "can edit my plans and lists" level, or is that out of scope? The owner chose "replace" on 2026-11-12. The
   lead recommended keeping households, because of the size of the migration. Discussion:
   [#76](https://github.com/bachtly/Meally/issues/76).
-- Friend cap: 20, like Locket, or set by the instance?
