@@ -29,9 +29,10 @@ export const runtimeCaching = [
     options: { cacheName: "recipes", expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 }, cacheableResponse: { statuses: [200] } },
   },
   {
+    // An image id never changes content (a new photo gets a new id), so once it's on the device it never needs the network.
     urlPattern: matchers.images,
-    handler: "StaleWhileRevalidate" as const,
-    options: { cacheName: "recipes", expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 }, cacheableResponse: { statuses: [200] } },
+    handler: "CacheFirst" as const,
+    options: { cacheName: "images", expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true }, cacheableResponse: { statuses: [200] } },
   },
   {
     urlPattern: matchers.features,
@@ -41,4 +42,4 @@ export const runtimeCaching = [
 ];
 
 /** Cache names to wipe on sign-out (shared devices). */
-export const OFFLINE_CACHES = ["recipes", "recipes-list", "features"];
+export const OFFLINE_CACHES = ["recipes", "recipes-list", "images", "features"];

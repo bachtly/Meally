@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { matchers, runtimeCaching } from "../../pwa/runtimeCaching";
+import { matchers, OFFLINE_CACHES, runtimeCaching } from "../../pwa/runtimeCaching";
 import { OfflineBanner, PwaProvider, UpdateToast } from "./Pwa";
 import { syncServiceWorker } from "./register";
 
@@ -84,7 +84,13 @@ describe("runtime caching rules", () => {
   it("caches recipe detail, list and images", () => {
     expect(first(ctx("/api/v1/recipes/pasta"))).toEqual(["recipes"]);
     expect(first(ctx("/api/v1/recipes?q=a"))).toEqual(["recipes-list"]);
-    expect(first(ctx("/api/v1/images/abc/800"))).toEqual(["recipes"]);
+    expect(first(ctx("/api/v1/images/abc/800"))).toEqual(["images"]);
+  });
+  it("keeps images cache-first in their own cache, cleared on sign-out", () => {
+    const images = runtimeCaching.find((r) => r.urlPattern === matchers.images)!;
+    expect(images.handler).toBe("CacheFirst");
+    expect(images.options).toMatchObject({ cacheName: "images", cacheableResponse: { statuses: [200] } });
+    expect(OFFLINE_CACHES).toContain("images");
   });
   it("matchers still work when rebuilt from source, as Workbox does in sw.js", () => {
     // Workbox writes each matcher into sw.js with toString(), so any helper it closes over is undefined there.

@@ -22,7 +22,6 @@ describe("disk image store", () => {
       expect(big?.contentType).toBe("image/webp");
       expect((await sharp(big!.bytes).metadata()).width).toBe(1600);
       expect(await store.get("h2", id, 800)).toBeNull();
-      expect(await store.urlFor("h1", id, 800)).toBeNull();
       expect(store.localDir).toBe(path.join(dir, "images"));
       await store.delete("h1", id);
       expect(await store.get("h1", id, 320)).toBeNull();

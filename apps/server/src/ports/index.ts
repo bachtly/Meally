@@ -35,8 +35,6 @@ export interface ImageStore {
   get(householdId: string, imageId: string, size: ImageSize): Promise<StoredImage | null>;
   /** Removes every size of the image. Missing files are not an error. */
   delete(householdId: string, imageId: string): Promise<void>;
-  /** A directly fetchable (e.g. signed) URL, or null when the server must proxy the bytes. */
-  urlFor(householdId: string, imageId: string, size: ImageSize): Promise<string | null>;
   /** Set when images live in a local directory, so backups can read them. */
   readonly localDir?: string;
 }
