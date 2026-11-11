@@ -22,7 +22,7 @@ export function normalizeBasePath(raw: string | undefined): string {
   return p && !p.startsWith("/") ? `/${p}` : p;
 }
 
-/** MEALLY_PUBLIC_URL (the browser-facing origin, e.g. the Vercel URL) is the CSRF/cookie origin, never the function Host. */
+/** MEALLY_PUBLIC_URL (the browser-facing origin, e.g. the Pages custom domain) is the CSRF/cookie origin, never the function Host. */
 export function withPublicUrl(env: Env): Env {
   return env.MEALLY_PUBLIC_URL ? { ...env, BASE_URL: env.MEALLY_PUBLIC_URL } : env;
 }

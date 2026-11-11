@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Deploys Meally: Supabase (DB, bucket, cron, Edge Function) + Vercel (SPA and /api proxy).
+# Deploys Meally: Supabase (DB, bucket, cron, Edge Function), Terraform (Cloudflare Pages project, custom domain,
+# CNAME at Vercel DNS), then the SPA and its /api proxy function to Pages with wrangler.
 # Idempotent; secrets are read from the environment and never echoed. `--dry-run` prints the plan only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -8,27 +9,32 @@ DRY=0
 [ "${1:-}" = "--dry-run" ] && DRY=1
 
 TOKEN_V="${VERCEL_API_TOKEN:-${VERCEL_TOKEN:-}}"
+TOKEN_CF="${CLOUDFLARE_API_TOKEN:-}"
 JOBS="${JOB_SECRET:-${MEALLY_JOBS_SECRET:-}}"
 missing=()
 [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || missing+=(SUPABASE_ACCESS_TOKEN)
 [ -n "${SUPABASE_PROJECT_REF:-}" ] || missing+=(SUPABASE_PROJECT_REF)
 [ -n "${SUPABASE_DB_PASSWORD:-}" ] || missing+=(SUPABASE_DB_PASSWORD)
 [ -n "$TOKEN_V" ] || missing+=("VERCEL_API_TOKEN|VERCEL_TOKEN")
+[ -n "$TOKEN_CF" ] || missing+=(CLOUDFLARE_API_TOKEN)
+[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] || missing+=(CLOUDFLARE_ACCOUNT_ID)
 [ -n "$JOBS" ] || missing+=("JOB_SECRET|MEALLY_JOBS_SECRET")
 if [ ${#missing[@]} -gt 0 ]; then echo "Missing required env vars: ${missing[*]}" >&2; exit 2; fi
 [[ "$SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{10,30}$ ]] || { echo "SUPABASE_PROJECT_REF looks invalid" >&2; exit 2; }
 
 export SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD
 REF="$SUPABASE_PROJECT_REF"
-PROJECT="${VERCEL_PROJECT_NAME:-meally}"
-PUBLIC_URL="${MEALLY_PUBLIC_URL:-https://$PROJECT.vercel.app}"
-# A custom domain on the Vercel project (e.g. meally.bachtly.com) wins over *.vercel.app in step 9.
+PROJECT="${PAGES_PROJECT_NAME:-meally}"
+DOMAIN="${MEALLY_DOMAIN:-bachtly.com}"
+SUBDOMAIN="${MEALLY_SUBDOMAIN:-meally}"
+# The browser origin. CSRF accepts exactly this origin, so it is the custom domain, never *.pages.dev.
+PUBLIC_URL="https://$SUBDOMAIN.$DOMAIN"
 ITER="${MEALLY_PBKDF2_ITERATIONS:-100000}"
 SB="npx --yes supabase@2"
 VC="npx --yes vercel"
 
 step() { echo; echo "==> $*"; }
-redact() { local t="$*"; t="${t//$TOKEN_V/***}"; t="${t//$SUPABASE_DB_PASSWORD/***}"; echo "$t"; }
+redact() { local t="$*"; t="${t//$TOKEN_V/***}"; t="${t//$TOKEN_CF/***}"; t="${t//$SUPABASE_DB_PASSWORD/***}"; echo "$t"; }
 run() { if [ "$DRY" = 1 ]; then echo "[dry-run] $(redact "$@")"; else "$@"; fi; }
 
 TMP="$(mktemp -d)"
@@ -82,34 +88,35 @@ set_secrets "$PUBLIC_URL"
 step "7. Deploy the Edge Function"
 run $SB functions deploy meally --no-verify-jwt --project-ref "$REF"
 
-step "8. Deploy the SPA to Vercel (project: $PROJECT)"
-run node scripts/render-vercel.mjs vercel.template.json vercel.json "$REF"
-run $VC link --yes --project "$PROJECT" --token "$TOKEN_V"
-run $VC deploy --prod --yes --token "$TOKEN_V"
-
-step "9. Read back the production URL"
+step "8. Terraform: Pages project $PROJECT, $SUBDOMAIN.$DOMAIN, CNAME at Vercel DNS (state in Supabase)"
+export CLOUDFLARE_API_TOKEN="$TOKEN_CF" CLOUDFLARE_ACCOUNT_ID VERCEL_API_TOKEN="$TOKEN_V"
+export TF_VAR_cloudflare_account_id="$CLOUDFLARE_ACCOUNT_ID" TF_VAR_vercel_team_id="${VERCEL_TEAM_ID:-}"
+export TF_VAR_domain="$DOMAIN" TF_VAR_subdomain="$SUBDOMAIN" TF_VAR_project_name="$PROJECT"
 if [ "$DRY" = 1 ]; then
-  echo "[dry-run] GET https://api.vercel.com/v9/projects/$PROJECT, set MEALLY_PUBLIC_URL, redeploy function if it changed"
-  FINAL_URL="$PUBLIC_URL"
+  echo "[dry-run] terraform -chdir=infra init + apply (PG_CONN_STR = session pooler, port 5432)"
 else
-  FINAL_URL="$(curl -fsS -H "Authorization: Bearer $TOKEN_V" "https://api.vercel.com/v9/projects/$PROJECT/domains" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const ds = (JSON.parse(s).domains ?? []).filter((d) => d.verified && !d.redirect).map((d) => d.name); const a = ds.find((d) => !d.endsWith(".vercel.app")) ?? ds[0]; process.stdout.write(a ? "https://" + a : ""); });')"
-  [ -n "$FINAL_URL" ] || { echo "Could not read the Vercel production URL; keeping $PUBLIC_URL" >&2; FINAL_URL="$PUBLIC_URL"; }
-  if [ "$FINAL_URL" != "$PUBLIC_URL" ]; then
-    echo "Production URL is $FINAL_URL (was $PUBLIC_URL); updating MEALLY_PUBLIC_URL and redeploying the function"
-    set_secrets "$FINAL_URL"
-    $SB functions deploy meally --no-verify-jwt --project-ref "$REF"
-  fi
+  # Session pooler (5432), not the transaction pooler: the pg backend locks state with advisory locks.
+  PG_CONN_STR="$(POOLER="$(cat supabase/.temp/pooler-url)" node -e 'const u = new URL(process.env.POOLER); u.password = ""; u.port = "5432"; u.searchParams.set("sslmode", "require"); process.stdout.write(u.toString());')"
+  export PG_CONN_STR PGPASSWORD="$SUPABASE_DB_PASSWORD"
+  terraform -chdir=infra init -input=false
+  terraform -chdir=infra apply -input=false -auto-approve
 fi
+
+step "9. Build the SPA and upload it with the /api proxy function to Pages (Direct Upload)"
+run node scripts/render-pages.mjs apps/web/pages/upstream.gen.ts "$REF"
+run npm run build -w apps/web
+# From apps/web so wrangler finds functions/ next to dist/.
+run bash -c "cd apps/web && npx --yes wrangler@4 pages deploy dist --project-name '$PROJECT' --branch main --commit-dirty=true"
 
 step "10. Smoke test"
 if [ "$DRY" = 1 ]; then
-  echo "[dry-run] curl $FINAL_URL/api/v1/health and $FINAL_URL/api/v1/auth/status"
+  echo "[dry-run] curl $PUBLIC_URL/api/v1/health and $PUBLIC_URL/api/v1/auth/status"
 else
   for p in health auth/status; do
-    code="$(curl -sS -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-all-errors "$FINAL_URL/api/v1/$p")"
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --retry 10 --retry-delay 6 --retry-all-errors "$PUBLIC_URL/api/v1/$p")"
     echo "GET /api/v1/$p -> $code"
     [ "$code" = 200 ] || { echo "Smoke test failed" >&2; exit 1; }
   done
 fi
 echo
-echo "Done: $FINAL_URL"
+echo "Done: $PUBLIC_URL"
