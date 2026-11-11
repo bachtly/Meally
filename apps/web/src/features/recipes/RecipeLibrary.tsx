@@ -1,4 +1,4 @@
-import { ArrowDownUp, BookOpen, Check, CheckSquare, ChevronDown, Heart, SearchX, Share2, Star } from "lucide-react";
+import { ArrowDownUp, BookOpen, Check, CheckSquare, Heart, Plus, SearchX, Share2, Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { BookMarked } from "lucide-react";
 import { useState } from "react";
@@ -219,7 +219,7 @@ export function RecipeLibrary() {
 
   return (
     <>
-      {/* Select and Sort are icon-only so the row fits a phone; it wraps if it still doesn't. */}
+      {/* The toolbar is icon-only so it fits a phone; the row wraps if it still doesn't. */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Recipes</h1>
         <div className="flex items-center gap-2 whitespace-nowrap">
@@ -246,10 +246,9 @@ export function RecipeLibrary() {
           {canImport ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                  New recipe
-                  <ChevronDown className="size-4" aria-hidden />
-                </Button>
+                <IconButton variant="primary" aria-label="New recipe" title="New recipe">
+                  <Plus className="size-5" aria-hidden />
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => navigate("/recipes/new")}>Write from scratch</DropdownMenuItem>
@@ -261,8 +260,8 @@ export function RecipeLibrary() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/recipes/new" className={`inline-flex min-h-9 items-center justify-center rounded-md bg-accent px-3 text-sm font-medium pointer-coarse:min-h-11 text-accent-contrast hover:bg-accent-hover`}>
-              New recipe
+            <Link to="/recipes/new" aria-label="New recipe" title="New recipe" className="inline-flex size-11 items-center justify-center rounded-md bg-accent text-accent-contrast hover:bg-accent-hover">
+              <Plus className="size-5" aria-hidden />
             </Link>
           )}
         </div>
