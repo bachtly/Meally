@@ -104,9 +104,9 @@ Authenticated (`requireFeature('share-links')`, household from session):
 - `POST /api/v1/shares` `{recipeSlugs: string[1..100], title, expiresInDays, showName, note}` → `{url}`.
 - `POST /api/v1/cookbooks/:slug/shares` (also `cookbooks`) → `{url}`.
 - `GET /api/v1/shares` → every active link of the household (no tokens). `DELETE /api/v1/shares/:id` as today.
-- `GET /api/v1/shares/by-token/:token/status` → `{sameHousehold, saved: {n: slug}[]}`.
-- `POST /api/v1/shares/by-token/:token/save` `{items: number[] | "all", asCookbook?: boolean}` → `{recipes: slug[],
-  cookbookSlug?}`; over 10 items it runs as a job (existing jobs machinery) and returns `{jobId}`. Rate-limited.
+- `GET /api/v1/shares/received/:token` → `{sameHousehold, saved: {linkSlug: mySlug}}`.
+- `POST /api/v1/shares/received/:token/save` `{slugs: 1..10, cookbook?: {name} | {slug}}` → `{saved, cookbookSlug}`.
+  The web app saves bigger sets in batches of 10 with progress (no job queue; see share-links D11).
 
 Public (no auth, 404 for unknown/expired/revoked/flag off, same headers as F16):
 

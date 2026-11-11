@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { createShareSchema, createShareSetSchema, imageSizes, type ImageSize } from "@meally/shared";
+import { createShareSchema, createShareSetSchema, imageSizes, saveShareSchema, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
@@ -19,6 +19,7 @@ import {
   revokeShare,
   type ShareFlags,
 } from "./service.js";
+import { saveShare, shareStatus } from "./save.js";
 
 const body = async (c: Context<AppEnv>) => c.req.json().catch(() => ({}));
 const invalid = (msg: string) => new ApiError(400, "invalid_body", msg);
@@ -53,6 +54,25 @@ shareRoutes
     return created(c, await createSetShare(c.get("db"), c.get("householdId"), c.get("user"), parsed.data));
   })
   .get("/shares", async (c) => c.json({ items: await listAllShares(c.get("db"), c.get("householdId")) }))
+  // A link someone else sent: what the viewer already has, and saving copies into their household.
+  .get("/shares/received/:token", async (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json(await shareStatus(c.get("db"), c.get("householdId"), c.req.param("token"), await shareFlags(c)));
+  })
+  .post("/shares/received/:token/save", async (c) => {
+    const parsed = saveShareSchema.safeParse(await body(c));
+    if (!parsed.success) throw invalid("slugs must list 1 to 10 recipes of the link");
+    const f = await c.get("flags").getFeatures();
+    const result = await saveShare(
+      c.get("db"),
+      c.get("platform").images,
+      { householdId: c.get("householdId"), userId: c.get("user").id },
+      c.req.param("token"),
+      parsed.data,
+      { ...(await shareFlags(c)), foods: f["foods-units"].enabled },
+    );
+    return c.json(result, 201);
+  })
   .delete("/shares/:id", async (c) => {
     await revokeShare(c.get("db"), c.get("householdId"), c.req.param("id"));
     return c.body(null, 204);

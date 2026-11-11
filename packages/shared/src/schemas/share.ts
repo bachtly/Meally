@@ -87,3 +87,27 @@ export interface PublicShare {
   /** Set and cookbook links; for a recipe link, the one recipe. */
   items: PublicShareItem[];
 }
+
+/** Recipes saved per request; the web app saves a larger set in batches and shows progress. */
+export const SHARE_SAVE_BATCH = 10;
+
+export const saveShareSchema = z.object({
+  /** Slugs as the link lists them (`PublicShareItem.slug`). */
+  slugs: z.array(z.string().min(1)).min(1).max(SHARE_SAVE_BATCH),
+  /** Also put the copies in a cookbook: a new hand-picked one by name, or one already made by an earlier batch. */
+  cookbook: z.union([z.object({ name: z.string().trim().min(1).max(100) }), z.object({ slug: z.string().min(1) })]).optional(),
+});
+export type SaveShare = z.infer<typeof saveShareSchema>;
+
+/** What the signed-in viewer already has from a link. `saved` maps the link's slug to the viewer's own copy. */
+export interface ShareStatus {
+  /** The link belongs to the viewer's household: nothing to save, open the recipes directly. */
+  sameHousehold: boolean;
+  saved: Record<string, string>;
+}
+
+export interface SaveShareResult {
+  /** Link slug → the viewer's new (or existing) recipe slug. */
+  saved: Record<string, string>;
+  cookbookSlug: string | null;
+}

@@ -161,7 +161,7 @@ export async function findActive(db: Db, token: string, now = new Date()) {
  * The recipe ids a link shows, in order, all from the link's household; null when its target is gone or turned off.
  * A cookbook link is live: a smart cookbook re-runs its filter as the sharer (their favourites and ratings).
  */
-async function linkRecipeIds(db: Db, link: Link, flags: ShareFlags): Promise<string[] | null> {
+export async function linkRecipeIds(db: Db, link: Link, flags: ShareFlags): Promise<string[] | null> {
   if (link.kind === "recipe") return link.recipeId ? [link.recipeId] : null;
   if (link.kind === "set") {
     const rows = await db

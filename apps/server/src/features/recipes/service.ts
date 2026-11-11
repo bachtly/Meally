@@ -125,6 +125,7 @@ async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Reci
     imageUrl: imageUrl(row.imageId, 800),
     ingredients: ings.map(({ position, section, quantity, unit, food, note, raw }) => ({ position, section, quantity, unit, food, note, raw })),
     steps: steps.map(({ position, section, text }) => ({ position, section, text })),
+    savedFrom: row.savedAt ? { name: row.savedFromName, at: row.savedAt.getTime() } : null,
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
     ...extra,

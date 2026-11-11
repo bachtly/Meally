@@ -108,6 +108,8 @@ export const recipeSchema = recipeInputSchema.extend({
   /** Present only when the `ratings` flag is on. */
   me: z.object({ favourite: z.boolean(), rating: z.number().int().min(1).max(5).nullable() }).optional(),
   householdRating: z.object({ average: z.number().nullable(), count: z.number().int() }).optional(),
+  /** Set when the recipe was saved from a share link: who shared it (null when they hid their name) and when. */
+  savedFrom: z.object({ name: z.string().nullable(), at: z.number() }).nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
