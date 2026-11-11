@@ -26,6 +26,20 @@ export function sharedUrl(params: URLSearchParams): string {
   return params.get("text")?.match(/https?:\/\/\S+/)?.[0] ?? "";
 }
 
+/**
+ * A Meally share link from this server (`/s/:token` or `/s/:token/:slug`), as an in-app path; null for anything else.
+ * Pasting or sharing one into the app opens it in the app instead of importing the page.
+ */
+export function ownSharePath(raw: string, origin = typeof location !== "undefined" ? location.origin : ""): string | null {
+  try {
+    const u = new URL(raw.trim());
+    if (u.origin !== origin) return null;
+    return /^\/s\/[^/]+(\/[^/]+)?\/?$/.test(u.pathname) ? u.pathname.replace(/\/$/, "") : null;
+  } catch {
+    return null;
+  }
+}
+
 export function importErrorMessage(e: unknown): {
   text: string;
   manual?: boolean;
@@ -114,6 +128,11 @@ function LinkImport({ embedded = false }: { embedded?: boolean }) {
 
   const run = (u = url) => {
     const v = u.trim();
+    const own = ownSharePath(v);
+    if (own) {
+      navigate(own);
+      return;
+    }
     if (!v || preview.isPending) return;
     save.reset();
     preview.mutate(v);
@@ -122,7 +141,9 @@ function LinkImport({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     if (initialUrl && !started.current) {
       started.current = true;
-      preview.mutate(initialUrl);
+      const own = ownSharePath(initialUrl);
+      if (own) navigate(own, { replace: true });
+      else preview.mutate(initialUrl);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

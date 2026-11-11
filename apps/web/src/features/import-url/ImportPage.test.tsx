@@ -12,7 +12,7 @@ import * as matchers from "vitest-axe/matchers";
 import { afterEach, expect, it, vi } from "vitest";
 import { FeaturesProvider } from "../features/FeaturesProvider";
 import { appRoutes } from "../../app/App";
-import { sharedUrl } from "./ImportPage";
+import { ownSharePath, sharedUrl } from "./ImportPage";
 
 expect.extend(matchers);
 
@@ -171,4 +171,20 @@ it("reads a shared url from text", () => {
   expect(
     sharedUrl(new URLSearchParams({ text: "Look https://a.com/x yum" })),
   ).toBe("https://a.com/x");
+});
+
+it("recognises this server's own share links, and nothing else", () => {
+  const o = "https://meally.example";
+  expect(ownSharePath(`${o}/s/tok`, o)).toBe("/s/tok");
+  expect(ownSharePath(` ${o}/s/tok/lemon-cake/ `, o)).toBe("/s/tok/lemon-cake");
+  expect(ownSharePath(`${o}/s/tok?x=1`, o)).toBe("/s/tok");
+  expect(ownSharePath("https://other.example/s/tok", o)).toBeNull();
+  expect(ownSharePath(`${o}/recipes/x`, o)).toBeNull();
+  expect(ownSharePath("not a url", o)).toBeNull();
+});
+
+it("a share link sent to the app (share target or paste) opens the share view instead of importing", async () => {
+  renderAt(`/recipes/import?url=${encodeURIComponent(`${location.origin}/s/tok`)}`);
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/s/tok"));
+  expect(calls).toEqual([]);
 });

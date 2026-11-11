@@ -1,12 +1,13 @@
-import { ArrowLeft, Check, Clock, Quote } from "lucide-react";
+import { ArrowLeft, Check, Clock, Copy, Quote, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, Outlet, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import type { PublicShare, PublicShareItem } from "@meally/shared";
 import { AppShell } from "../../app/AppShell";
 import { ApiRequestError } from "../../lib/api";
 import { Badge, Brand, Button, Dialog, EmptyState, Skeleton, useToast } from "../../ui";
 import { useAuthStatus, useSession } from "../auth/useSession";
 import { useFeature } from "../features/FeaturesProvider";
+import { usePwa } from "../../pwa/Pwa";
 import { GRID } from "../recipes/RecipeLibrary";
 import { formatMinutes } from "../recipes/format";
 import { RecipeThumb } from "../recipes/RecipeThumb";
@@ -39,9 +40,43 @@ export function ShareLayout() {
       </header>
       <main className="mx-auto max-w-4xl px-4 py-4">
         <Outlet />
+        <OpenInAppHint />
       </main>
       <footer className="mx-auto max-w-4xl px-4 pb-8 text-center text-sm text-muted">Shared with Meally</footer>
     </div>
+  );
+}
+
+/**
+ * iPhone and iPad open links from Messages in Safari, never in the Home Screen app, and the two don't share a sign-in
+ * (WebKit keeps them separate). So an existing user copies the link and pastes it in the app's Import page.
+ */
+function OpenInAppHint() {
+  const { isIos } = usePwa();
+  const importOn = useFeature("import-url");
+  const toast = useToast();
+  const { pathname } = useLocation();
+  if (!isIos || !importOn) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${pathname}`);
+      toast("Link copied. Open Meally and paste it under Import.", "success");
+    } catch {
+      toast("Could not copy; copy the address from Safari instead", "danger");
+    }
+  };
+  return (
+    <aside aria-label="Open in the Meally app" className="print:hidden mt-8 flex items-start gap-3 rounded-lg border border-line bg-raised p-4">
+      <Smartphone className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">Already have Meally on your home screen?</p>
+        <p className="text-sm text-muted">Copy this link, open Meally, then paste it on the Import page. It opens there, already signed in.</p>
+        <Button variant="secondary" size="sm" className="self-start" onClick={() => void copy()}>
+          <Copy className="size-4" aria-hidden />
+          Copy link
+        </Button>
+      </div>
+    </aside>
   );
 }
 

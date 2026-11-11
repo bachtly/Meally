@@ -47,7 +47,7 @@ following [the template](features/_template.md).
 | 39 | feat(server): share sets and cookbooks, sharer name and note | F16, F14 | Done (#63) |
 | 40 | feat(server): save a share into my household (copy, images, provenance, dedupe, bulk job) | F16 | Done (#67) |
 | 41 | feat(web): library select mode, share many, share a cookbook, Shared links page | F16, F14 | Done (#69) |
-| 42 | feat(web): share view for sets and cookbooks, in-shell when signed in, Save and Save all | F16 | This PR |
-| 43 | feat(web): newcomer path (sign-up with share intent, auto-save, install card after save) | F16, F24 | This PR |
-| 44 | feat(web): import page accepts our own share links; "already have the app" hint on iOS ("Shared by" shipped in 43) | F16 | Planned |
+| 42 | feat(web): share view for sets and cookbooks, in-shell when signed in, Save and Save all | F16 | Done (#70) |
+| 43 | feat(web): newcomer path (sign-up with share intent, auto-save, install card after save) | F16, F24 | Done (#70) |
+| 44 | feat(web): import page accepts our own share links; "already have the app" hint on iOS ("Shared by" shipped in 43) | F16 | This PR |
 | 45 | feat(deploy): link previews and JSON-LD for `/s/*`; `launch_handler` | F16, F24 | Planned |
