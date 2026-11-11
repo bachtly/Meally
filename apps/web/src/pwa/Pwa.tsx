@@ -1,8 +1,9 @@
 import { Download, WifiOff } from "lucide-react";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFeature, useFeaturesState } from "../features/features/FeaturesProvider";
 import { Button } from "../ui";
 import { syncServiceWorker } from "./register";
+import { createUpdateScheduler, type UpdateScheduler } from "./updates";
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -40,12 +41,24 @@ export function PwaProvider({ children }: { children: ReactNode }) {
   const [apply, setApply] = useState<(() => void) | null>(null);
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
+  const scheduler = useRef<UpdateScheduler | null>(null);
+  const pendingApply = useRef<() => void>(() => {});
+
+  // Updates apply on their own while the app is hidden or just opened; the toast is only a fallback (updates.ts).
+  useEffect(() => {
+    const s = createUpdateScheduler({ doc: document, win: window, onFallback: () => setApply(() => pendingApply.current) });
+    scheduler.current = s;
+    return () => s.dispose();
+  }, []);
 
   useEffect(() => {
     if (!features) return; // flags unknown (loading or offline): leave any existing SW alone
     void syncServiceWorker(enabled, {
       sw: typeof navigator !== "undefined" ? navigator.serviceWorker : undefined,
-      onUpdate: (fn) => setApply(() => fn),
+      onUpdate: (fn, atStart) => {
+        pendingApply.current = fn;
+        scheduler.current?.offer(fn, atStart);
+      },
     }).catch(() => undefined);
   }, [enabled, features]);
 

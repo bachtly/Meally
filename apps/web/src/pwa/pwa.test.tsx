@@ -39,8 +39,22 @@ describe("syncServiceWorker", () => {
     const onUpdate = vi.fn();
     await syncServiceWorker(true, { sw, onUpdate });
     expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate.mock.calls[0]![1]).toBe(true); // already waiting at start
     onUpdate.mock.calls[0]![0]();
     expect(worker.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+  });
+  it("checks for a new version when the app comes back to the front", async () => {
+    const { sw, reg } = fakeSw();
+    const update = vi.fn().mockResolvedValue(undefined);
+    Object.assign(reg, { update });
+    const doc = new EventTarget() as EventTarget & { visibilityState: string };
+    doc.visibilityState = "hidden";
+    await syncServiceWorker(true, { sw, onUpdate: vi.fn(), doc: doc as unknown as Document });
+    doc.dispatchEvent(new Event("visibilitychange"));
+    expect(update).not.toHaveBeenCalled();
+    doc.visibilityState = "visible";
+    doc.dispatchEvent(new Event("visibilitychange"));
+    expect(update).toHaveBeenCalledTimes(1);
   });
   it("does not call a first install an update", async () => {
     const { sw, reg } = fakeSw({ controller: null });

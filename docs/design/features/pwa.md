@@ -13,6 +13,7 @@ Meally can be installed to the home screen (manifest, icons, shortcuts for New r
 | D3 | The SW never touches auth, admin, shopping SSE, public share JSON or any non-GET. Matchers are exact-path regexes, not prefixes, and the navigate fallback denies `/api/` | Cache all GETs | Auth/admin responses are per-user and sensitive; SSE streams are long-lived and must not be buffered or replayed; writes must reach the server. Caches are also deleted on sign-out so a shared device keeps nothing. |
 | D4 | Flag is read at runtime from `/features`: on registers `/sw.js`, off unregisters every registration. Unknown flags (loading or offline) leave the SW alone | Build-time flag | The admin can flip it without a rebuild. |
 | D5 | Offline cold start: `RequireAuth` renders its children when `/auth/me` fails with a network error while `navigator.onLine` is false, instead of redirecting to sign-in. `/auth/me` itself stays uncached | Cache the session | Keeps D3 intact; cached API data is still only returned for already-viewed recipes. |
+| D7 | Updates apply in the background (2026-11-11): a waiting version activates (`SKIP_WAITING`, then reload on `controllerchange`) when the page turns hidden, or at start if the user hasn't touched the page yet. The recipe editor with unsaved changes and cook mode hold updates off (`useHoldUpdates`). The app checks for a new `sw.js` each time it becomes visible. The toast is only a fallback after 30 minutes on screen (`apps/web/src/pwa/updates.ts`) | Toast only (the old flow); `autoUpdate` with `skipWaiting` and `clientsClaim` | With a toast, users who ignore it stay on the old version until every window closes, which on iOS can be days [S3]. Forcing control mid-session swaps the worker under a running page and reloads while the user is mid-task [S4]. Reloading while hidden is invisible, and #52 makes the reload cheap (stored session, cached images). |
 | D6 | iOS: no `beforeinstallprompt`, so show "Share, then Add to Home Screen" text on iOS Safari | Hide the item | [S1] |
 
 "Available offline" badge is deferred.
@@ -30,9 +31,11 @@ None. Server change: `sw.js`, `manifest.webmanifest` and `registerSW.js` get `Ca
 
 ## UI
 
-`OfflineBanner` under the header (role=status), `UpdateToast` (fixed, persistent until Reload), `InstallItem` on More (native prompt or iOS text; hidden when installed or flag off). Flag off: no registration, SW unregistered, nothing rendered.
+`OfflineBanner` under the header (role=status), `UpdateToast` (fixed, persistent until Reload; only after an update has waited 30 minutes on screen, see D7), `InstallItem` on More (native prompt or iOS text; hidden when installed or flag off). Flag off: no registration, SW unregistered, nothing rendered.
 
 ## Sources
 
 - [S1] PWA iOS Limitations and Safari Support, https://www.magicbell.com/blog/pwa-ios-limitations-safari-support-complete-guide
 - [S2] Safari iOS PWA Data Persistence Beyond 7 Days, https://developer.apple.com/forums/thread/710157
+- [S3] The service worker lifecycle (waiting until all clients close), https://web.dev/articles/service-worker-lifecycle
+- [S4] Handling service worker updates with immediacy, https://developer.chrome.com/docs/workbox/handling-service-worker-updates
