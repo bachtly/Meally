@@ -7,6 +7,7 @@ import { ApiRequestError, postJson } from "../../lib/api";
 import { RecipeEditor } from "../recipes/RecipeEditor";
 import { useFeature } from "../features/FeaturesProvider";
 import { AiImport } from "./AiImport";
+import { importSource, type ImportSource } from "./importOptions";
 import { Button, Card, Field, Input, Tabs, TabsContent, TabsList, TabsTrigger, useToast } from "../../ui";
 
 interface Preview {
@@ -53,11 +54,22 @@ const bookmarklet = () =>
 
 export function RecipeImportPage() {
   const ai = useFeature("ai");
+  const [params, setParams] = useSearchParams();
   if (!ai) return <LinkImport />;
+  const tab = importSource(params);
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <h1 className="text-2xl font-semibold">Import a recipe</h1>
-      <Tabs defaultValue="link" className="flex flex-col gap-4">
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(params);
+          if (v === "link") next.delete("from");
+          else next.set("from", v as ImportSource);
+          setParams(next, { replace: true });
+        }}
+        className="flex flex-col gap-4"
+      >
         <TabsList>
           <TabsTrigger value="link">From a link</TabsTrigger>
           <TabsTrigger value="text">From text</TabsTrigger>
@@ -132,7 +144,7 @@ function LinkImport({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      {!embedded && <h1 className="text-2xl font-semibold">Import from URL</h1>}
+      {!embedded && <h1 className="text-2xl font-semibold">Import from a link</h1>}
       <form
         noValidate
         className="flex flex-col gap-3"
