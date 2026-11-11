@@ -136,12 +136,12 @@ receiver's household prefix.
 
 Each feature PR adds or updates `docs/design/features/share-links.md` with its decisions.
 
-## 7. Open questions for the product owner
+## 7. Product decisions (2026-11-11)
 
-1. **"Show my name" default** — on (proposed, matches the feedback) or off (stricter privacy)?
-2. **Invite-only instances** — should a share link let a newcomer sign up (like an invite), or stay "ask the owner"?
-   Proposed: no; sign-up mode wins.
-3. **Set links** — live (proposed, D2) or frozen at share time?
+1. **"Show my name" is on by default** (D4). The sharer can turn it off per link.
+2. **Share links don't open sign-up on invite-only or closed instances** (D7). Sign-up mode wins.
+3. **Set links show current versions** (D2). The receiver clones a recipe when they save it (D3); after that their
+   copy is their own.
 
 ## 8. Sources
 
