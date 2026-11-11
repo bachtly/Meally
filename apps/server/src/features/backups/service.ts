@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Db } from "../../db/index.js";
 import { appliedMigrations, dumperFor } from "../../db/index.js";
 import { ApiError } from "../../lib/errors.js";
-import { writeZipFile } from "./zipwriter.js";
+import { addDir, addFile, writeZipFile } from "./zipfile.js";
 
 export const MANIFEST_FORMAT = 1;
 export interface Manifest {
@@ -28,16 +28,8 @@ export function backupFile(dataDir: string, name: string): string {
   return path.join(backupDir(dataDir), name);
 }
 
-export interface BackupSettings {
-  hours: number;
-  keep: number;
-}
-/** Read-only schedule from the environment. 0 hours means scheduled backups are off. */
-export function backupSettings(env: Record<string, string | undefined>): BackupSettings {
-  const h = Number(env.MEALLY_BACKUP_CRON_HOURS ?? 24);
-  const k = Number(env.MEALLY_BACKUP_KEEP ?? 7);
-  return { hours: Number.isFinite(h) && h > 0 ? h : 0, keep: Number.isInteger(k) && k >= 1 ? k : 7 };
-}
+import { backupSettings, type BackupSettings } from "./settings.js";
+export { backupSettings, type BackupSettings };
 
 export interface BackupInfo {
   name: string;
@@ -101,8 +93,8 @@ export async function createBackup(db: Db, dataDir: string, version: string, kee
     const partial = `${final}.partial`;
     await writeZipFile(partial, async (z) => {
       z.addBuffer("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2)));
-      await z.addFile("pgdata.tar.gz", snapshot);
-      await z.addDir("images", path.join(dataDir, "images"));
+      await addFile(z, "pgdata.tar.gz", snapshot);
+      await addDir(z, "images", path.join(dataDir, "images"));
     });
     await fs.promises.rename(partial, final);
     await pruneBackups(dataDir, keep);

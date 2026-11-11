@@ -2,29 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { sql, type AnyColumn, type SQL } from "drizzle-orm";
-import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { countAppliedMigrations, isPostgresUrl, registerDumper, type DbHandle, type Db } from "./core.js";
 import * as schema from "./schema/index.js";
 
-/** The one Drizzle type every query module uses; both drivers satisfy it. */
-export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
-
-export interface DbHandle {
-  db: Db;
-  /** Resolves once migrations are applied. */
-  ready: Promise<void>;
-  kind: "pglite" | "postgres";
-  /** Present for the embedded PGlite driver; backups use it to snapshot the data directory. */
-  pglite?: PGlite;
-  close(): Promise<void>;
-}
-
-export const isPostgresUrl = (s: string) => /^postgres(ql)?:\/\//i.test(s);
+export * from "./core.js";
+export type { Db, DbHandle } from "./core.js";
 
 /**
  * Where the database lives: DATABASE_URL (external Postgres) wins, otherwise PGlite persisted
@@ -60,28 +47,11 @@ export function openDb(target: string): DbHandle {
   return { db: db as unknown as Db, ready, kind: "pglite", pglite, close: () => pglite.close() };
 }
 
-const dumpers = new WeakMap<object, () => Promise<Uint8Array>>();
-
-/** Lets backups snapshot an embedded database; external Postgres has no in-process dump (use pg_dump). */
-export function registerDumper(db: object, fn: () => Promise<Uint8Array>) {
-  dumpers.set(db, fn);
-}
-export const dumperFor = (db: object) => dumpers.get(db) ?? null;
-
 /** Opens the database and waits until it is migrated and ready. */
 export async function createDb(target: string) {
   const opened = openDb(target);
   await opened.ready;
   return opened;
-}
-
-/** Rows of a raw `db.execute()` result, whichever driver ran it. */
-export function rowsOf<T = Record<string, unknown>>(res: unknown): T[] {
-  return (Array.isArray(res) ? res : (res as { rows: T[] }).rows) as T[];
-}
-
-export async function queryRows<T = Record<string, unknown>>(db: Db, q: SQL): Promise<T[]> {
-  return rowsOf<T>(await db.execute(q));
 }
 
 // tsx: src/db/migrations. Bundle: dist/migrations (copied by tsup onSuccess).
@@ -97,11 +67,7 @@ export function migrationCount(): number {
   return journal.entries.length;
 }
 
-/** Number of migrations applied to this database. */
+/** Number of migrations applied to this database (falls back to the bundled count). */
 export async function appliedMigrations(db: Db): Promise<number> {
-  const r = await queryRows<{ n: number | string }>(db, sql`SELECT count(*) AS n FROM drizzle.__drizzle_migrations`).catch(() => null);
-  return r ? Number(r[0]?.n ?? 0) : migrationCount();
+  return (await countAppliedMigrations(db)) ?? migrationCount();
 }
-
-/** Epoch milliseconds of a timestamp column, as a number, so keyset cursors can carry it. */
-export const ms = (col: SQL | AnyColumn) => sql<number>`(extract(epoch from ${col}) * 1000)::double precision`;

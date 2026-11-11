@@ -1,6 +1,6 @@
 import type { Db } from "../../db/index.js";
 import type { Events } from "../../ports/index.js";
-import { NodeEvents } from "../../adapters/node/events.js";
+import { MemoryEvents } from "../../adapters/memory-events.js";
 
 export interface ShoppingEvent {
   type: "items" | "list" | "deleted";
@@ -12,7 +12,7 @@ export const shoppingChannel = (householdId: string, listId: string) => `shoppin
 
 /** Typed view over the Events port for shopping lists. */
 export class ShoppingBus {
-  constructor(private events: Events = new NodeEvents()) {}
+  constructor(private events: Events = new MemoryEvents()) {}
 
   subscribe(householdId: string, listId: string, fn: (e: ShoppingEvent) => void): () => void {
     return this.events.subscribe(shoppingChannel(householdId, listId), (e) => fn(e as ShoppingEvent));
@@ -24,7 +24,7 @@ export class ShoppingBus {
 
   /** Only meaningful for the in-process adapter; used by tests. */
   listenerCount(householdId: string, listId: string) {
-    return (this.events as Partial<NodeEvents>).listenerCount?.(shoppingChannel(householdId, listId)) ?? 0;
+    return (this.events as Partial<MemoryEvents>).listenerCount?.(shoppingChannel(householdId, listId)) ?? 0;
   }
 }
 

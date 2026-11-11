@@ -133,9 +133,9 @@ describe("export", () => {
     expect(bread.steps[0].section).toBe("Dough");
   });
 
-  it("is hidden when the flag is off", async () => {
+  it("stays available when the backups flag is off; only instance backups are hidden", async () => {
     const t = await mk({ MEALLY_FEATURE_BACKUPS: "off" });
-    expect((await t.req(t.A, "/export/recipes")).status).toBe(404);
+    expect((await t.req(t.A, "/export/recipes")).status).toBe(200);
     expect((await t.req(t.A, "/admin/backups")).status).toBe(404);
   });
 });

@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
-    "lint": "oxlint",
+    "lint": "oxlint --ignore-pattern dist-edge",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build -w apps/web && npm run build -w apps/server",

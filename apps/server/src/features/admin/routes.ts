@@ -1,15 +1,13 @@
-import fs from "node:fs";
-import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { and, count, eq, ne, or, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { FEATURES, featureEnvVar, isFeatureKey, signupModes, userRoles, z } from "@meally/shared";
-import { version } from "../../app.js";
-import { appliedMigrations } from "../../db/index.js";
+import { version } from "../../app-core.js";
+import { countAppliedMigrations } from "../../db/core.js";
 import { households, instanceSettings, recipes, sessions, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
-import { backupSettings } from "../backups/service.js";
+import { backupSettings } from "../backups/settings.js";
 import { requireAdmin, requireAuth } from "../auth/middleware.js";
 import { resolveSignupMode, SIGNUP_KEY } from "../auth/routes.js";
 import { SESSION_TTL_MS } from "../auth/sessions.js";
@@ -168,32 +166,22 @@ adminRoutes.post("/users/:id/reset-password", async (c) => {
 
 // ---- info ----
 
-async function dirSize(dir: string): Promise<number> {
-  let total = 0;
-  const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => []);
-  for (const e of entries) {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) total += await dirSize(p);
-    else if (e.isFile()) total += (await fs.promises.stat(p).catch(() => null))?.size ?? 0;
-  }
-  return total;
-}
-
 adminRoutes.get("/info", async (c) => {
   const db = c.get("db");
   const dataDir = c.get("dataDir");
   const n = async (t: typeof users | typeof households | typeof recipes) => (await db.select({ n: count() }).from(t))[0]?.n ?? 0;
-  const mig = await appliedMigrations(db);
-  const dbBytes = await dirSize(path.join(dataDir, "pgdata"));
+  const mig = (await countAppliedMigrations(db)) ?? 0;
+  const platform = c.get("platform");
+  const host = (await platform.info?.(dataDir)) ?? { runtime: platform.name, uptimeSeconds: 0, dbBytes: 0, imagesBytes: 0, dataDir: "" };
   return c.json({
     version,
-    nodeVersion: process.version,
-    uptimeSeconds: Math.round(process.uptime()),
-    dbBytes,
-    imagesBytes: await dirSize(path.join(dataDir, "images")),
+    nodeVersion: host.runtime,
+    uptimeSeconds: host.uptimeSeconds,
+    dbBytes: host.dbBytes,
+    imagesBytes: host.imagesBytes,
     counts: { users: await n(users), households: await n(households), recipes: await n(recipes) },
     migrations: mig,
-    dataDir: path.resolve(dataDir),
+    dataDir: host.dataDir,
     backupSchedule: backupSettings(c.get("env")),
   });
 });

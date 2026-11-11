@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shared";
-import { ms, type Db } from "../../db/index.js";
+import { ms, type Db } from "../../db/core.js";
 import { images, recipes, recipeUserData, timelineEvents, users } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";

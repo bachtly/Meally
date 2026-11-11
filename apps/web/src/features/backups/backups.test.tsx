@@ -48,8 +48,9 @@ it("shows the backups list and schedule to admins", async () => {
   expect(screen.getAllByRole("link", { name: "Download" })[0]).toHaveAttribute("href", "/api/v1/admin/backups/meally-20261111T120000000Z.zip");
 });
 
-it("hides the section when the flag is off", async () => {
+it("keeps the household export but hides instance backups when the flag is off", async () => {
   setup("admin", false);
-  expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-  expect(screen.queryByText("Export & backups")).not.toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Download my household's recipes" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Export" })).toBeInTheDocument();
+  expect(screen.queryByText("Instance backups")).not.toBeInTheDocument();
 });

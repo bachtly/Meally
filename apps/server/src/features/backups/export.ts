@@ -1,10 +1,9 @@
-import fs from "node:fs";
 import { asc, eq } from "drizzle-orm";
 import { isNutritionEmpty, type Recipe } from "@meally/shared";
 import type { Db } from "../../db/index.js";
 import { recipes } from "../../db/schema/index.js";
 import { findRow, getRecipe } from "../recipes/service.js";
-import { imagePath } from "../../adapters/node/images.js";
+import type { ImageStore } from "../../ports/index.js";
 import type { ZipWriter } from "./zipwriter.js";
 
 export const exportFormats = ["jsonld", "markdown"] as const;
@@ -119,13 +118,14 @@ export function toMarkdown(r: Recipe, imageFile: string | null): string {
 }
 
 /** Adds one recipe (and its image) to the zip. Names are unique because slugs are unique per household. */
-async function addRecipe(z: ZipWriter, dataDir: string, householdId: string, r: Recipe, imageId: string | null, format: ExportFormat) {
+async function addRecipe(z: ZipWriter, images: ImageStore, householdId: string, r: Recipe, imageId: string | null, format: ExportFormat) {
   let imageFile: string | null = null;
   if (imageId) {
-    const src = imagePath(dataDir, householdId, imageId, 1600);
-    if (fs.existsSync(src)) {
+    // A store that cannot serve the image (missing file, edge placeholder) just leaves it out of the export.
+    const img = await images.get(householdId, imageId, 1600).catch(() => null);
+    if (img) {
       imageFile = `images/${r.slug}.webp`;
-      await z.addFile(imageFile, src, true);
+      z.addBuffer(imageFile, img.bytes, true);
     }
   }
   if (format === "jsonld") z.addBuffer(`recipes/${r.slug}.json`, Buffer.from(JSON.stringify(toJsonLd(r, imageFile), null, 2)));
@@ -133,7 +133,7 @@ async function addRecipe(z: ZipWriter, dataDir: string, householdId: string, r: 
 }
 
 export interface ExportOpts {
-  dataDir: string;
+  images: ImageStore;
   householdId: string;
   org: boolean;
   nutrition?: boolean;
@@ -147,12 +147,12 @@ export async function exportHousehold(db: Db, z: ZipWriter, o: ExportOpts, forma
     .orderBy(asc(recipes.slug));
   for (const row of rows) {
     const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
-    await addRecipe(z, o.dataDir, o.householdId, r, row.imageId, format);
+    await addRecipe(z, o.images, o.householdId, r, row.imageId, format);
   }
 }
 
 export async function exportOne(db: Db, z: ZipWriter, o: ExportOpts, slug: string, format: ExportFormat) {
   const row = await findRow(db, o.householdId, slug);
   const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
-  await addRecipe(z, o.dataDir, o.householdId, r, row.imageId, format);
+  await addRecipe(z, o.images, o.householdId, r, row.imageId, format);
 }

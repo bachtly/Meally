@@ -1,9 +1,6 @@
-import dns from "node:dns/promises";
-import http from "node:http";
-import https from "node:https";
-import net from "node:net";
+import { Buffer } from "node:buffer";
 import { ApiError } from "../../lib/errors.js";
-import { isBlockedIp } from "./ssrf.js";
+import { isBlockedIp, isIP } from "./ssrf.js";
 
 export const MAX_REDIRECTS = 5;
 export const TIMEOUT_MS = 10_000;
@@ -50,6 +47,7 @@ export type Transport = (req: TransportRequest) => Promise<TransportResponse>;
 export interface FetcherDeps {
   allowPrivate?: boolean;
   version?: string;
+  /** DNS lookup. When omitted, hostnames are vetted by name only (edge: no DNS API, no raw sockets). */
   resolve?: (host: string) => Promise<string[]>;
   transport?: Transport;
 }
@@ -57,35 +55,28 @@ export interface FetcherDeps {
 const blocked = (msg = "That address is not allowed") => new ApiError(400, "blocked_url", msg);
 const failed = (msg: string) => new ApiError(502, "fetch_failed", msg);
 
-const defaultResolve = async (host: string) => (await dns.lookup(host, { all: true, verbatim: true })).map((a) => a.address);
-
-/** Connects to the already-vetted IP, so a second DNS answer cannot redirect us (DNS rebinding). */
-const defaultTransport: Transport = ({ url, ip, headers, signal, method = "GET", body }) =>
-  new Promise((resolve, reject) => {
-    const mod = url.protocol === "https:" ? https : http;
-    const req = mod.request(
-      url,
-      {
-        method,
-        headers,
-        signal,
-        lookup: ((_h: string, o: { all?: boolean }, cb: (...a: unknown[]) => void) =>
-          o?.all ? cb(null, [{ address: ip, family: net.isIP(ip) }]) : cb(null, ip, net.isIP(ip))) as never,
-      },
-      (res) => {
-        const h: Record<string, string | undefined> = {};
-        for (const [k, v] of Object.entries(res.headers)) h[k] = Array.isArray(v) ? v[0] : v;
-        resolve({
-          status: res.statusCode ?? 0,
-          headers: h,
-          body: res as AsyncIterable<Buffer>,
-          destroy: () => res.destroy(),
-        });
-      },
-    );
-    req.on("error", reject);
-    req.end(body);
-  });
+/**
+ * Default transport for runtimes without raw sockets (edge): plain fetch. It cannot pin the vetted IP,
+ * so private ranges are only blocked by hostname there (see `vet`); the edge sandbox has no private network.
+ */
+const fetchTransport: Transport = async ({ url, headers, signal, method = "GET", body }) => {
+  const res = await fetch(url, { method, headers, signal, body, redirect: "manual" });
+  const h: Record<string, string | undefined> = {};
+  res.headers.forEach((v, k) => (h[k] = v));
+  const reader = res.body?.getReader();
+  return {
+    status: res.status,
+    headers: h,
+    body: (async function* () {
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        yield Buffer.from(value);
+      }
+    })(),
+    destroy: () => void res.body?.cancel().catch(() => {}),
+  };
+};
 
 export function checkUrlShape(raw: string, allowPrivate: boolean): URL {
   let url: URL;
@@ -103,15 +94,18 @@ export function checkUrlShape(raw: string, allowPrivate: boolean): URL {
 
 export function createFetcher(deps: FetcherDeps = {}): Fetcher {
   const allowPrivate = deps.allowPrivate ?? false;
-  const resolve = deps.resolve ?? defaultResolve;
-  const transport = deps.transport ?? defaultTransport;
+  const resolve = deps.resolve;
+  const transport = deps.transport ?? fetchTransport;
   const ua = `Meally/${deps.version ?? "0.0.0"} (+recipe import)`;
 
   async function vet(url: URL): Promise<string> {
     const host = url.hostname.replace(/^\[|\]$/g, "");
     let ips: string[];
-    if (net.isIP(host)) ips = [host];
-    else {
+    if (isIP(host)) ips = [host];
+    else if (!resolve) {
+      if (!allowPrivate && (!host.includes(".") || /(^|\.)(localhost|local|internal|lan|home|corp)$/i.test(host))) throw blocked();
+      return host;
+    } else {
       try {
         ips = await resolve(host);
       } catch {

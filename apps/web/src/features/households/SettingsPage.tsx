@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { ReactNode } from "react";
 import { Feature } from "../features/Feature";
+import { useFeature } from "../features/FeaturesProvider";
 import { useSession } from "../auth/useSession";
 import { ThemeToggle } from "../../ui";
 import { ExportBackupsSection } from "../backups/ExportBackupsSection";
@@ -21,6 +22,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export function SettingsPage() {
   const { user } = useSession();
+  const backups = useFeature("backups");
   return (
     <div className="flex max-w-2xl flex-col gap-8">
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -56,11 +58,10 @@ export function SettingsPage() {
           </Link>
         </Section>
       </Feature>
-      <Feature on="backups">
-        <Section title="Export & backups">
-          <ExportBackupsSection />
-        </Section>
-      </Feature>
+      {/* Export is core. Only instance backups are flagged (off on Postgres/Supabase). */}
+      <Section title={backups ? "Export & backups" : "Export"}>
+        <ExportBackupsSection />
+      </Section>
       <Feature on="api-tokens">
         <Section title="API tokens">
           <TokensSection />
