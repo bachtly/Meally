@@ -118,9 +118,9 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
     save.mutate(
       { input, image: photo },
       {
-        onSuccess: ({ recipe: saved, imageFailed }) => {
+        onSuccess: ({ recipe: saved, imageError }) => {
           allowLeave.current = true;
-          toast(imageFailed ? "Saved, but the photo could not be uploaded" : "Recipe saved", imageFailed ? "danger" : "success");
+          toast(imageError ? `Saved, but the photo could not be uploaded. ${imageError}` : "Recipe saved", imageError ? "danger" : "success");
           navigate(`/recipes/${saved.slug}`);
         },
         onError: (e) => {

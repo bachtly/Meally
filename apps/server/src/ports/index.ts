@@ -10,18 +10,27 @@ export interface StoredImage {
   contentType: string;
 }
 
+/** Formats a browser may send for pre-sized parts. Safari cannot encode WebP from a canvas, so it sends JPEG. */
+export type SizedImageType = "image/webp" | "image/jpeg";
+
+/** One ready-made size, with the format sniffed from its bytes (never the client's claim). */
+export interface SizedImage {
+  bytes: Uint8Array;
+  contentType: SizedImageType;
+}
+
 /**
  * Stores household images. `putOriginal` accepts an upload and does the processing (the Node
  * adapter resizes with sharp); `put` stores bytes that were already resized, which is what a
  * platform without sharp would call after resizing elsewhere.
  */
 export interface ImageStore {
-  /** True when clients should resize in the browser and upload ready-made WebP sizes (no sharp on this platform). */
+  /** True when clients should resize in the browser and upload ready-made sizes (no sharp on this platform). */
   readonly acceptsPresized: boolean;
   /** Processes an uploaded original into every size and returns the new image id. */
   putOriginal(householdId: string, original: Uint8Array): Promise<string>;
-  /** Stores a complete set of ready-made WebP sizes under a new image id and returns it. */
-  putSized(householdId: string, sizes: Record<ImageSize, Uint8Array>): Promise<string>;
+  /** Stores a complete set of ready-made sizes under a new image id and returns it. Partial sets are cleaned up. */
+  putSized(householdId: string, sizes: Record<ImageSize, SizedImage>): Promise<string>;
   put(householdId: string, imageId: string, size: ImageSize, bytes: Uint8Array, contentType: string): Promise<void>;
   get(householdId: string, imageId: string, size: ImageSize): Promise<StoredImage | null>;
   /** Removes every size of the image. Missing files are not an error. */

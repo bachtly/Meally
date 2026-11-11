@@ -124,7 +124,7 @@ async function addRecipe(z: ZipWriter, images: ImageStore, householdId: string, 
     // A store that cannot serve the image (missing file, edge placeholder) just leaves it out of the export.
     const img = await images.get(householdId, imageId, 1600).catch(() => null);
     if (img) {
-      imageFile = `images/${r.slug}.webp`;
+      imageFile = `images/${r.slug}.${img.contentType === "image/jpeg" ? "jpg" : "webp"}`;
       z.addBuffer(imageFile, img.bytes, true);
     }
   }
