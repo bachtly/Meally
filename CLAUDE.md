@@ -20,9 +20,9 @@ Read `docs/design/03-architecture.md` before writing code.
   each decision (1–3 sources) and cite them.
 - **Every non-core feature is behind its flag**: server routes use `requireFeature('<key>')`, and the web app uses
   `useFeature` / `<Feature>`. Register new flags only in `packages/shared/src/features.ts`.
-- **Tenant isolation:** every query filters by the session user's id (ADR 0002). Only the listed Friend read paths
-  (snaps, feed, linked recipes) may also allow an accepted Friendship. Add tests that another user, a non-friend, and a
-  pending or removed Friendship all get a 404. Writes and all other reads stay owner-only.
+- **Tenant isolation:** every query filters by the session user's id (ADR 0002). Only the listed Friend paths
+  (snaps, feed, linked recipe reads, Reactions, Save to my recipes) may also allow an accepted Friendship. Add tests that another user, a non-friend, and a
+  pending or removed Friendship all get a 404. All other reads and writes stay owner-only.
 
 ## Commands (from the repo root)
 

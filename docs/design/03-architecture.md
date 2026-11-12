@@ -132,6 +132,6 @@ import upload temp files stay Node-only. A test (`platform-guard.test.ts`) fails
 - Lists use cursor pagination: `?limit=&cursor=` returns `{ items, nextCursor }`.
 - Every row is owned by a user. Every query filters on the session user's id (tenant isolation, G3;
   [ADR 0002](2026-11-12-snap-loop/adr/0002-scope-queries-by-user-or-accepted-friendship.md)). Only the listed Friend
-  read paths (snaps, feed, linked recipes) also allow an accepted Friendship. A non-friend, or a pending or removed
-  Friendship, gets a 404.
+  paths (snaps, feed, linked recipe reads, Reactions, Save to my recipes) also allow an accepted Friendship. A non-friend, or a pending or removed
+  Friendship, gets a 404. All other reads and writes stay owner-only.
 - Request bodies are validated with zod schemas from `packages/shared`.
