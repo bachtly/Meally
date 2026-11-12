@@ -105,16 +105,40 @@ export async function acceptInvite(db: Db, userId: string, token: string): Promi
   const tokenHash = hashInviteToken(token);
   const [peek] = await db.select().from(friendshipInvites).where(eq(friendshipInvites.tokenHash, tokenHash)).limit(1);
   if (!peek) throw new ApiError(404, "not_found", "Invite not found");
-  return db.transaction(async (tx) => {
-    const ids = [peek.createdBy, userId].sort();
+  return db.transaction((tx) => redeemLocked(tx, userId, tokenHash, peek.createdBy, () => new ApiError(404, "not_found", "Invite not found")));
+}
+
+/**
+ * Sign-up with an invite: runs inside the registration transaction, after the new user row exists. A token that is
+ * no longer valid fails the whole sign-up with `invite_required`; a full Friend list fails it with `friend_cap`.
+ */
+export async function redeemForSignup(tx: Tx, userId: string, token: string): Promise<void> {
+  const tokenHash = hashInviteToken(token);
+  const gone = () => new ApiError(403, "invite_required", "An invitation is required to sign up");
+  const [peek] = await tx.select().from(friendshipInvites).where(eq(friendshipInvites.tokenHash, tokenHash)).limit(1);
+  if (!peek) throw gone();
+  await redeemLocked(tx, userId, tokenHash, peek.createdBy, gone);
+}
+
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+async function redeemLocked(
+  tx: Tx,
+  userId: string,
+  tokenHash: string,
+  inviterId: string,
+  invalid: () => ApiError,
+): Promise<{ friend: Friend; created: boolean }> {
+  {
+    const ids = [inviterId, userId].sort();
     await tx.select({ id: users.id }).from(users).where(inArray(users.id, ids)).orderBy(users.id).for("update");
     const [inv] = await tx.select().from(friendshipInvites).where(eq(friendshipInvites.tokenHash, tokenHash)).limit(1);
-    if (!inv) throw new ApiError(404, "not_found", "Invite not found");
+    if (!inv) throw invalid();
     if (inv.usedBy === userId) {
       const existing = await friendOf(tx, userId, inv.createdBy);
       if (existing) return { friend: existing, created: false };
     }
-    if (inv.usedAt || inv.expiresAt.getTime() <= Date.now()) throw new ApiError(404, "not_found", "Invite not found");
+    if (inv.usedAt || inv.expiresAt.getTime() <= Date.now()) throw invalid();
     if (inv.createdBy === userId) throw new ApiError(409, "own_invite", "That is your own invite link");
     if (await friendOf(tx, userId, inv.createdBy)) throw new ApiError(409, "already_friends", "You are already friends");
     const cap = await getFriendCap(tx);
@@ -128,7 +152,7 @@ export async function acceptInvite(db: Db, userId: string, token: string): Promi
     await tx.update(friendshipInvites).set({ usedAt: now, usedBy: userId }).where(eq(friendshipInvites.id, inv.id));
     const friend = await friendOf(tx, userId, inv.createdBy);
     return { friend: friend!, created: true };
-  });
+  }
 }
 
 export async function listFriends(db: Db, userId: string): Promise<{ items: Friend[]; cap: number }> {

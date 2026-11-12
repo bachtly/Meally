@@ -7,7 +7,7 @@ const H = { "content-type": "application/json", "x-requested-with": "meally" };
 
 async function mk(env: Record<string, string> = {}) {
   const o = openTestDb();
-  const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "invite", ...env }, scryptLogN: 10, dataDir: "./.nonexistent-friends-test" });
+  const app = createApp({ db: o.db, env: { MEALLY_SIGNUP_MODE: "open", ...env }, scryptLogN: 10, dataDir: "./.nonexistent-friends-test" });
   await o.ready;
   const post = (path: string, cookie: string | undefined, body?: unknown, method = "POST") =>
     app.request(`/api/v1${path}`, { method, headers: { ...H, ...(cookie ? { cookie } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -171,15 +171,60 @@ describe("friends", () => {
 });
 
 describe("invite as a sign-up permit", () => {
-  it("lets one register in invite mode, not without a valid token, and not in closed mode", async () => {
-    const t = await mk();
+  const inviteMode = { MEALLY_SIGNUP_MODE: "invite" };
+  it("lets one register in invite mode only with a valid token, and makes them a Friend", async () => {
+    const t = await mk(inviteMode);
     const reg = (inviteToken?: string, email = "x@example.com") =>
       t.post("/auth/register", undefined, { email, name: "X", password: "correct horse", inviteToken });
     expect((await reg()).status).toBe(403);
     expect((await reg("bogus")).status).toBe(403);
     const inv = (await t.call(t.A, "POST", "/friends/invites")).body;
-    expect((await reg(inv.token)).status).toBe(201);
-    // Registering does not use the invite up: the new user still accepts it.
+    const ok = await reg(inv.token);
+    expect(ok.status).toBe(201);
+    const X = t.cookieOf(ok);
+    expect((await t.call(t.A, "GET", "/friends")).body.items.map((f: any) => f.name)).toEqual(["X"]);
+    expect((await t.call(X, "GET", "/friends")).body.items.map((f: any) => f.name)).toEqual(["Ann"]);
+    expect((await t.call(t.A, "GET", "/friends/invites")).body.items[0].usedAt).toEqual(expect.any(Number));
+    // Opening the link again as the same user is a safe retry.
+    expect((await t.call(X, "POST", `/friends/invites/${inv.token}/accept`)).status).toBe(200);
+  });
+
+  it("a used token cannot permit a second sign-up", async () => {
+    const t = await mk(inviteMode);
+    const inv = (await t.call(t.A, "POST", "/friends/invites")).body;
+    const reg = (email: string) =>
+      t.post("/auth/register", undefined, { email, name: "X", password: "correct horse", inviteToken: inv.token });
+    expect((await reg("x@example.com")).status).toBe(201);
+    const second = await reg("y@example.com");
+    expect(second.status).toBe(403);
+    expect(((await second.json()) as any).error).toBe("invite_required");
+    // The second account was not created.
+    expect((await t.post("/auth/login", undefined, { email: "y@example.com", password: "correct horse" })).status).toBe(401);
+  });
+
+  it("is refused once the invite is revoked", async () => {
+    const t = await mk(inviteMode);
+    const inv = (await t.call(t.A, "POST", "/friends/invites")).body;
+    await t.call(t.A, "DELETE", `/friends/invites/${inv.id}`);
+    const r = await t.post("/auth/register", undefined, { email: "c@example.com", name: "C", password: "correct horse", inviteToken: inv.token });
+    expect(r.status).toBe(403);
+  });
+
+  it("rolls back the account when the inviter is at the Friend cap", async () => {
+    const t = await mk(inviteMode);
+    const one = (await t.call(t.A, "POST", "/friends/invites")).body;
+    const two = (await t.call(t.A, "POST", "/friends/invites")).body;
+    const reg = (email: string, inviteToken: string) =>
+      t.post("/auth/register", undefined, { email, name: "X", password: "correct horse", inviteToken });
+    expect((await reg("x@example.com", one.token)).status).toBe(201);
+    await t.call(t.A, "PUT", "/admin/settings", { friendCap: 1 });
+    const r = await reg("y@example.com", two.token);
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as any).error).toBe("friend_cap");
+    expect((await t.post("/auth/login", undefined, { email: "y@example.com", password: "correct horse" })).status).toBe(401);
+    // The invite was not used up, so it still works once there is room.
+    await t.call(t.A, "PUT", "/admin/settings", { friendCap: 2 });
+    expect((await reg("y@example.com", two.token)).status).toBe(201);
   });
 
   it("does not open a closed instance", async () => {
@@ -188,14 +233,6 @@ describe("invite as a sign-up permit", () => {
     const r = await t.post("/auth/register", undefined, { email: "x@example.com", name: "X", password: "correct horse", inviteToken: inv.token });
     expect(r.status).toBe(403);
     expect(((await r.json()) as any).error).toBe("signup_closed");
-  });
-
-  it("is refused once the invite is used or revoked", async () => {
-    const t = await mk();
-    const B = await t.join(t.A, "b@example.com", "Bob");
-    await t.call(B.cookie, "POST", `/friends/invites/${B.token}/accept`);
-    const r = await t.post("/auth/register", undefined, { email: "c@example.com", name: "C", password: "correct horse", inviteToken: B.token });
-    expect(r.status).toBe(403);
   });
 });
 

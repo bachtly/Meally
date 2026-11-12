@@ -16,7 +16,7 @@ import type { Db } from "../../db/index.js";
 import { instanceSettings, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
-import { findValidInvite } from "../friends/service.js";
+import { findValidInvite, redeemForSignup } from "../friends/service.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
@@ -61,7 +61,7 @@ function limit(c: Context<AppEnv>, kind: "login" | "register") {
 async function createAccount(
   c: Context<AppEnv>,
   input: { email: string; name: string; password: string },
-  opts: { role: "admin" | "member"; requireEmpty?: boolean },
+  opts: { role: "admin" | "member"; requireEmpty?: boolean; inviteToken?: string },
 ) {
   const db = c.get("db");
   const passwordHash = await c.get("platform").hasher.hash(input.password);
@@ -84,6 +84,8 @@ async function createAccount(
       role: opts.role,
       createdAt: now,
     });
+    // The invite is one-time: it is used up in the same transaction that creates the account.
+    if (opts.inviteToken) await redeemForSignup(tx, userId, opts.inviteToken);
   });
   setSessionCookie(c, await createSession(db, userId, c.req.header("user-agent")));
   const res: MeResponse = { user: { id: userId, email: input.email, name: input.name, role: opts.role } };
@@ -115,14 +117,14 @@ export const authRoutes = new Hono<AppEnv>()
     const mode = await resolveSignupMode(db, c.get("auth").lockedSignupMode);
     if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
     const input = await body(c, registerSchema);
-    // In invite mode a valid, unused Friendship invite is the permit. It is only checked here, not used up:
-    // the new user accepts it afterwards. With the friends flag off the token is ignored.
+    // In invite mode a valid, unused Friendship invite is the permit, and it is redeemed with the account
+    // (the new user becomes a Friend of the inviter). With the friends flag off the token is ignored.
     const permit =
       !!input.inviteToken &&
       (await c.get("flags").getFeatures()).friends.enabled &&
       !!(await findValidInvite(db, input.inviteToken));
     if (mode === "invite" && !permit) throw new ApiError(403, "invite_required", "An invitation is required to sign up");
-    return createAccount(c, input, { role: "member" });
+    return createAccount(c, input, { role: "member", inviteToken: mode === "invite" ? input.inviteToken : undefined });
   })
   .post("/login", async (c) => {
     limit(c, "login");
