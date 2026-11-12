@@ -60,6 +60,44 @@ async function copyImage(db: Db, store: ImageStore, from: RecipeRow, toUser: str
 }
 
 /**
+ * Makes an independent copy of a recipe in the viewer's recipes (fields, ingredients, steps, image) and returns its slug.
+ * The copy remembers who it came from and the origin recipe id, which is what dedupes a second save.
+ */
+export async function copyRecipe(
+  db: Db,
+  store: ImageStore,
+  src: RecipeRow,
+  userId: string,
+  fromName: string | null,
+  foods: boolean,
+  now = new Date(),
+): Promise<string> {
+  const ings = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, src.id)).orderBy(asc(recipeIngredients.position));
+  const steps = await db.select().from(recipeSteps).where(eq(recipeSteps.recipeId, src.id)).orderBy(asc(recipeSteps.position));
+  const data = recipeInputSchema.parse({
+    name: src.name,
+    description: src.description,
+    yieldText: src.yieldText,
+    servings: src.servings,
+    prepMinutes: src.prepMinutes,
+    cookMinutes: src.cookMinutes,
+    totalMinutes: src.totalMinutes,
+    sourceUrl: src.sourceUrl,
+    notes: src.notes,
+    ingredients: ings.map(({ section, quantity, unit, food, note, raw }) => ({ section, quantity, unit, food, note, raw })),
+    steps: steps.map(({ section, text }) => ({ section, text })),
+  });
+  // `foods` relinks ingredients to the viewer's own catalogue; the sharer's food ids never cross over.
+  const created = await createRecipe(db, userId, data, { foods });
+  const imageId = await copyImage(db, store, src, userId);
+  await db
+    .update(recipes)
+    .set({ savedFromName: fromName, savedAt: now, originRecipeId: src.id, ...(imageId ? { imageId } : {}) })
+    .where(and(eq(recipes.id, created.id), eq(recipes.userId, userId)));
+  return created.slug;
+}
+
+/**
  * Saves recipes of a link into the viewer's recipes as independent copies (fields, ingredients, steps, image).
  * Already-saved recipes are not copied twice. Tags, ratings and the sharer's food links are not copied.
  */
@@ -86,29 +124,7 @@ export async function saveShare(
       saved[src.slug] = have;
       continue;
     }
-    const ings = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, src.id)).orderBy(asc(recipeIngredients.position));
-    const steps = await db.select().from(recipeSteps).where(eq(recipeSteps.recipeId, src.id)).orderBy(asc(recipeSteps.position));
-    const data = recipeInputSchema.parse({
-      name: src.name,
-      description: src.description,
-      yieldText: src.yieldText,
-      servings: src.servings,
-      prepMinutes: src.prepMinutes,
-      cookMinutes: src.cookMinutes,
-      totalMinutes: src.totalMinutes,
-      sourceUrl: src.sourceUrl,
-      notes: src.notes,
-      ingredients: ings.map(({ section, quantity, unit, food, note, raw }) => ({ section, quantity, unit, food, note, raw })),
-      steps: steps.map(({ section, text }) => ({ section, text })),
-    });
-    // `foods` relinks ingredients to the viewer's own catalogue; the sharer's food ids never cross over.
-    const created = await createRecipe(db, viewer.userId, data, { foods: flags.foods });
-    const imageId = await copyImage(db, store, src, viewer.userId);
-    await db
-      .update(recipes)
-      .set({ savedFromName: link.sharerName, savedAt: now, originRecipeId: src.id, ...(imageId ? { imageId } : {}) })
-      .where(and(eq(recipes.id, created.id), eq(recipes.userId, viewer.userId)));
-    saved[src.slug] = created.slug;
+    saved[src.slug] = await copyRecipe(db, store, src, viewer.userId, link.sharerName, flags.foods, now);
   }
   let cookbookSlug: string | null = null;
   if (body.cookbook) {
