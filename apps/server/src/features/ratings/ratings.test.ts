@@ -29,10 +29,9 @@ describe("favourites and ratings", () => {
     expect((await call(B, "PUT", "/recipes/soup/me", { rating: 5 })).status).toBe(404);
     const r = (await call(A, "GET", "/recipes/soup")).body;
     expect(r.me).toEqual({ favourite: true, rating: 4 });
-    expect(r.householdRating).toEqual({ average: 4, count: 1 });
     // clearing
     expect((await call(A, "PUT", "/recipes/soup/me", { rating: null })).body.rating).toBeNull();
-    expect((await call(A, "GET", "/recipes/soup")).body.householdRating).toEqual({ average: null, count: 0 });
+    expect((await call(A, "GET", "/recipes/soup")).body.me.rating).toBeNull();
     await call(A, "PUT", "/recipes/soup/me", { rating: 4 });
     expect((await call(A, "PUT", "/recipes/soup/me", { rating: 6 })).status).toBe(400);
     expect((await call(A, "PUT", "/recipes/soup/me", {})).status).toBe(400);
@@ -54,7 +53,7 @@ describe("favourites and ratings", () => {
     const other = (await call(undefined, "POST", "/auth/register", { email: "z@example.com", name: "Z", password: "correct horse" })).res;
     const Z = other.headers.get("set-cookie")!.split(";")[0]!;
     expect((await call(Z, "PUT", "/recipes/soup/me", { rating: 5 })).status).toBe(404);
-    expect((await call(A, "GET", "/recipes/soup")).body.householdRating.count).toBe(0);
+    expect((await call(A, "GET", "/recipes/soup")).body.me.rating).toBeNull();
   });
 
   it("is ignored when the flag is off", async () => {
@@ -63,7 +62,6 @@ describe("favourites and ratings", () => {
     expect((await call(A, "PUT", "/recipes/soup/me", { rating: 5 })).status).toBe(404);
     const r = (await call(A, "GET", "/recipes/soup")).body;
     expect(r.me).toBeUndefined();
-    expect(r.householdRating).toBeUndefined();
     const l = (await call(A, "GET", "/recipes?favourites=1&minRating=4&sort=rating")).body.items;
     expect(l).toHaveLength(1);
     expect(l[0].favourite).toBeUndefined();

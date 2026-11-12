@@ -93,9 +93,9 @@ function splitNote(rest: string): { food: string; note: string | null } {
   return { food, note: notes.length ? notes.join("; ") : null };
 }
 
-/** Optional household vocabulary. The parser stays pure: the caller loads and passes this in. */
+/** Optional per-user vocabulary. The parser stays pure: the caller loads and passes this in. */
 export interface ParseVocab {
-  /** Household-defined units; `names` are extra spellings, matched case-insensitively. */
+  /** User-defined units; `names` are extra spellings, matched case-insensitively. */
   units?: Array<{ key: string; names: string[] }>;
   /** Foods with their other spellings; a parsed food matching one becomes `name`. */
   foods?: Array<{ name: string; plural?: string | null; aliases?: string[] }>;
@@ -116,7 +116,7 @@ function takeUnit(s: string, allow?: (key: string) => boolean, vocab?: ParseVoca
   return null;
 }
 
-/** The canonical household food name for a parsed food, or the input when nothing matches. */
+/** The canonical food name for a parsed food, or the input when nothing matches. */
 export function canonicalFood(food: string, foods: ParseVocab["foods"]): string {
   const f = food.trim().toLowerCase();
   for (const c of foods ?? []) {

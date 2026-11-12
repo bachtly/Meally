@@ -107,7 +107,6 @@ export const recipeSchema = recipeInputSchema.extend({
   nutrition: nutritionSchema.nullable().optional(),
   /** Present only when the `ratings` flag is on. */
   me: z.object({ favourite: z.boolean(), rating: z.number().int().min(1).max(5).nullable() }).optional(),
-  householdRating: z.object({ average: z.number().nullable(), count: z.number().int() }).optional(),
   /** Set when the recipe was saved from a share link: who shared it (null when they hid their name) and when. */
   savedFrom: z.object({ name: z.string().nullable(), at: z.number() }).nullable().optional(),
   createdAt: z.number(),
@@ -127,7 +126,7 @@ export const recipeSummarySchema = z.object({
   /** The caller's own favourite and rating; present only when the `ratings` flag is on. */
   favourite: z.boolean().optional(),
   rating: z.number().nullable().optional(),
-  /** Household-wide, from the timeline; present only when the `timeline` flag is on. */
+  /** From the timeline; present only when the `timeline` flag is on. */
   lastMadeAt: z.number().nullable().optional(),
   madeCount: z.number().optional(),
   updatedAt: z.number(),

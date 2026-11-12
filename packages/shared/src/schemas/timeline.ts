@@ -29,7 +29,7 @@ export interface TimelineEvent {
   recipeName: string;
   createdAt: number;
   editedAt: number | null;
-  /** True when the caller may edit or delete this event (author, or household owner for delete). */
+  /** True when the caller may edit or delete this event (the author). */
   canEdit: boolean;
   canDelete: boolean;
 }
