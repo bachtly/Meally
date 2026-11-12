@@ -62,8 +62,13 @@ export function createDiskImageStore(dataDir: string): ImageStore {
       await fs.mkdir(to, { recursive: true });
       for (const name of names) {
         const dest = path.join(to, name);
-        // Copy first; an existing destination was copied by an earlier, interrupted run.
-        if (!(await fs.stat(dest).catch(() => null))) await fs.copyFile(path.join(from, name), dest);
+        // An existing destination was fully copied by an earlier, interrupted run.
+        // Copy to a temp name, then rename: a crash mid-copy never leaves a partial file at the destination.
+        if (!(await fs.stat(dest).catch(() => null))) {
+          const part = `${dest}.${randomUUID()}.tmp`;
+          await fs.copyFile(path.join(from, name), part);
+          await fs.rename(part, dest);
+        }
         await fs.rm(path.join(from, name), { force: true });
       }
       await fs.rmdir(from).catch(() => {});

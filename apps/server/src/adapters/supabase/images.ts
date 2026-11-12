@@ -84,8 +84,13 @@ export function createSupabaseImageStore(opts: SupabaseImageOptions): ImageStore
             headers: headers({ "Content-Type": "application/json" }),
             body: JSON.stringify({ bucketId: bucket, sourceKey: `${fromOwnerId}/${name}`, destinationKey: `${toOwnerId}/${name}` }),
           });
-          // 400/409: the destination already exists, copied by an earlier interrupted run.
-          if (!copy.ok && copy.status !== 400 && copy.status !== 409) fail("copy", copy.status);
+          if (!copy.ok) {
+            // 400/409 can mean the destination already exists (an earlier interrupted run). Never trust the status
+            // alone: delete the source only once the destination is confirmed to be there.
+            if (copy.status !== 400 && copy.status !== 409) fail("copy", copy.status);
+            const there = await doFetch(`${base}/object/authenticated/${bucket}/${enc(`${toOwnerId}/${name}`)}`, { headers: headers() });
+            if (!there.ok) fail("copy", copy.status);
+          }
         }
         const del = await doFetch(`${base}/object/${bucket}`, {
           method: "DELETE",

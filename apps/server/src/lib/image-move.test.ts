@@ -52,7 +52,7 @@ describe("moveLegacyImages (Node files)", () => {
 });
 
 describe("Supabase Storage moveOwner", () => {
-  function fake() {
+  function fake(opts: { badCopy?: boolean } = {}) {
     const objects = new Set(["h1/a-full", "h1/a-thumb", "u1/a-full"]); // u1/a-full: copied by an interrupted run
     const calls: string[] = [];
     const fetch = (async (input: string | URL, init?: RequestInit) => {
@@ -63,7 +63,11 @@ describe("Supabase Storage moveOwner", () => {
         const names = [...objects].filter((o) => o.startsWith(`${body.prefix}/`)).map((o) => ({ name: o.slice(body.prefix.length + 1) }));
         return new Response(JSON.stringify(names), { status: 200 });
       }
+      if (url.includes("/object/authenticated/")) {
+        return new Response("x", { status: objects.has(decodeURIComponent(url.split(`/object/authenticated/meally-images/`)[1]!)) ? 200 : 404 });
+      }
       if (url.endsWith("/object/copy")) {
+        if (opts.badCopy) return new Response("{}", { status: 400 });
         if (objects.has(body.destinationKey)) return new Response("{}", { status: 400 });
         objects.add(body.destinationKey);
         return new Response("{}", { status: 200 });
@@ -84,5 +88,13 @@ describe("Supabase Storage moveOwner", () => {
     expect([...f.objects].sort()).toEqual(["u1/a-full", "u1/a-thumb"]);
     expect(f.calls.findIndex((c) => c.includes("/object/copy"))).toBeLessThan(f.calls.findIndex((c) => c.startsWith("DELETE")));
     expect(await store.moveOwner("h1", "u1")).toBe(0);
+  });
+
+  it("fails and keeps the source when a copy returns 400 but the destination is missing", async () => {
+    const f = fake({ badCopy: true });
+    const store = createSupabaseImageStore({ url: "https://x.supabase.co", serviceKey: "k", bucket: "meally-images", fetch: f.fetch });
+    await expect(store.moveOwner("h1", "u1")).rejects.toThrow();
+    expect(f.objects.has("h1/a-full")).toBe(true);
+    expect(f.objects.has("h1/a-thumb")).toBe(true);
   });
 });
