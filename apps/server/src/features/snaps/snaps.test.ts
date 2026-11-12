@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { friendships, images, reactions, recipes, snaps } from "../../db/schema/index.js";
+import { friendships, images, pushDeliveries, pushSubscriptions, reactions, recipes, snaps } from "../../db/schema/index.js";
 import { openTestDb } from "../../db/testing.js";
 import { createLimiter } from "./service.js";
 
@@ -194,6 +194,87 @@ describe("Feed and reads", () => {
     const theirs = (await call(B, "GET", `/snaps/${s.id}`)).body;
     expect(theirs.reactions).toBeUndefined();
     expect(theirs.myReactions).toEqual(["heart"]);
+  });
+});
+
+describe("Reactions", () => {
+  const sub = async (o: Awaited<ReturnType<typeof mk>>["o"], userId: string) =>
+    o.db.insert(pushSubscriptions).values({ id: `sub-${userId}`, userId, endpoint: `https://push/${userId}`, p256dh: "k", auth: "a", createdAt: new Date() });
+
+  it("lets a Friend react; the author sees all, everyone else only their own", async () => {
+    const { A, B, C, send, call, befriend, id } = await mk();
+    await befriend(A, B);
+    await befriend(A, C);
+    const s = (await send(A, { clientId: "s" })).body;
+    const put = await call(B, "PUT", `/snaps/${s.id}/reactions/yum`);
+    expect(put.status).toBe(200);
+    expect(put.body.myReactions).toEqual(["yum"]);
+    expect(put.body.reactions).toBeUndefined();
+    await call(C, "PUT", `/snaps/${s.id}/reactions/fire`);
+    expect((await call(C, "GET", `/snaps/${s.id}`)).body.myReactions).toEqual(["fire"]);
+    const mine = (await call(A, "GET", `/snaps/${s.id}`)).body;
+    expect(mine.reactions).toEqual(
+      expect.arrayContaining([
+        { userId: await id(B), name: "Bo", emoji: "yum" },
+        { userId: await id(C), name: "Cy", emoji: "fire" },
+      ]),
+    );
+    expect((await call(B, "PUT", `/snaps/${s.id}/reactions/yum`)).status).toBe(200);
+    expect((await call(A, "GET", `/snaps/${s.id}`)).body.reactions).toHaveLength(2);
+  });
+
+  it("rejects an unknown key", async () => {
+    const { A, send, call } = await mk();
+    const s = (await send(A, { clientId: "s" })).body;
+    expect((await call(A, "PUT", `/snaps/${s.id}/reactions/poop`)).status).toBe(400);
+    expect((await call(A, "DELETE", `/snaps/${s.id}/reactions/poop`)).status).toBe(400);
+  });
+
+  it("gives 404 to a non-friend, a pending Friendship and a removed Friendship", async () => {
+    const { o, A, B, C, send, call, link, befriend } = await mk();
+    const s = (await send(A, { clientId: "s" })).body;
+    for (const verb of ["PUT", "DELETE"]) expect((await call(B, verb, `/snaps/${s.id}/reactions/heart`)).status).toBe(404);
+    await link(A, B, "pending");
+    for (const verb of ["PUT", "DELETE"]) expect((await call(B, verb, `/snaps/${s.id}/reactions/heart`)).status).toBe(404);
+    await befriend(A, C);
+    expect((await call(C, "PUT", `/snaps/${s.id}/reactions/heart`)).status).toBe(200);
+    await o.db.delete(friendships);
+    for (const verb of ["PUT", "DELETE"]) expect((await call(C, verb, `/snaps/${s.id}/reactions/heart`)).status).toBe(404);
+    expect((await call(A, "PUT", "/snaps/missing/reactions/heart")).status).toBe(404);
+  });
+
+  it("removes a Reaction, and DELETE of a missing one is 204 every time", async () => {
+    const { A, B, send, call, befriend } = await mk();
+    await befriend(A, B);
+    const s = (await send(A, { clientId: "s" })).body;
+    expect((await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`)).status).toBe(204);
+    await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
+    expect((await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`)).status).toBe(204);
+    expect((await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`)).status).toBe(204);
+    expect((await call(B, "GET", `/snaps/${s.id}`)).body.myReactions).toEqual([]);
+    expect((await call(A, "GET", `/snaps/${s.id}`)).body.reactions).toEqual([]);
+    await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
+    expect((await call(B, "GET", `/snaps/${s.id}`)).body.myReactions).toEqual(["heart"]);
+  });
+
+  it("queues one push per (Snap, user, key), even after DELETE then PUT, and none for the author", async () => {
+    const { o, A, B, send, call, befriend, id } = await mk();
+    await befriend(A, B);
+    await sub(o, await id(A));
+    await sub(o, await id(B));
+    const s = (await send(A, { clientId: "s" })).body;
+    await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
+    await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
+    await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`);
+    await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
+    const rows = await o.db.select().from(pushDeliveries);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.subscriptionId).toBe(`sub-${await id(A)}`);
+    expect(rows[0]!.payload).toEqual({ type: "reaction", snapId: s.id, from: "Bo", emoji: "heart" });
+    await call(B, "PUT", `/snaps/${s.id}/reactions/yum`);
+    expect(await o.db.select().from(pushDeliveries)).toHaveLength(2);
+    await call(A, "PUT", `/snaps/${s.id}/reactions/heart`);
+    expect(await o.db.select().from(pushDeliveries)).toHaveLength(2);
   });
 });
 

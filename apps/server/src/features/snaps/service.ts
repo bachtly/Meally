@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, ReactionKey, Recipe, Snap, SnapCreate, SnapListResponse } from "@meally/shared";
 import { ms, type Db } from "../../db/core.js";
-import { images, reactions, recipes, snaps, users } from "../../db/schema/index.js";
+import { images, pushDeliveries, pushSubscriptions, reactions, recipes, snaps, users } from "../../db/schema/index.js";
 import { authoredByViewerOrFriend, type Viewer } from "../../lib/access.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";
@@ -62,6 +62,8 @@ async function present(db: Db, viewer: Viewer, rows: Row[]): Promise<Snap[]> {
           rows.map((r) => r.s.id),
         ),
         isNull(reactions.removedAt),
+        // Filtered in SQL: another user's Reactions never leave the DB unless the viewer wrote the Snap.
+        or(eq(reactions.userId, viewer.userId), sql`${reactions.snapId} IN (SELECT ${snaps.id} FROM ${snaps} WHERE ${snaps.userId} = ${viewer.userId})`),
       ),
     )
     .orderBy(reactions.createdAt, reactions.userId);
@@ -275,6 +277,57 @@ export async function saveSnapRecipe(
   const have = await copyOf(db, viewer.userId, recipe.id);
   if (have) return { slug: have, created: false };
   return { slug: await copyRecipe(db, store, recipe, viewer.userId, authorName, foods), created: true };
+}
+
+/** The Snap if the viewer may see it (own or accepted Friend's), else 404. */
+async function visibleSnap(db: Db, viewer: Viewer, id: string) {
+  const [row] = await db
+    .select({ id: snaps.id, userId: snaps.userId })
+    .from(snaps)
+    .where(and(eq(snaps.id, id), authoredByViewerOrFriend(snaps.userId, viewer)))
+    .limit(1);
+  if (!row) throw new ApiError(404, "not_found", "Snap not found");
+  return row;
+}
+
+/**
+ * Adds the viewer's Reaction (idempotent). A first-ever (Snap, user, key) queues one push for the author's
+ * devices; a repeat PUT, or PUT after DELETE, finds the soft-deleted row and queues nothing. No push when the
+ * author reacts to their own Snap.
+ */
+export async function addReaction(db: Db, viewer: Viewer, snapId: string, emoji: ReactionKey): Promise<Snap> {
+  const snap = await visibleSnap(db, viewer, snapId);
+  await db.transaction(async (tx) => {
+    const now = new Date();
+    const [fresh] = await tx
+      .insert(reactions)
+      .values({ snapId, userId: viewer.userId, emoji, createdAt: now })
+      .onConflictDoNothing()
+      .returning({ snapId: reactions.snapId });
+    if (!fresh) {
+      await tx
+        .update(reactions)
+        .set({ removedAt: null })
+        .where(and(eq(reactions.snapId, snapId), eq(reactions.userId, viewer.userId), eq(reactions.emoji, emoji), isNotNull(reactions.removedAt)));
+      return;
+    }
+    if (snap.userId === viewer.userId) return;
+    const [from] = await tx.select({ name: users.name }).from(users).where(eq(users.id, viewer.userId)).limit(1);
+    const subs = await tx.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, snap.userId));
+    if (!subs.length) return;
+    const payload = { type: "reaction", snapId, from: (from?.name ?? "Someone").slice(0, 100), emoji };
+    await tx.insert(pushDeliveries).values(subs.map((x) => ({ id: randomUUID(), subscriptionId: x.id, payload, nextAt: now })));
+  });
+  return getSnap(db, viewer, snapId);
+}
+
+/** Removes the viewer's Reaction. Removing one that is not there is a no-op (204), so DELETE is idempotent. */
+export async function removeReaction(db: Db, viewer: Viewer, snapId: string, emoji: ReactionKey): Promise<void> {
+  await visibleSnap(db, viewer, snapId);
+  await db
+    .update(reactions)
+    .set({ removedAt: new Date() })
+    .where(and(eq(reactions.snapId, snapId), eq(reactions.userId, viewer.userId), eq(reactions.emoji, emoji), isNull(reactions.removedAt)));
 }
 
 /**
