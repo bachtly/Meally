@@ -185,6 +185,28 @@ export async function createSnap(
   return done(id, true);
 }
 
+/**
+ * Relinks or unlinks the Linked recipe. Author only (a Friend or stranger gets 404), and the recipe must be the
+ * author's own, else 404.
+ */
+export async function relinkSnap(db: Db, viewer: Viewer, id: string, recipeId: string | null): Promise<Snap> {
+  if (recipeId) {
+    const [r] = await db
+      .select({ id: recipes.id })
+      .from(recipes)
+      .where(and(eq(recipes.id, recipeId), eq(recipes.userId, viewer.userId)))
+      .limit(1);
+    if (!r) throw new ApiError(404, "not_found", "Recipe not found");
+  }
+  const done = await db
+    .update(snaps)
+    .set({ recipeId })
+    .where(and(eq(snaps.id, id), eq(snaps.userId, viewer.userId)))
+    .returning({ id: snaps.id });
+  if (!done.length) throw new ApiError(404, "not_found", "Snap not found");
+  return getSnap(db, viewer, id);
+}
+
 /** Author only: another user, a Friend and a stranger all get a 404. */
 export async function deleteSnap(db: Db, store: ImageStore, viewer: Viewer, id: string): Promise<void> {
   const imageId = await db.transaction(async (tx) => {

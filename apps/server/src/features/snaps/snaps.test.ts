@@ -301,6 +301,51 @@ describe("Linked recipe", () => {
   });
 });
 
+describe("relink a Snap", () => {
+  it("lets the author link, relink and unlink their own recipe", async () => {
+    const { A, send, call, recipe } = await mk();
+    const soup = await recipe(A, "Soup");
+    const stew = await recipe(A, "Stew");
+    const s = (await send(A, { clientId: "s", dishName: "Lunch" })).body;
+    const linked = await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: soup.id });
+    expect(linked.status).toBe(200);
+    expect(linked.body).toMatchObject({ id: s.id, dishName: "Lunch", recipe: { slug: soup.slug, name: "Soup" } });
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: stew.id })).body.recipe.name).toBe("Stew");
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: null })).body.recipe).toBeNull();
+    expect((await call(A, "GET", `/snaps/${s.id}/recipe`)).status).toBe(404);
+  });
+
+  it("is a 404 for another user's recipe and leaves the link unchanged", async () => {
+    const { A, B, send, call, recipe } = await mk();
+    const mine = await recipe(A, "Soup");
+    const theirs = await recipe(B, "Stew");
+    const s = (await send(A, { clientId: "s", recipeId: mine.id })).body;
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: theirs.id })).status).toBe(404);
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: "nope" })).status).toBe(404);
+    expect((await call(A, "GET", `/snaps/${s.id}`)).body.recipe.name).toBe("Soup");
+  });
+
+  it("is a 404 for a Friend, a non-friend and a pending Friendship, and changes nothing", async () => {
+    const { A, B, C, send, call, befriend, link, recipe } = await mk();
+    const theirs = await recipe(B, "Stew");
+    const s = (await send(A, { clientId: "s" })).body;
+    expect((await call(B, "PATCH", `/snaps/${s.id}`, { recipeId: theirs.id })).status).toBe(404);
+    await link(A, C, "pending");
+    expect((await call(C, "PATCH", `/snaps/${s.id}`, { recipeId: null })).status).toBe(404);
+    await befriend(A, B);
+    expect((await call(B, "PATCH", `/snaps/${s.id}`, { recipeId: theirs.id })).status).toBe(404);
+    expect((await call(B, "PATCH", `/snaps/${s.id}`, { recipeId: null })).status).toBe(404);
+    expect((await call(A, "GET", `/snaps/${s.id}`)).body.recipe).toBeNull();
+  });
+
+  it("accepts only recipeId", async () => {
+    const { A, send, call } = await mk();
+    const s = (await send(A, { clientId: "s" })).body;
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, {})).status).toBe(400);
+    expect((await call(A, "PATCH", `/snaps/${s.id}`, { recipeId: null, caption: "x" })).status).toBe(400);
+  });
+});
+
 describe("processing limiter", () => {
   it("never runs more than the limit at once and runs every task", async () => {
     const run = createLimiter(2);
