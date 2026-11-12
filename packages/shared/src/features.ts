@@ -27,6 +27,9 @@ export const FEATURES = [
   { key: "api-tokens", label: "API tokens", description: "Tokens for scripts.", default: true, dependsOn: [] },
   { key: "webhooks", label: "Webhooks", description: "Call a URL when events happen.", default: false, dependsOn: ["api-tokens"] },
   { key: "pwa", label: "Installable app", description: "Install as an app; recent recipes work offline.", default: true, dependsOn: [] },
+  { key: "snaps", label: "Snaps", description: "Share a photo of what you cooked with your friends.", default: true, dependsOn: [] },
+  { key: "friends", label: "Friends", description: "Connect with friends by invite link.", default: true, dependsOn: [] },
+  { key: "push", label: "Push notifications", description: "Notify friends of new snaps and reactions.", default: true, dependsOn: ["snaps"] },
   { key: "ai", label: "AI helpers", description: "Bring your own key for photo and text import.", default: false, dependsOn: [] },
 ] as const satisfies readonly FeatureDef[];
 
