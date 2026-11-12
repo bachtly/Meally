@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
-import type { ImageSize, ReactionKey, Snap, SnapCreate, SnapListResponse } from "@meally/shared";
+import { and, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
+import type { ImageSize, ReactionKey, Recipe, Snap, SnapCreate, SnapListResponse } from "@meally/shared";
 import { ms, type Db } from "../../db/core.js";
 import { images, reactions, recipes, snaps, users } from "../../db/schema/index.js";
 import { authoredByViewerOrFriend, type Viewer } from "../../lib/access.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";
 import { storeImage, type ImageInput } from "../recipes/image-input.js";
-import { decode, encode } from "../recipes/service.js";
+import { decode, encode, load } from "../recipes/service.js";
+import { copyRecipe } from "../share/save.js";
 
 /** Immutable-cache safe: the URL carries the image id, and an image never changes under an id. */
 export const snapImageUrl = (snapId: string, imageId: string, size: ImageSize) =>
@@ -200,14 +201,72 @@ export async function deleteSnap(db: Db, store: ImageStore, viewer: Viewer, id: 
   await store.delete(viewer.userId, imageId);
 }
 
-/** Bytes of a Snap's image for the author or an accepted Friend. `imageId` must be the Snap's own Image. */
+/**
+ * The Snap's Linked recipe row, for the author or an accepted Friend. The recipe must belong to the Snap's author
+ * (a Snap is only ever linked to its author's own recipe), so a stale link never leaks someone else's recipe.
+ */
+async function linkedRecipe(db: Db, viewer: Viewer, snapId: string) {
+  const [row] = await db
+    .select({ recipe: recipes, authorName: users.name })
+    .from(snaps)
+    .innerJoin(recipes, and(eq(recipes.id, snaps.recipeId), eq(recipes.userId, snaps.userId)))
+    .leftJoin(users, eq(users.id, snaps.userId))
+    .where(and(eq(snaps.id, snapId), isNotNull(snaps.recipeId), authoredByViewerOrFriend(snaps.userId, viewer)))
+    .limit(1);
+  if (!row) throw new ApiError(404, "not_found", "Recipe not found");
+  return row;
+}
+
+/** The viewer's own copy of a recipe, found by its origin id. */
+async function copyOf(db: Db, userId: string, originId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ slug: recipes.slug })
+    .from(recipes)
+    .where(and(eq(recipes.userId, userId), eq(recipes.originRecipeId, originId)))
+    .limit(1);
+  return row?.slug ?? null;
+}
+
+export type SnapRecipe = Recipe & { savedSlug: string | null };
+
+/** Read-only Linked recipe with image URLs on the Snap's own paths, plus the viewer's existing copy (if any). */
+export async function getSnapRecipe(db: Db, viewer: Viewer, snapId: string): Promise<SnapRecipe> {
+  const { recipe: row } = await linkedRecipe(db, viewer, snapId);
+  const full = await load(db, row);
+  return {
+    ...full,
+    imageUrl: row.imageId ? snapImageUrl(snapId, row.imageId, 800) : null,
+    savedSlug: row.userId === viewer.userId ? null : await copyOf(db, viewer.userId, row.id),
+  };
+}
+
+/** Save to my recipes: an independent copy, deduped by origin. The author gets 409 `own_recipe`. */
+export async function saveSnapRecipe(
+  db: Db,
+  store: ImageStore,
+  viewer: Viewer,
+  snapId: string,
+  foods: boolean,
+): Promise<{ slug: string; created: boolean }> {
+  const { recipe, authorName } = await linkedRecipe(db, viewer, snapId);
+  if (recipe.userId === viewer.userId) throw new ApiError(409, "own_recipe", "That recipe is already yours");
+  const have = await copyOf(db, viewer.userId, recipe.id);
+  if (have) return { slug: have, created: false };
+  return { slug: await copyRecipe(db, store, recipe, viewer.userId, authorName, foods), created: true };
+}
+
+/**
+ * Bytes of an image for the author or an accepted Friend. `imageId` must be the Snap's own Image or the current
+ * Image of its Linked recipe, so a URL never serves bytes that can change under it.
+ */
 export async function readSnapImage(db: Db, store: ImageStore, viewer: Viewer, snapId: string, imageId: string, size: ImageSize) {
   const [row] = await db
-    .select({ userId: snaps.userId, imageId: snaps.imageId })
+    .select({ userId: snaps.userId })
     .from(snaps)
-    .where(and(eq(snaps.id, snapId), eq(snaps.imageId, imageId), authoredByViewerOrFriend(snaps.userId, viewer)))
+    .leftJoin(recipes, and(eq(recipes.id, snaps.recipeId), eq(recipes.userId, snaps.userId)))
+    .where(and(eq(snaps.id, snapId), sql`${imageId} IN (${snaps.imageId}, ${recipes.imageId})`, authoredByViewerOrFriend(snaps.userId, viewer)))
     .limit(1);
-  const data = row ? await store.get(row.userId, row.imageId, size) : null;
+  const data = row ? await store.get(row.userId, imageId, size) : null;
   if (!data) throw new ApiError(404, "not_found", "Image not found");
   return data;
 }

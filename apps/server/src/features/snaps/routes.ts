@@ -7,7 +7,7 @@ import { viewerOf } from "../../lib/access.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { MAX_IMAGE_BYTES, readImageUpload } from "../recipes/image-input.js";
-import { createSnap, deleteSnap, getSnap, listFeed, readSnapImage } from "./service.js";
+import { createSnap, deleteSnap, getSnap, getSnapRecipe, listFeed, readSnapImage, saveSnapRecipe } from "./service.js";
 
 function invalid(issue?: { path: PropertyKey[]; message: string }) {
   return new ApiError(400, "invalid_body", `${issue?.path.length ? `${issue.path.join(".")}: ` : ""}${issue?.message ?? "Invalid request"}`);
@@ -49,6 +49,12 @@ snapRoutes
   .delete("/:id", async (c) => {
     await deleteSnap(c.get("db"), c.get("platform").images, viewerOf(c), c.req.param("id"));
     return c.body(null, 204);
+  })
+  .get("/:id/recipe", async (c) => c.json(await getSnapRecipe(c.get("db"), viewerOf(c), c.req.param("id"))))
+  .post("/:id/recipe/save", async (c) => {
+    const foods = (await c.get("flags").getFeatures())["foods-units"].enabled;
+    const { slug, created } = await saveSnapRecipe(c.get("db"), c.get("platform").images, viewerOf(c), c.req.param("id"), foods);
+    return c.json({ slug }, created ? 201 : 200);
   })
   .get("/:id/images/:imageId/:size", async (c) => {
     const size = Number(c.req.param("size")) as ImageSize;

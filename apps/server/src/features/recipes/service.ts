@@ -93,7 +93,7 @@ async function writeOrganizers(tx: Tx, userId: string, id: string, data: RecipeD
   if (data.tools) await setRecipeOrganizers(tx, "tools", userId, id, data.tools);
 }
 
-async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Recipe> {
+export async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Recipe> {
   const org = o.org;
   const rate =
     o.ratings && o.userId

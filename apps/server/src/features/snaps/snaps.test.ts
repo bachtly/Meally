@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { friendships, images, reactions, snaps } from "../../db/schema/index.js";
+import { friendships, images, reactions, recipes, snaps } from "../../db/schema/index.js";
 import { openTestDb } from "../../db/testing.js";
 import { createLimiter } from "./service.js";
 
@@ -212,6 +212,92 @@ describe("delete a Snap", () => {
     expect(await o.db.select().from(images)).toHaveLength(0);
     expect(imageFiles().some((f) => f.startsWith(row!.imageId))).toBe(false);
     expect((await call(A, "DELETE", `/snaps/${s.id}`)).status).toBe(404);
+  });
+});
+
+describe("Linked recipe", () => {
+  async function setup() {
+    const t = await mk();
+    const r = (await t.call(t.A, "POST", "/recipes", { name: "Soup", ingredients: [{ raw: "2 carrots" }], steps: [{ text: "Boil." }] })).body;
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(await sharp({ create: { width: 900, height: 600, channels: 3, background: "#39c" } }).png().toBuffer())], "x.png", { type: "image/png" }));
+    const up = await t.app.request(`/api/v1/recipes/${r.slug}/image`, { method: "POST", headers: { cookie: t.A, "x-requested-with": "meally" }, body: form });
+    expect(up.status).toBe(201);
+    const snap = (await t.send(t.A, { clientId: "s", recipeId: r.id })).body;
+    return { ...t, r, snap };
+  }
+
+  it("lets an accepted Friend read it with image URLs on the Snap's paths, and shows savedSlug after saving", async () => {
+    const { app, A, B, call, befriend, snap, r } = await setup();
+    await befriend(A, B);
+    const read = await call(B, "GET", `/snaps/${snap.id}/recipe`);
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({ slug: r.slug, name: "Soup", savedSlug: null, ingredients: [{ raw: "2 carrots" }], steps: [{ text: "Boil." }] });
+    expect(read.body.imageUrl).toMatch(new RegExp(`^/api/v1/snaps/${snap.id}/images/[^/]+/800$`));
+    const img = await app.request(read.body.imageUrl, { headers: { cookie: B } });
+    expect(img.status).toBe(200);
+    expect(img.headers.get("cache-control")).toContain("immutable");
+    const saved = await call(B, "POST", `/snaps/${snap.id}/recipe/save`);
+    expect(saved.status).toBe(201);
+    expect((await call(B, "GET", `/snaps/${snap.id}/recipe`)).body.savedSlug).toBe(saved.body.slug);
+    const mine = (await call(B, "GET", `/recipes/${saved.body.slug}`)).body;
+    expect(mine).toMatchObject({ name: "Soup", savedFrom: { name: "Ann" } });
+    expect(mine.imageUrl).toMatch(/^\/api\/v1\/images\//);
+    expect((await app.request(mine.imageUrl, { headers: { cookie: B } })).status).toBe(200);
+  });
+
+  it("saves once: a second save returns 200 with the same copy and makes no new row", async () => {
+    const { o, A, B, call, befriend, snap } = await setup();
+    await befriend(A, B);
+    const first = await call(B, "POST", `/snaps/${snap.id}/recipe/save`);
+    const second = await call(B, "POST", `/snaps/${snap.id}/recipe/save`);
+    expect([first.status, second.status]).toEqual([201, 200]);
+    expect(second.body.slug).toBe(first.body.slug);
+    expect((await o.db.select().from(recipes)).filter((x) => x.name === "Soup")).toHaveLength(2);
+  });
+
+  it("gives the author 409 own_recipe on save and no savedSlug on read", async () => {
+    const { A, call, snap } = await setup();
+    const r = await call(A, "POST", `/snaps/${snap.id}/recipe/save`);
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe("own_recipe");
+    expect((await call(A, "GET", `/snaps/${snap.id}/recipe`)).body.savedSlug).toBeNull();
+  });
+
+  it("is a 404 for a Snap with no Linked recipe", async () => {
+    const { A, send, call } = await setup();
+    const plain = (await send(A, { clientId: "plain" })).body;
+    expect((await call(A, "GET", `/snaps/${plain.id}/recipe`)).status).toBe(404);
+    expect((await call(A, "POST", `/snaps/${plain.id}/recipe/save`)).status).toBe(404);
+  });
+
+  it("is a 404 on read, image and save for a non-friend and for a removed Friendship", async () => {
+    const { app, A, B, C, call, befriend, id, snap } = await setup();
+    const imageUrl = (await call(A, "GET", `/snaps/${snap.id}/recipe`)).body.imageUrl as string;
+    const probe = async (cookie: string) => [
+      (await call(cookie, "GET", `/snaps/${snap.id}/recipe`)).status,
+      (await app.request(imageUrl, { headers: { cookie } })).status,
+      (await call(cookie, "POST", `/snaps/${snap.id}/recipe/save`)).status,
+    ];
+    expect(await probe(C)).toEqual([404, 404, 404]);
+    await befriend(A, B);
+    expect(await probe(B)).toEqual([200, 200, 201]);
+    await call(B, "DELETE", `/friends/${await id(A)}`);
+    expect(await probe(B)).toEqual([404, 404, 404]);
+  });
+
+  it("is a 404 for a pending Friendship", async () => {
+    const { A, B, call, link, snap } = await setup();
+    await link(A, B, "pending");
+    expect((await call(B, "GET", `/snaps/${snap.id}/recipe`)).status).toBe(404);
+    expect((await call(B, "POST", `/snaps/${snap.id}/recipe/save`)).status).toBe(404);
+  });
+
+  it("only serves a recipe image id that is the Linked recipe's current one", async () => {
+    const { app, A, snap } = await setup();
+    const url = (await (await app.request(`/api/v1/snaps/${snap.id}/recipe`, { headers: { cookie: A } })).json() as any).imageUrl as string;
+    const stale = url.replace(/\/images\/[^/]+\//, "/images/00000000-0000-0000-0000-000000000000/");
+    expect((await app.request(stale, { headers: { cookie: A } })).status).toBe(404);
   });
 });
 

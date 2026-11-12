@@ -17,6 +17,8 @@ photos of the finished dish. This is our own design.
 | D3 | Image URLs are `/snaps/:id/images/:imageId/:size`. The server checks the id is the Snap's own image, so the URL is safe to cache as immutable. | `/snaps/:id/image/:size` (bytes can change when the image changes; cached for a year). | [S3]: `immutable` with a year-long `max-age` is correct only when the URL changes whenever the bytes do. |
 | D4 | Image processing runs through a limiter of 2 at once; extra uploads wait. | Unbounded (a burst of 10 MB originals can exhaust memory in sharp); reject with 503 (the client would retry anyway). | [S4]: sharp already runs its own thread pool, so more concurrent jobs add memory, not speed. |
 | D5 | The Feed query takes the author set from `accepted` Friendship rows in `lib/access`. Pending and removed Friendships give nothing. | A join in each route (the rule would drift). | ADR 0002. |
+| D7 | The Linked recipe is read through `GET /snaps/:id/recipe`, with its image under `/snaps/:id/images/:imageId/:size` (the Snap's image or the recipe's current image). A recipe is only returned when it belongs to the Snap's author. | Reusing `/recipes/:slug` for Friends (it is owner-only, ADR 0002). | ADR 0002. |
+| D8 | Save to my recipes copies the recipe like a share link does (shared `copyRecipe`), and dedupes by `origin_recipe_id`: `201` for a new copy, `200` with the existing slug. The author gets `409 own_recipe`. | A new copy on every tap. | [S5] says copying a shared recipe should give an independent copy the saver can edit. |
 | D6 | Devices that cannot run sharp (edge) send `w320`, `w800`, `w1600` parts, resized in the browser. The existing `readImageUpload` already handles this. | Resizing on the edge (sharp does not run there). | Existing `ImageStore.acceptsPresized`. |
 
 ## Data and API
@@ -31,7 +33,12 @@ deleting the Snap deletes the row and the files. Reactions are soft-deleted, so 
 - `DELETE /api/v1/snaps/:id`: `204`, author only (a Friend gets `404`).
 - `GET /api/v1/snaps/:id/images/:imageId/:size`: image bytes, `Cache-Control: private, max-age=31536000, immutable`.
 
-Deferred to later PRs: `PATCH` (F6), the Linked recipe read and save (F5), Reactions (F7), push (F8).
+- `GET /api/v1/snaps/:id/recipe`: the recipe (same shape as `GET /recipes/:slug`, image URL on the Snap's path) plus `savedSlug` (the viewer's copy, or `null`). `404` when the Snap has no Linked recipe.
+- `POST /api/v1/snaps/:id/recipe/save`: `201 { slug }` new copy, `200 { slug }` existing copy, `409 own_recipe` for the author.
+
+Both are Friend paths: a non-friend, a pending Friendship and a removed Friendship all get `404`.
+
+Deferred to later PRs: `PATCH` (F6), Reactions (F7), push (F8).
 
 ## UI
 
@@ -43,3 +50,4 @@ Not in this PR.
 - [S2] PostgreSQL, "INSERT … ON CONFLICT", https://www.postgresql.org/docs/current/sql-insert.html
 - [S3] MDN, "Cache-Control: immutable", https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
 - [S4] sharp, "Performance: concurrency", https://sharp.pixelplumbing.com/performance
+- [S5] Mealie docs (behaviour only; nothing copied), https://docs.mealie.io/documentation/getting-started/features/
