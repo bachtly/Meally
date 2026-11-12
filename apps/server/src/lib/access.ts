@@ -1,5 +1,6 @@
-import { eq, type Column } from "drizzle-orm";
+import { eq, or, sql, type Column, type SQL } from "drizzle-orm";
 import type { Context } from "hono";
+import { friendships } from "../db/schema/friends.js";
 import type { AppEnv } from "./context.js";
 
 /**
@@ -15,3 +16,17 @@ export const viewerOf = (c: Context<AppEnv>): Viewer => ({ userId: c.get("user")
 
 /** `WHERE <owner column> = viewer.userId`: scope a query to what the viewer owns. */
 export const ownedBy = (column: Column, viewer: Viewer) => eq(column, viewer.userId);
+
+/**
+ * Snap paths only: `column` (a Snap's author) is the viewer or someone with an accepted Friendship with the
+ * viewer. A pending or removed Friendship (no row) gives nothing.
+ */
+export const authoredByViewerOrFriend = (column: Column, viewer: Viewer): SQL =>
+  or(
+    eq(column, viewer.userId),
+    sql`${column} IN (
+      SELECT CASE WHEN ${friendships.userAId} = ${viewer.userId} THEN ${friendships.userBId} ELSE ${friendships.userAId} END
+      FROM ${friendships}
+      WHERE ${friendships.status} = 'accepted' AND (${friendships.userAId} = ${viewer.userId} OR ${friendships.userBId} = ${viewer.userId})
+    )`,
+  )!;
