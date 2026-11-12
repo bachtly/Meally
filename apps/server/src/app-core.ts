@@ -24,6 +24,7 @@ import { csrfProtection } from "./features/auth/middleware.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { publicRoutes, shareRoutes } from "./features/share/routes.js";
 import { friendRoutes } from "./features/friends/routes.js";
+import { snapRoutes } from "./features/snaps/routes.js";
 import { webhookRoutes } from "./features/webhooks/routes.js";
 import { createDispatcher } from "./features/webhooks/service.js";
 import { tokenRoutes } from "./features/tokens/routes.js";
@@ -131,6 +132,7 @@ export function createCoreApp(opts: CoreAppOptions) {
   api.route("/ai", aiRoutes);
   api.route("/webhooks", webhookRoutes);
   api.route("/friends", friendRoutes);
+  api.route("/snaps", snapRoutes);
   api.route("/cookbooks", cookbookRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
