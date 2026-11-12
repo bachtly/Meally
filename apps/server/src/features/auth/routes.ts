@@ -16,6 +16,7 @@ import type { Db } from "../../db/index.js";
 import { instanceSettings, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
+import { findValidInvite } from "../friends/service.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
@@ -114,8 +115,13 @@ export const authRoutes = new Hono<AppEnv>()
     const mode = await resolveSignupMode(db, c.get("auth").lockedSignupMode);
     if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
     const input = await body(c, registerSchema);
-    // Invite mode needs an invitation. The Friendship invite link that carries one arrives with the Friends work.
-    if (mode === "invite") throw new ApiError(403, "invite_required", "An invitation is required to sign up");
+    // In invite mode a valid, unused Friendship invite is the permit. It is only checked here, not used up:
+    // the new user accepts it afterwards. With the friends flag off the token is ignored.
+    const permit =
+      !!input.inviteToken &&
+      (await c.get("flags").getFeatures()).friends.enabled &&
+      !!(await findValidInvite(db, input.inviteToken));
+    if (mode === "invite" && !permit) throw new ApiError(403, "invite_required", "An invitation is required to sign up");
     return createAccount(c, input, { role: "member" });
   })
   .post("/login", async (c) => {
