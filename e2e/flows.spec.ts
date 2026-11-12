@@ -10,6 +10,9 @@ test("1. first-run setup creates the admin and lands on the empty library", asyn
   await page.getByLabel("Email").fill(ADMIN.email);
   await page.getByLabel("Password").fill(ADMIN.password);
   await page.getByRole("button", { name: "Create admin account" }).click();
+  // Snaps are on by default, so the app opens on the camera; the library is one tap away.
+  await expect(page.getByRole("heading", { name: "Snap", exact: true })).toBeVisible();
+  await nav(page).getByRole("link", { name: "Recipes" }).click();
   await expect(page).toHaveURL(/\/recipes$/);
   await expect(page.getByRole("heading", { name: "No recipes yet" })).toBeVisible();
   await context.close();

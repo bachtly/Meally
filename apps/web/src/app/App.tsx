@@ -25,6 +25,8 @@ import { SharePage, ShareLayout, ShareRecipePage } from "../features/share/Share
 import { AdminPage } from "../features/admin/AdminPage";
 import { FriendsPage } from "../features/friends/FriendsPage";
 import { InviteLayout, InvitePage } from "../features/friends/InvitePage";
+import { FeedPage } from "../features/snaps/FeedPage";
+import { SnapsIndex } from "../features/snaps/SnapsIndex";
 import { MorePage } from "./pages/Placeholders";
 
 // offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
@@ -76,7 +78,15 @@ export const appRoutes = createRoutesFromElements(
           </RequireAuth>
         }
       >
-        <Route path="/" element={<Navigate to="/recipes" replace />} />
+        <Route path="/" element={<SnapsIndex />} />
+        <Route
+          path="/feed"
+          element={
+            <FeatureRoute on="snaps">
+              <FeedPage />
+            </FeatureRoute>
+          }
+        />
         <Route path="/recipes" element={<RecipeLibrary />} />
         <Route path="/recipes/new" element={<RecipeNewPage />} />
         <Route
