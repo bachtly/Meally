@@ -16,9 +16,10 @@ describe("snap schemas", () => {
     expect(snapCreateSchema.safeParse({ clientId: "c", dishName: "a".repeat(121) }).success).toBe(false);
     expect(snapCreateSchema.safeParse({ clientId: "c", place: "a".repeat(121) }).success).toBe(false);
   });
-  it("patch needs a field and allows null to clear", () => {
+  it("patch accepts only recipeId, and null clears it", () => {
     expect(snapPatchSchema.safeParse({}).success).toBe(false);
     expect(snapPatchSchema.safeParse({ recipeId: null }).success).toBe(true);
+    expect(snapPatchSchema.safeParse({ recipeId: "r1", caption: "x" }).success).toBe(false);
   });
   it("limits the feed page size", () => {
     expect(snapListQuerySchema.parse({}).limit).toBe(20);

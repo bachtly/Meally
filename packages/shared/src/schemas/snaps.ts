@@ -23,14 +23,8 @@ export const snapCreateSchema = z.object({
 });
 export type SnapCreate = z.infer<typeof snapCreateSchema>;
 
-export const snapPatchSchema = z
-  .object({
-    recipeId: z.string().min(1).max(100).nullable().optional(),
-    caption: caption.nullable().optional(),
-    dishName: dishName.nullable().optional(),
-    place: place.nullable().optional(),
-  })
-  .refine((v) => Object.values(v).some((x) => x !== undefined), "Send at least one field");
+/** Only the Linked recipe can change after posting. */
+export const snapPatchSchema = z.object({ recipeId: z.string().min(1).max(100).nullable() }).strict();
 export type SnapPatch = z.infer<typeof snapPatchSchema>;
 
 export const snapListQuerySchema = z.object({
