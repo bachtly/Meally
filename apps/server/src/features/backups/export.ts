@@ -117,12 +117,12 @@ export function toMarkdown(r: Recipe, imageFile: string | null): string {
   return `${fm.join("\n")}${body.join("\n")}`.replace(/\n{3,}/g, "\n\n");
 }
 
-/** Adds one recipe (and its image) to the zip. Names are unique because slugs are unique per household. */
-async function addRecipe(z: ZipWriter, images: ImageStore, householdId: string, r: Recipe, imageId: string | null, format: ExportFormat) {
+/** Adds one recipe (and its image) to the zip. Names are unique because slugs are unique per user. */
+async function addRecipe(z: ZipWriter, images: ImageStore, userId: string, r: Recipe, imageId: string | null, format: ExportFormat) {
   let imageFile: string | null = null;
   if (imageId) {
     // A store that cannot serve the image (missing file, edge placeholder) just leaves it out of the export.
-    const img = await images.get(householdId, imageId, 1600).catch(() => null);
+    const img = await images.get(userId, imageId, 1600).catch(() => null);
     if (img) {
       imageFile = `images/${r.slug}.${img.contentType === "image/jpeg" ? "jpg" : "webp"}`;
       z.addBuffer(imageFile, img.bytes, true);
@@ -134,25 +134,25 @@ async function addRecipe(z: ZipWriter, images: ImageStore, householdId: string, 
 
 export interface ExportOpts {
   images: ImageStore;
-  householdId: string;
+  userId: string;
   org: boolean;
   nutrition?: boolean;
 }
 
-export async function exportHousehold(db: Db, z: ZipWriter, o: ExportOpts, format: ExportFormat) {
+export async function exportAll(db: Db, z: ZipWriter, o: ExportOpts, format: ExportFormat) {
   const rows = await db
     .select({ slug: recipes.slug, imageId: recipes.imageId })
     .from(recipes)
-    .where(eq(recipes.householdId, o.householdId))
+    .where(eq(recipes.userId, o.userId))
     .orderBy(asc(recipes.slug));
   for (const row of rows) {
-    const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
-    await addRecipe(z, o.images, o.householdId, r, row.imageId, format);
+    const r = await getRecipe(db, o.userId, row.slug, { org: o.org, nutrition: o.nutrition });
+    await addRecipe(z, o.images, o.userId, r, row.imageId, format);
   }
 }
 
 export async function exportOne(db: Db, z: ZipWriter, o: ExportOpts, slug: string, format: ExportFormat) {
-  const row = await findRow(db, o.householdId, slug);
-  const r = await getRecipe(db, o.householdId, row.slug, { org: o.org, nutrition: o.nutrition });
-  await addRecipe(z, o.images, o.householdId, r, row.imageId, format);
+  const row = await findRow(db, o.userId, slug);
+  const r = await getRecipe(db, o.userId, row.slug, { org: o.org, nutrition: o.nutrition });
+  await addRecipe(z, o.images, o.userId, r, row.imageId, format);
 }

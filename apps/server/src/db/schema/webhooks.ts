@@ -1,13 +1,13 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { households } from "./auth.js";
+import { users } from "./auth.js";
 
 export const webhooks = pgTable(
   "webhooks",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     url: text("url").notNull(),
     secret: text("secret").notNull(),
@@ -22,7 +22,7 @@ export const webhooks = pgTable(
     lastDeliveryAt: timestamp("last_delivery_at", { withTimezone: true, mode: "date" }),
     failureCount: integer("failure_count").notNull().default(0),
   },
-  (t) => [index("webhooks_household_idx").on(t.householdId)],
+  (t) => [index("webhooks_user_idx").on(t.userId)],
 );
 
 export const webhookDeliveries = pgTable(

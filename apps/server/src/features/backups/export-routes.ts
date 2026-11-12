@@ -3,7 +3,7 @@ import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findRow } from "../recipes/service.js";
-import { exportFormats, exportHousehold, exportOne, type ExportFormat } from "./export.js";
+import { exportFormats, exportAll, exportOne, type ExportFormat } from "./export.js";
 import { zipResponseStream } from "./zipwriter.js";
 
 function format(c: Context<AppEnv>): ExportFormat {
@@ -14,7 +14,7 @@ function format(c: Context<AppEnv>): ExportFormat {
 
 async function opts(c: Context<AppEnv>) {
   const f = await c.get("flags").getFeatures();
-  return { images: c.get("platform").images, householdId: c.get("householdId"), org: f.organizers.enabled, nutrition: f.nutrition.enabled };
+  return { images: c.get("platform").images, userId: c.get("userId"), org: f.organizers.enabled, nutrition: f.nutrition.enabled };
 }
 
 function zipResponse(body: ReadableStream<Uint8Array>, filename: string) {
@@ -28,7 +28,7 @@ function zipResponse(body: ReadableStream<Uint8Array>, filename: string) {
 }
 
 /**
- * Household recipe export for any member, and single-recipe export. Mounted at /api/v1. Export is core, not
+ * Recipe export for the signed-in user, and single-recipe export. Mounted at /api/v1. Export is core, not
  * a feature flag, and it works on every platform (only instance backups depend on the embedded database).
  */
 export const exportRoutes = new Hono<AppEnv>();
@@ -39,7 +39,7 @@ exportRoutes.get("/export/recipes", async (c) => {
   const o = await opts(c);
   const db = c.get("db");
   const day = new Date().toISOString().slice(0, 10);
-  return zipResponse(zipResponseStream((z) => exportHousehold(db, z, o, fmt)), `meally-recipes-${fmt}-${day}.zip`);
+  return zipResponse(zipResponseStream((z) => exportAll(db, z, o, fmt)), `meally-recipes-${fmt}-${day}.zip`);
 });
 
 exportRoutes.get("/recipes/:slug/export", async (c) => {
@@ -48,6 +48,6 @@ exportRoutes.get("/recipes/:slug/export", async (c) => {
   const slug = c.req.param("slug");
   const db = c.get("db");
   // Fail with 404 before streaming starts.
-  await findRow(db, o.householdId, slug);
+  await findRow(db, o.userId, slug);
   return zipResponse(zipResponseStream((z) => exportOne(db, z, o, slug, fmt)), `${slug}-${fmt}.zip`);
 });

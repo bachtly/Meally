@@ -126,7 +126,7 @@ describe("meal plan API", () => {
     expect((await app.request(`/api/v1/meal-plan/ical?token=${next}`)).status).toBe(200);
   });
 
-  it("isolates households", async () => {
+  it("isolates users", async () => {
     const { app, A, B, call, json } = await mk();
     const e = await json(await call(A, "POST", "/meal-plan", { date: new Date().toISOString().slice(0, 10), mealType: "dinner", title: "Mine" }));
     const r = await json(await call(A, "POST", "/recipes", { name: "Secret" }));

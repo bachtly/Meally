@@ -1,14 +1,13 @@
 import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { households, users } from "./auth.js";
+import { users } from "./auth.js";
 
 export const importJobs = pgTable(
   "import_jobs",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
-    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     format: text("format").notNull(),
     filename: text("filename"),
     status: text("status", { enum: ["queued", "running", "done", "failed"] }).notNull(),
@@ -21,5 +20,5 @@ export const importJobs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true, mode: "date" }),
   },
-  (t) => [index("import_jobs_household_idx").on(t.householdId, t.createdAt)],
+  (t) => [index("import_jobs_user_idx").on(t.userId, t.createdAt)],
 );

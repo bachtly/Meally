@@ -23,11 +23,6 @@ export function MorePage() {
           Cookbooks
         </Link>
       </Feature>
-      <Feature on="timeline">
-        <Link to="/activity" className="text-accent underline">
-          Activity
-        </Link>
-      </Feature>
       <Feature on="organizers">
         <Link to="/organizers" className="text-accent underline">
           Tags, categories and tools

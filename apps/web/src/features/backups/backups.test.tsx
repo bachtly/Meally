@@ -16,7 +16,7 @@ function setup(role: "admin" | "member", backups = true) {
     vi.fn(async (url: string) => {
       const u = String(url);
       if (u.endsWith("/auth/me"))
-        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role, householdId: "h1", householdRole: "owner" }, household: { id: "h1", name: "Home" } });
+        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role } });
       if (u.endsWith("/auth/status")) return Response.json({ needsSetup: false, signupMode: "invite" });
       if (u.endsWith("/features")) return Response.json({ features: { backups: { enabled: backups } } });
       if (u.endsWith("/admin/backups"))
@@ -33,9 +33,9 @@ function setup(role: "admin" | "member", backups = true) {
   );
 }
 
-it("lets any member download the household export", async () => {
+it("lets any member download the recipe export", async () => {
   setup("member");
-  expect(await screen.findByRole("heading", { name: "Download my household's recipes" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Download my recipes" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Markdown" })).toHaveAttribute("href", "/api/v1/export/recipes?format=markdown");
   expect(screen.queryByText("Instance backups")).not.toBeInTheDocument();
 });
@@ -48,9 +48,9 @@ it("shows the backups list and schedule to admins", async () => {
   expect(screen.getAllByRole("link", { name: "Download" })[0]).toHaveAttribute("href", "/api/v1/admin/backups/meally-20261111T120000000Z.zip");
 });
 
-it("keeps the household export but hides instance backups when the flag is off", async () => {
+it("keeps the recipe export but hides instance backups when the flag is off", async () => {
   setup("admin", false);
-  expect(await screen.findByRole("heading", { name: "Download my household's recipes" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Download my recipes" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Export" })).toBeInTheDocument();
   expect(screen.queryByText("Instance backups")).not.toBeInTheDocument();
 });

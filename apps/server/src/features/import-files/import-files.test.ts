@@ -202,7 +202,7 @@ describe("import files", () => {
     expect(safeEntryName("a/b.json")).toBe("a/b.json");
   }, 60_000);
 
-  it("keeps jobs private to the household", async () => {
+  it("keeps jobs private to the user", async () => {
     const { run, get, B } = await mk();
     const j = await run(JSON.stringify(ld("Bread")), "a.json");
     expect((await get(B, `/import/jobs/${j.id}`)).status).toBe(404);

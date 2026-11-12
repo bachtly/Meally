@@ -48,9 +48,7 @@ function renderAt(
       email: "a@example.com",
       name: "Ada",
       role: "admin",
-      householdId: "h1",
     },
-    household: { id: "h1", name: "Home" },
   };
   calls = [];
   vi.stubGlobal(

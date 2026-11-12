@@ -70,7 +70,7 @@ interface Info {
   uptimeSeconds: number;
   dbBytes: number;
   imagesBytes: number;
-  counts: { users: number; households: number; recipes: number };
+  counts: { users: number; recipes: number };
   migrations: number;
   dataDir: string;
   backupSchedule: { hours: number; keep: number };
@@ -89,7 +89,6 @@ function Overview() {
     ["Database", bytes(i.dbBytes)],
     ["Images", bytes(i.imagesBytes)],
     ["Users", String(i.counts.users)],
-    ["Households", String(i.counts.households)],
     ["Recipes", String(i.counts.recipes)],
     ["Migrations", String(i.migrations)],
     ["Backups", i.backupSchedule.hours > 0 ? `Every ${i.backupSchedule.hours} h, keep ${i.backupSchedule.keep}` : "Off"],
@@ -125,7 +124,7 @@ interface Flag {
 const GROUPS: [string, string[]][] = [
   ["Recipes", ["import-url", "import-files", "ingredient-parser", "foods-units", "scaling", "organizers", "cook-mode", "ratings", "timeline", "nutrition", "print"]],
   ["Planning", ["meal-plan", "shopping-lists", "cookbooks"]],
-  ["Sharing and people", ["households", "share-links"]],
+  ["Sharing", ["share-links"]],
   ["Platform", ["backups", "api-tokens", "webhooks", "pwa", "ai"]],
 ];
 
@@ -200,7 +199,6 @@ interface AdminUser {
   email: string;
   name: string;
   role: "admin" | "member";
-  householdName: string;
   createdAt: number;
   lastSeenAt: number | null;
 }
@@ -259,7 +257,7 @@ function Users() {
     }),
     delete: (u: AdminUser) => ({
       title: "Delete user?",
-      text: `${u.email} and their sessions will be deleted. Their household keeps its recipes, unless it is empty.`,
+      text: `${u.email} and their sessions will be deleted. Their recipes are deleted with them.`,
       go: "Delete",
     }),
     reset: (u: AdminUser) => ({
@@ -293,7 +291,6 @@ function Users() {
             <thead className="text-muted">
               <tr>
                 <th className="p-2">User</th>
-                <th className="p-2">Household</th>
                 <th className="p-2">Role</th>
                 <th className="p-2">Created</th>
                 <th className="p-2">Last seen</th>
@@ -309,7 +306,6 @@ function Users() {
                     <p className="font-medium">{u.name}</p>
                     <p className="text-muted">{u.email}</p>
                   </td>
-                  <td className="p-2">{u.householdName}</td>
                   <td className="p-2">{u.role}</td>
                   <td className="p-2">{day(u.createdAt)}</td>
                   <td className="p-2">{day(u.lastSeenAt)}</td>
@@ -327,7 +323,7 @@ function Users() {
                   </p>
                   <p className="break-all text-sm text-muted">{u.email}</p>
                   <p className="text-sm text-muted">
-                    {u.householdName} · Joined {day(u.createdAt)} · Last seen {day(u.lastSeenAt)}
+                    Joined {day(u.createdAt)} · Last seen {day(u.lastSeenAt)}
                   </p>
                   {buttons(u)}
                 </Card>
@@ -369,8 +365,8 @@ function Users() {
 
 // ---- sign-up ----
 const MODES = [
-  ["open", "Open", "Anyone who can reach this server can create an account and a household. Only use this on a private network."],
-  ["invite", "Invite only", "New people need an invite link from a household owner. Recommended for servers on the public internet."],
+  ["open", "Open", "Anyone who can reach this server can create an account. Only use this on a private network."],
+  ["invite", "Invite only", "New people need an invite link. Recommended for servers on the public internet."],
   ["closed", "Closed", "Nobody can create an account, even with an invite. Existing users can still sign in."],
 ] as const;
 

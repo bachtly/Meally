@@ -4,7 +4,8 @@ import type { Db } from "../../db/core.js";
 import { shareLinks } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
-import type { Scheduler } from "../../ports/index.js";
+import { moveLegacyImages } from "../../lib/image-move.js";
+import type { ImageStore, Scheduler } from "../../ports/index.js";
 
 /** Compares without exiting early on the first differing byte (length is not secret). */
 export function safeEqual(a: string, b: string): boolean {
@@ -27,9 +28,11 @@ export async function cleanupShares(db: Db, now = new Date()): Promise<void> {
  * Jobs every platform exposes by name. `import.run` is a no-op here; the Node app replaces it with the
  * file-import worker, so calling it on the edge (where file import is off) is harmless.
  */
-export function defineCoreJobs(scheduler: Scheduler, db: Db) {
+export function defineCoreJobs(scheduler: Scheduler, db: Db, images: ImageStore) {
   if (!scheduler.has("import.run")) scheduler.define("import.run", () => {});
   scheduler.define("shares.cleanup", () => cleanupShares(db));
+  // Finishes the household-to-user rekey (ADR 0003). Safe to run again; a no-op once nothing is left to move.
+  scheduler.define("images.move", async () => void (await moveLegacyImages(db, images)));
 }
 
 /** `POST /internal/jobs/:name`: called by pg_cron/pg_net with `Authorization: Bearer <MEALLY_JOBS_SECRET>`. */

@@ -34,7 +34,7 @@ function body<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
 }
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
 const ctx = (c: Context<AppEnv>) =>
-  [c.get("db"), c.get("householdId")] as const;
+  [c.get("db"), c.get("userId")] as const;
 const HEARTBEAT_MS = 25_000;
 
 export const shoppingRoutes = new Hono<AppEnv>();
@@ -148,12 +148,12 @@ shoppingRoutes
   })
   .get("/lists/:id/events", async (c) => {
     if (!c.get("platform").events.supportsStreaming) throw new ApiError(501, "not_configured", "Live updates are not available on this deployment");
-    const [db, householdId] = ctx(c);
+    const [db, userId] = ctx(c);
     const listId = c.req.param("id");
-    await svc.assertList(db, householdId, listId);
+    await svc.assertList(db, userId, listId);
     return streamSSE(c, async (stream) => {
       const off = new ShoppingBus(c.get("platform").events).subscribe(
-        householdId,
+        userId,
         listId,
         (e) =>
           void stream

@@ -108,7 +108,7 @@ describe("Supabase image store", () => {
   /** JPEG signature; the declared type is wrong on purpose, because the server sniffs the bytes. */
   const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16])], "a.jpg", { type: "application/octet-stream" });
 
-  it("takes pre-sized uploads, serves the bytes with a stable cacheable URL, and keeps households apart", async () => {
+  it("takes pre-sized uploads, serves the bytes with a stable cacheable URL, and keeps users apart", async () => {
     calls.length = 0;
     const t = await mk((p) => ({ ...p, images: store() }));
     const A = await t.su("setup", "a@example.com");

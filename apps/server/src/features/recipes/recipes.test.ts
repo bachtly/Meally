@@ -81,7 +81,7 @@ describe("recipes CRUD", () => {
     expect((await call(A, "PUT", "/recipes/nope", { name: "x" })).status).toBe(404);
   });
 
-  it("makes slugs unique per household", async () => {
+  it("makes slugs unique per user", async () => {
     const slugs = [];
     for (let i = 0; i < 3; i++) slugs.push(((await (await make(A, "Soup!")).json()) as any).slug);
     expect(slugs).toEqual(["soup", "soup-2", "soup-3"]);
@@ -173,7 +173,7 @@ describe("images", () => {
 });
 
 describe("tenant isolation", () => {
-  it("hides household A's recipes from household B", async () => {
+  it("hides user A's recipes from user B", async () => {
     const a = (await (await make(A, "Secret Stew", { ingredients: [ing("1 kg unobtainium")] })).json()) as any;
     expect((await call(B, "GET", `/recipes/${a.slug}`)).status).toBe(404);
     expect((await call(B, "PUT", `/recipes/${a.slug}`, { name: "Hijack" })).status).toBe(404);

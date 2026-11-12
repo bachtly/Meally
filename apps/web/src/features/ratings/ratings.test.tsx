@@ -20,7 +20,7 @@ let failPut = false;
 
 function renderAt(path: string) {
   const info = { enabled: true, locked: false, source: "default", label: "x", description: "y" };
-  const user = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } };
+  const user = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -82,10 +82,9 @@ it("rolls the heart back when saving fails", async () => {
   await waitFor(() => expect(heart).toHaveAttribute("aria-pressed", "false"));
 });
 
-it("rates with the keyboard, shows the household average and clears", async () => {
+it("rates with the keyboard, and clears", async () => {
   const { container } = renderAt("/recipes/tomato-soup");
   const group = await screen.findByRole("radiogroup", { name: "Your rating" });
-  expect(screen.getByText(/4\.3\s*·\s*3 ratings/)).toBeInTheDocument();
   const first = screen.getByRole("radio", { name: "1 star" });
   first.focus();
   await userEvent.keyboard("{ArrowRight}");

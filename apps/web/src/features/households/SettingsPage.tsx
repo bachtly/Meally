@@ -5,7 +5,6 @@ import { useFeature } from "../features/FeaturesProvider";
 import { useSession } from "../auth/useSession";
 import { ThemeToggle } from "../../ui";
 import { ExportBackupsSection } from "../backups/ExportBackupsSection";
-import { HouseholdSection } from "./HouseholdSection";
 import { TokensSection } from "../tokens/TokensSection";
 import { WebhooksSection } from "../webhooks/WebhooksSection";
 import { SharedLinksSection } from "../share/SharedLinksSection";
@@ -33,11 +32,6 @@ export function SettingsPage() {
         </p>
         <p className="text-sm text-muted">Profile editing is coming soon.</p>
       </Section>
-      <Feature on="households">
-        <Section title="Household">
-          <HouseholdSection />
-        </Section>
-      </Feature>
       <Feature on="organizers">
         <Section title="Organisers">
           <Link to="/organizers" className="text-accent underline">

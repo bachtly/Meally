@@ -24,7 +24,7 @@ function renderPlan(opts: { shopping?: boolean } = {}) {
   const on = { enabled: true, locked: false, source: "default", label: "x", description: "y" };
   const features: Record<string, typeof on> = { "meal-plan": on, organizers: on };
   if (opts.shopping !== false) features["shopping-lists"] = on;
-  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } };
+  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {

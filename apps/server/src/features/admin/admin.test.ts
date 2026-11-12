@@ -61,9 +61,12 @@ describe("admin", () => {
     const t = await mk();
     const all = await t.json(await t.req(t.A, "/users"));
     expect(all.total).toBe(2);
-    expect(all.items[0]).toMatchObject({ email: "a@example.com", role: "admin" });
-    expect(all.items[0].householdName).toBeTruthy();
-    expect(all.items[0].lastSeenAt).toBeTypeOf("number");
+    // Both accounts can share a created_at millisecond, so don't rely on the order.
+    const a = all.items.find((u: any) => u.email === "a@example.com");
+    expect(a).toMatchObject({ role: "admin" });
+    expect(a).not.toHaveProperty("householdId");
+    expect(a).not.toHaveProperty("householdName");
+    expect(a.lastSeenAt).toBeTypeOf("number");
     const f = await t.json(await t.req(t.A, "/users?q=B@EX&limit=1"));
     expect(f.total).toBe(1);
     expect(f.items[0].email).toBe("b@example.com");
@@ -91,28 +94,28 @@ describe("admin", () => {
     expect((await t.req(t.A, "/users/nope/reset-password", "POST")).status).toBe(404);
   });
 
-  it("deletes a user with their sessions and their empty household", async () => {
+  it("deletes a user with their sessions", async () => {
     const t = await mk();
     const [, b] = await t.users();
     expect((await t.req(t.A, `/users/${b.id}`, "DELETE")).status).toBe(204);
     expect((await t.app.request("/api/v1/auth/me", { headers: { cookie: t.B } })).status).toBe(401);
     expect((await t.users()).length).toBe(1);
-    expect((await t.json(await t.req(t.A, "/info"))).counts).toMatchObject({ users: 1, households: 1 });
+    expect((await t.json(await t.req(t.A, "/info"))).counts).toEqual({ users: 1, recipes: 0 });
   });
 
-  it("keeps a household that still has recipes", async () => {
+  it("deletes a user's recipes with them", async () => {
     const t = await mk();
     const [, b] = await t.users();
     const rec = await t.app.request("/api/v1/recipes", { method: "POST", headers: { ...H, cookie: t.B }, body: JSON.stringify({ name: "Soup", ingredients: [{ raw: "1 cup water" }], steps: [{ text: "Boil." }] }) });
     expect(rec.status).toBe(201);
     await t.req(t.A, `/users/${b.id}`, "DELETE");
-    expect((await t.json(await t.req(t.A, "/info"))).counts).toMatchObject({ users: 1, households: 2, recipes: 1 });
+    expect((await t.json(await t.req(t.A, "/info"))).counts).toEqual({ users: 1, recipes: 0 });
   });
 
   it("reports server info", async () => {
     const t = await mk();
     const i = await t.json(await t.req(t.A, "/info"));
-    expect(i).toMatchObject({ version: "0.0.0", counts: { users: 2, households: 2, recipes: 0 }, backupSchedule: { hours: 24, keep: 7 } });
+    expect(i).toMatchObject({ version: "0.0.0", counts: { users: 2, recipes: 0 }, backupSchedule: { hours: 24, keep: 7 } });
     expect(i.migrations).toBeGreaterThanOrEqual(2);
     expect(i.nodeVersion).toMatch(/^v/);
   });

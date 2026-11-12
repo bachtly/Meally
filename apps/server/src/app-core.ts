@@ -21,7 +21,6 @@ import type { Platform } from "./ports/index.js";
 import { ShoppingBus, registerShoppingBus } from "./features/shopping/bus.js";
 import { recipeRoutes, imageRoutes } from "./features/recipes/routes.js";
 import { csrfProtection } from "./features/auth/middleware.js";
-import { householdRoutes } from "./features/households/routes.js";
 import { createRateLimiter } from "./lib/rate-limit.js";
 import { publicRoutes, shareRoutes } from "./features/share/routes.js";
 import { webhookRoutes } from "./features/webhooks/routes.js";
@@ -78,7 +77,7 @@ export function createCoreApp(opts: CoreAppOptions) {
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
   const webhooks = createDispatcher({ db, fetcher, flags, scheduler: platform.scheduler, allowPrivate: allowPrivateUrls(env) });
-  defineCoreJobs(platform.scheduler, db);
+  defineCoreJobs(platform.scheduler, db, platform.images);
   if (opts.webhookScheduler) webhooks.start();
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
@@ -131,7 +130,6 @@ export function createCoreApp(opts: CoreAppOptions) {
   api.route("/ai", aiRoutes);
   api.route("/webhooks", webhookRoutes);
   api.route("/cookbooks", cookbookRoutes);
-  api.route("/household", householdRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
   opts.mountLate?.(api);

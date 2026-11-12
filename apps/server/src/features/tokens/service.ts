@@ -24,7 +24,7 @@ const toDto = (r: typeof apiTokens.$inferSelect): ApiToken => ({
 
 export async function createToken(
   db: Db,
-  user: { id: string; householdId: string },
+  user: { id: string },
   input: { name: string; scope: "read" | "write"; expiresInDays?: number | null },
   now = new Date(),
 ) {
@@ -32,7 +32,6 @@ export async function createToken(
   const row = {
     id: randomUUID(),
     userId: user.id,
-    householdId: user.householdId,
     name: input.name,
     tokenHash: hashToken(token),
     prefix: token.slice(0, 8),

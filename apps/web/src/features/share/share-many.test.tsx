@@ -26,7 +26,7 @@ function renderAt(path: string) {
       const method = init?.method ?? "GET";
       calls.push({ method, url: u, body: init?.body as string | undefined });
       if (u.includes("/auth/me"))
-        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } });
+        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } });
       if (u.includes("/features")) return Response.json({ features: { "share-links": on, cookbooks: on } });
       if (u.endsWith("/cookbooks/weeknight/shares") && method === "POST") return Response.json({ url: "https://meally.test/s/cb" }, { status: 201 });
       if (u.endsWith("/shares") && method === "POST") return Response.json({ url: "https://meally.test/s/tok" }, { status: 201 });

@@ -45,7 +45,7 @@ describe("rate limiter", () => {
 });
 
 describe("auth routes", () => {
-  it("setup works once and creates admin + household", async () => {
+  it("setup works once and creates the admin", async () => {
     const app = makeApp();
     expect(await (await app.request("/api/v1/auth/status")).json()).toEqual({ needsSetup: true, signupMode: "invite" });
     const res = await post(app, "setup", admin);
@@ -56,7 +56,9 @@ describe("auth routes", () => {
     expect(res.headers.get("set-cookie")).not.toMatch(/Secure/i);
     const body = (await (await me(app, cookie)).json()) as any;
     expect(body.user).toMatchObject({ email: "admin@example.com", role: "admin" });
-    expect(body.household.id).toBe(body.user.householdId);
+    expect(body).not.toHaveProperty("household");
+    expect(body.user).not.toHaveProperty("householdId");
+    expect(body.user).not.toHaveProperty("householdRole");
     expect((await post(app, "setup", { ...admin, email: "b@example.com" })).status).toBe(409);
     expect(((await (await app.request("/api/v1/auth/status")).json()) as any).needsSetup).toBe(false);
   });
@@ -108,7 +110,7 @@ describe("auth routes", () => {
     expect((await makeApp().request("/api/v1/auth/me")).status).toBe(401);
   });
 
-  it("register: closed blocks, invite needs a token, open creates a household", async () => {
+  it("register: closed blocks, invite needs a token, open creates an account", async () => {
     const reg = { email: "u@example.com", name: "Uma", password: "another pass" };
     for (const [mode, status, code] of [
       ["closed", 403, "signup_closed"],
@@ -130,7 +132,7 @@ describe("auth routes", () => {
     const u = (await (await me(app, userCookie)).json()) as any;
     expect(u.user.email).toBe("u@example.com");
     expect(u.user.role).toBe("member");
-    expect(u.household.id).not.toBe(a.household.id);
+    expect(u.user.id).not.toBe(a.user.id);
     expect(a.user.email).toBe("admin@example.com");
     expect((await post(app, "register", reg)).status).toBe(409);
   });

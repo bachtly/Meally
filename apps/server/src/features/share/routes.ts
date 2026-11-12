@@ -41,24 +41,24 @@ shareRoutes
   .post("/recipes/:slug/shares", async (c) => {
     const parsed = createShareSchema.safeParse(await body(c));
     if (!parsed.success) throw invalid(OPTS_MSG);
-    return created(c, await createShare(c.get("db"), c.get("householdId"), c.get("user"), c.req.param("slug"), parsed.data));
+    return created(c, await createShare(c.get("db"), c.get("userId"), c.get("user"), c.req.param("slug"), parsed.data));
   })
-  .get("/recipes/:slug/shares", async (c) => c.json({ items: await listShares(c.get("db"), c.get("householdId"), c.req.param("slug")) }))
+  .get("/recipes/:slug/shares", async (c) => c.json({ items: await listShares(c.get("db"), c.get("userId"), c.req.param("slug")) }))
   .post("/cookbooks/:slug/shares", async (c) => {
     const parsed = createShareSchema.safeParse(await body(c));
     if (!parsed.success) throw invalid(OPTS_MSG);
-    return created(c, await createCookbookShare(c.get("db"), c.get("householdId"), c.get("user"), c.req.param("slug"), parsed.data));
+    return created(c, await createCookbookShare(c.get("db"), c.get("userId"), c.get("user"), c.req.param("slug"), parsed.data));
   })
   .post("/shares", async (c) => {
     const parsed = createShareSetSchema.safeParse(await body(c));
     if (!parsed.success) throw invalid(`recipeSlugs must list 1 to 100 different recipes; ${OPTS_MSG}`);
-    return created(c, await createSetShare(c.get("db"), c.get("householdId"), c.get("user"), parsed.data));
+    return created(c, await createSetShare(c.get("db"), c.get("userId"), c.get("user"), parsed.data));
   })
-  .get("/shares", async (c) => c.json({ items: await listAllShares(c.get("db"), c.get("householdId")) }))
-  // A link someone else sent: what the viewer already has, and saving copies into their household.
+  .get("/shares", async (c) => c.json({ items: await listAllShares(c.get("db"), c.get("userId")) }))
+  // A link someone else sent: what the viewer already has, and saving copies into their recipes.
   .get("/shares/received/:token", async (c) => {
     c.header("Cache-Control", "no-store");
-    return c.json(await shareStatus(c.get("db"), c.get("householdId"), c.req.param("token"), await shareFlags(c)));
+    return c.json(await shareStatus(c.get("db"), c.get("userId"), c.req.param("token"), await shareFlags(c)));
   })
   .post("/shares/received/:token/save", async (c) => {
     const parsed = saveShareSchema.safeParse(await body(c));
@@ -67,7 +67,7 @@ shareRoutes
     const result = await saveShare(
       c.get("db"),
       c.get("platform").images,
-      { householdId: c.get("householdId"), userId: c.get("user").id },
+      { userId: c.get("userId") },
       c.req.param("token"),
       parsed.data,
       { ...(await shareFlags(c)), foods: f["foods-units"].enabled },
@@ -75,7 +75,7 @@ shareRoutes
     return c.json(result, 201);
   })
   .delete("/shares/:id", async (c) => {
-    await revokeShare(c.get("db"), c.get("householdId"), c.req.param("id"));
+    await revokeShare(c.get("db"), c.get("userId"), c.req.param("id"));
     return c.body(null, 204);
   });
 
@@ -100,10 +100,10 @@ export async function shareFlags(c: Context<AppEnv>): Promise<ShareFlags> {
   return { scaling: f.scaling.enabled, cookbooks: f.cookbooks.enabled, organizers: f.organizers.enabled, ratings: f.ratings.enabled };
 }
 
-async function sendImage(c: Context<AppEnv>, sizeParam: string, img: { imageId: string; householdId: string } | null) {
+async function sendImage(c: Context<AppEnv>, sizeParam: string, img: { imageId: string; userId: string } | null) {
   const size = Number(sizeParam) as ImageSize;
   if (!imageSizes.includes(size) || !img) throw gone();
-  const data = await c.get("platform").images.get(img.householdId, img.imageId, size);
+  const data = await c.get("platform").images.get(img.userId, img.imageId, size);
   if (!data) throw gone();
   c.header("Cache-Control", "private, max-age=3600");
   return c.body(data.bytes as Uint8Array<ArrayBuffer>, 200, { "Content-Type": data.contentType });

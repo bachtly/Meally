@@ -18,7 +18,6 @@ export const FEATURES = [
   { key: "meal-plan", label: "Meal planner", description: "Plan meals by day and week.", default: true, dependsOn: [] },
   { key: "shopping-lists", label: "Shopping lists", description: "Build and share shopping lists.", default: true, dependsOn: [] },
   { key: "cookbooks", label: "Cookbooks", description: "Saved filtered collections of recipes.", default: true, dependsOn: ["organizers"] },
-  { key: "households", label: "Households", description: "Members, roles and invites.", default: true, dependsOn: [] },
   { key: "share-links", label: "Share links", description: "Public read-only links to a recipe.", default: true, dependsOn: [] },
   { key: "import-files", label: "Import from files", description: "Import from other apps and files.", default: true, dependsOn: [] },
   { key: "backups", label: "Export and backups", description: "Export recipes; back up and restore the instance.", default: true, dependsOn: [] },

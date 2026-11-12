@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1", householdRole: "owner" }, household: { id: "h1", name: "Home" } };
+const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
 
 function setup(items: unknown[] = []) {
   const calls: Array<{ url: string; method: string }> = [];

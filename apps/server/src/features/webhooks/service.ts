@@ -6,7 +6,7 @@ import type { Webhook, WebhookDelivery, WebhookEvent, WebhookWithSecret } from "
 import type { z } from "@meally/shared";
 import type { webhookInputSchema } from "@meally/shared";
 import { queryRows, type Db } from "../../db/core.js";
-import { households, webhookDeliveries, webhookRetries, webhooks } from "../../db/schema/index.js";
+import { users, webhookDeliveries, webhookRetries, webhooks } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import type { Fetcher } from "../import-url/fetch.js";
 import type { FlagsService } from "../features/service.js";
@@ -62,26 +62,26 @@ const toWebhook = (r: Row): Webhook => ({
 });
 const withSecret = (r: Row): WebhookWithSecret => ({ ...toWebhook(r), secret: r.secret });
 
-async function find(db: Db, householdId: string, id: string): Promise<Row> {
-  const [r] = await db.select().from(webhooks).where(and(eq(webhooks.id, id), eq(webhooks.householdId, householdId))).limit(1);
+async function find(db: Db, userId: string, id: string): Promise<Row> {
+  const [r] = await db.select().from(webhooks).where(and(eq(webhooks.id, id), eq(webhooks.userId, userId))).limit(1);
   if (!r) throw notFound();
   return r;
 }
 
-export async function listWebhooks(db: Db, householdId: string): Promise<Webhook[]> {
-  const rows = await db.select().from(webhooks).where(eq(webhooks.householdId, householdId)).orderBy(webhooks.createdAt);
+export async function listWebhooks(db: Db, userId: string): Promise<Webhook[]> {
+  const rows = await db.select().from(webhooks).where(eq(webhooks.userId, userId)).orderBy(webhooks.createdAt);
   return rows.map(toWebhook);
 }
-export async function getWebhook(db: Db, householdId: string, id: string) {
-  return withSecret(await find(db, householdId, id));
+export async function getWebhook(db: Db, userId: string, id: string) {
+  return withSecret(await find(db, userId, id));
 }
-export async function createWebhook(db: Db, householdId: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
+export async function createWebhook(db: Db, userId: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
   assertWebhookUrl(input.url, allowPrivate);
   const [r] = await db
     .insert(webhooks)
     .values({
       id: randomUUID(),
-      householdId,
+      userId,
       name: input.name,
       url: input.url,
       secret: newSecret(),
@@ -94,9 +94,9 @@ export async function createWebhook(db: Db, householdId: string, input: WebhookD
     .returning();
   return withSecret(r!);
 }
-export async function updateWebhook(db: Db, householdId: string, id: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
+export async function updateWebhook(db: Db, userId: string, id: string, input: WebhookData, allowPrivate = false): Promise<WebhookWithSecret> {
   assertWebhookUrl(input.url, allowPrivate);
-  const cur = await find(db, householdId, id);
+  const cur = await find(db, userId, id);
   const enabled = input.enabled ?? cur.enabled;
   const [r] = await db
     .update(webhooks)
@@ -110,16 +110,16 @@ export async function updateWebhook(db: Db, householdId: string, id: string, inp
       // Re-enabling resets the failure streak so the hook gets a fresh run.
       failureCount: enabled && !cur.enabled ? 0 : cur.failureCount,
     })
-    .where(and(eq(webhooks.id, id), eq(webhooks.householdId, householdId)))
+    .where(and(eq(webhooks.id, id), eq(webhooks.userId, userId)))
     .returning();
   return withSecret(r!);
 }
-export async function deleteWebhook(db: Db, householdId: string, id: string) {
-  await find(db, householdId, id);
-  await db.delete(webhooks).where(and(eq(webhooks.id, id), eq(webhooks.householdId, householdId)));
+export async function deleteWebhook(db: Db, userId: string, id: string) {
+  await find(db, userId, id);
+  await db.delete(webhooks).where(and(eq(webhooks.id, id), eq(webhooks.userId, userId)));
 }
-export async function listDeliveries(db: Db, householdId: string, id: string): Promise<WebhookDelivery[]> {
-  await find(db, householdId, id);
+export async function listDeliveries(db: Db, userId: string, id: string): Promise<WebhookDelivery[]> {
+  await find(db, userId, id);
   const rows = await db
     .select()
     .from(webhookDeliveries)
@@ -156,7 +156,7 @@ export function localParts(now: Date, tz: string): { date: string; time: string 
 }
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
-/** True once the household's local clock passes `dailyAt` (at most 2 h late), once per local day. */
+/** True once the owner's local clock passes `dailyAt` (at most 2 h late), once per local day. */
 export function digestDue(now: Date, h: { dailyAt: string; tz: string; lastDigestOn: string | null }): { due: boolean; date: string } {
   const { date, time } = localParts(now, h.tz);
   const late = minutes(time) - minutes(h.dailyAt);
@@ -288,22 +288,22 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
   scheduler.define(RETRY_JOB, async () => void (await runRetries()));
   scheduler.define(DIGEST_JOB, () => tick());
 
-  async function household(id: string) {
-    const [h] = await db.select({ id: households.id, name: households.name }).from(households).where(eq(households.id, id)).limit(1);
-    return h ?? { id, name: "" };
+  async function owner(id: string) {
+    const [u] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, id)).limit(1);
+    return u ?? { id, name: "" };
   }
 
   /** Sends now. With `retry`, failures are retried up to 3 times with jittered backoff. */
   async function deliver(hook: Row, event: string, data: unknown, retry: boolean): Promise<DeliveryResult> {
-    const body = JSON.stringify({ event, occurredAt: now().toISOString(), household: await household(hook.householdId), data });
+    const body = JSON.stringify({ event, occurredAt: now().toISOString(), user: await owner(hook.userId), data });
     const res = await attempt(hook, event, body);
     if (!res.ok && retry) await scheduleRetry(hook.id, event, body, 0);
     return res;
   }
 
-  async function emit(householdId: string, event: string, data: unknown) {
+  async function emit(userId: string, event: string, data: unknown) {
     if (!(await flags.getFeatures()).webhooks?.enabled) return;
-    const rows = await db.select().from(webhooks).where(and(eq(webhooks.householdId, householdId), eq(webhooks.enabled, true)));
+    const rows = await db.select().from(webhooks).where(and(eq(webhooks.userId, userId), eq(webhooks.enabled, true)));
     await Promise.all(rows.filter((r) => r.events.includes(event)).map((r) => deliver(r, event, data, true)));
   }
 
@@ -318,7 +318,7 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
       // Claim today's digest atomically so overlapping runs send it once.
       const claimed = await queryRows(db, sql`UPDATE webhooks SET last_digest_on = ${date} WHERE id = ${r.id} AND last_digest_on IS DISTINCT FROM ${date} RETURNING id`);
       if (!claimed.length) continue;
-      const entries = await listEntries(db, r.householdId, date, date);
+      const entries = await listEntries(db, r.userId, date, date);
       const slim = entries.map((e) => ({
         mealType: e.mealType,
         title: e.title,
@@ -340,8 +340,8 @@ export function createDispatcher({ db, fetcher, flags, scheduler = createNodeSch
     stop() {
       scheduler.stop();
     },
-    async sendTest(householdId: string, id: string) {
-      const hook = await find(db, householdId, id);
+    async sendTest(userId: string, id: string) {
+      const hook = await find(db, userId, id);
       return deliver(hook, "ping", { message: "This is a test from Meally." }, false);
     },
   };

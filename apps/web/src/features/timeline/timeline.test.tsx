@@ -25,7 +25,7 @@ function renderAt(path: string, timelineOn = true) {
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url);
-      if (u.includes("/auth/me")) return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } });
+      if (u.includes("/auth/me")) return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } });
       if (u.includes("/features")) return Response.json({ features: { timeline: flag(timelineOn), "cook-mode": flag(true) } });
       if (init?.method === "POST") {
         posts.push({ url: u, body: JSON.parse(String(init.body)) });

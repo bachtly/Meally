@@ -1,14 +1,14 @@
 import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { households } from "./auth.js";
+import { users } from "./auth.js";
 import { recipes } from "./recipes.js";
 
 export const cookbooks = pgTable(
   "cookbooks",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
@@ -18,7 +18,7 @@ export const cookbooks = pgTable(
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
-  (t) => [uniqueIndex("cookbooks_household_slug_uq").on(t.householdId, t.slug)],
+  (t) => [uniqueIndex("cookbooks_user_slug_uq").on(t.userId, t.slug)],
 );
 
 export const cookbookRecipes = pgTable(

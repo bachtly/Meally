@@ -15,13 +15,13 @@ export interface SupabaseImageOptions {
 }
 
 /**
- * Object path: `<householdId>/<imageId>-<size>`. No extension: a size may be WebP or JPEG (Safari cannot
+ * Object path: `<userId>/<imageId>-<size>`. No extension: a size may be WebP or JPEG (Safari cannot
  * encode WebP), and Storage keeps the real Content-Type with the object and serves it on signed URLs.
  */
-export const objectPath = (householdId: string, imageId: string, size: ImageSize) => `${householdId}/${imageId}-${size}`;
+export const objectPath = (userId: string, imageId: string, size: ImageSize) => `${userId}/${imageId}-${size}`;
 
 /**
- * Private Supabase Storage bucket through the plain REST API (no SDK). The server checks household
+ * Private Supabase Storage bucket through the plain REST API (no SDK). The server checks user
  * ownership and then streams the bytes from the authenticated endpoint, so tenant isolation stays in our code and
  * the image URL is stable (cacheable by the browser and the service worker).
  * Browsers resize before upload (the edge has no sharp), so `putOriginal` is not supported.
@@ -42,32 +42,62 @@ export function createSupabaseImageStore(opts: SupabaseImageOptions): ImageStore
     async putOriginal() {
       throw new ApiError(415, "unsupported_media", "This server stores browser-resized images; update the app and try again");
     },
-    async putSized(householdId, sizes) {
+    async putSized(userId, sizes) {
       const id = randomUUID();
-      const results = await Promise.allSettled(imageSizes.map((size) => store.put(householdId, id, size, sizes[size].bytes, sizes[size].contentType)));
+      const results = await Promise.allSettled(imageSizes.map((size) => store.put(userId, id, size, sizes[size].bytes, sizes[size].contentType)));
       const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
       if (failed) {
-        await store.delete(householdId, id).catch(() => {});
+        await store.delete(userId, id).catch(() => {});
         throw failed.reason;
       }
       return id;
     },
-    async put(householdId, imageId, size, bytes, contentType) {
-      const res = await doFetch(`${base}/object/${bucket}/${enc(objectPath(householdId, imageId, size))}`, {
+    async put(userId, imageId, size, bytes, contentType) {
+      const res = await doFetch(`${base}/object/${bucket}/${enc(objectPath(userId, imageId, size))}`, {
         method: "POST",
         headers: headers({ "Content-Type": contentType, "x-upsert": "true", "Cache-Control": "max-age=31536000" }),
         body: bytes as Uint8Array<ArrayBuffer>,
       });
       if (!res.ok) fail("upload", res.status);
     },
-    async get(householdId, imageId, size): Promise<StoredImage | null> {
-      const res = await doFetch(`${base}/object/authenticated/${bucket}/${enc(objectPath(householdId, imageId, size))}`, { headers: headers() });
+    async get(userId, imageId, size): Promise<StoredImage | null> {
+      const res = await doFetch(`${base}/object/authenticated/${bucket}/${enc(objectPath(userId, imageId, size))}`, { headers: headers() });
       if (res.status === 404 || res.status === 400) return null;
       if (!res.ok) fail("download", res.status);
       return { bytes: new Uint8Array(await res.arrayBuffer()), contentType: res.headers.get("content-type") ?? "image/webp" };
     },
-    async delete(householdId, imageId) {
-      const prefixes = imageSizes.map((s) => objectPath(householdId, imageId, s));
+    async moveOwner(fromOwnerId, toOwnerId) {
+      let moved = 0;
+      // Listing returns at most `limit` names; each pass deletes what it copied, so repeat until nothing is left.
+      for (;;) {
+        const list = await doFetch(`${base}/object/list/${bucket}`, {
+          method: "POST",
+          headers: headers({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ prefix: fromOwnerId, limit: 100, offset: 0 }),
+        });
+        if (!list.ok) fail("list", list.status);
+        const names = ((await list.json()) as Array<{ name: string }>).map((o) => o.name).filter(Boolean);
+        if (names.length === 0) return moved;
+        for (const name of names) {
+          const copy = await doFetch(`${base}/object/copy`, {
+            method: "POST",
+            headers: headers({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ bucketId: bucket, sourceKey: `${fromOwnerId}/${name}`, destinationKey: `${toOwnerId}/${name}` }),
+          });
+          // 400/409: the destination already exists, copied by an earlier interrupted run.
+          if (!copy.ok && copy.status !== 400 && copy.status !== 409) fail("copy", copy.status);
+        }
+        const del = await doFetch(`${base}/object/${bucket}`, {
+          method: "DELETE",
+          headers: headers({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ prefixes: names.map((n) => `${fromOwnerId}/${n}`) }),
+        });
+        if (!del.ok && del.status !== 404) fail("delete", del.status);
+        moved += names.length;
+      }
+    },
+    async delete(userId, imageId) {
+      const prefixes = imageSizes.map((s) => objectPath(userId, imageId, s));
       const res = await doFetch(`${base}/object/${bucket}`, {
         method: "DELETE",
         headers: headers({ "Content-Type": "application/json" }),

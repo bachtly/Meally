@@ -30,7 +30,7 @@ function renderAt(path: string, cookbooksOn = true) {
       const method = init?.method ?? "GET";
       calls.push({ method, url: u, body: init?.body as string | undefined });
       if (u.includes("/auth/me"))
-        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } });
+        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } });
       if (u.includes("/features")) return Response.json({ features: { cookbooks: cookbooksOn ? on : off, organizers: on, ratings: on } });
       if (u.includes("/cookbooks/containing/")) return Response.json({ items: held });
       if (u.match(/\/cookbooks\/weeknight\/recipes\/soup/) && method === "DELETE") {

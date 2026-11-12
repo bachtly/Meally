@@ -1,9 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
-import { loginSchema, registerSchema, setupSchema, type InviteLookup, type MeResponse } from "@meally/shared";
+import { loginSchema, registerSchema, setupSchema, type MeResponse } from "@meally/shared";
 import type { ZodType } from "zod";
-import { api, ApiRequestError, postJson } from "../../lib/api";
+import { ApiRequestError, postJson } from "../../lib/api";
 import { Brand, Button, EmptyState, Field, Input, Skeleton } from "../../ui";
 import { useAuthStatus, useSession } from "./useSession";
 
@@ -139,42 +138,18 @@ export function SignInPage() {
 export function SignUpPage() {
   const status = useAuthStatus();
   const { me } = useSession();
-  const token = useSearchParams()[0].get("invite") ?? "";
   const next = useNext();
-  const invite = useQuery({
-    queryKey: ["invite", token],
-    queryFn: () => api<InviteLookup>(`/auth/invite/${encodeURIComponent(token)}`),
-    enabled: !!token,
-    retry: false,
-  });
-  if (me) return <Navigate to={token ? `/invite/${encodeURIComponent(token)}` : (next ?? "/")} replace />;
+  if (me) return <Navigate to={next ?? "/"} replace />;
   if (status.data && (status.data.needsSetup || status.data.signupMode === "closed")) {
     return <Navigate to={withNext("/signin", next)} replace />;
   }
-  const validInvite = invite.data?.valid ? invite.data : null;
   return (
-    <AuthCard title={validInvite ? `Join ${validInvite.householdName}` : "Create your account"}>
-      {status.isLoading || (token && invite.isLoading) ? (
+    <AuthCard title="Create your account">
+      {status.isLoading ? (
         <Skeleton className="h-48 w-full" />
-      ) : validInvite ? (
-        <AuthForm
-          schema={registerSchema}
-          endpoint="/auth/register"
-          submitLabel="Create account and join"
-          fields={[name, email, newPassword]}
-          extra={{ inviteToken: token }}
-          footer={
-            <p className="text-center text-sm text-muted">
-              Have an account?{" "}
-              <Link to="/signin" state={{ from: `/invite/${token}` }} className="font-medium text-accent underline">
-                Sign in to join
-              </Link>
-            </p>
-          }
-        />
       ) : status.data?.signupMode === "invite" ? (
         <p className="text-sm text-muted">
-          {token ? "This invite link is invalid or has expired. " : ""}Sign-up is by invitation only. Ask a household admin for an invite link, or{" "}
+          Sign-up is by invitation only. Ask for an invite link, or{" "}
           <Link to={withNext("/signin", next)} className="font-medium text-accent underline">
             sign in
           </Link>
@@ -205,7 +180,7 @@ export function SetupPage() {
   if (status.data && !status.data.needsSetup) return <Navigate to="/signin" replace />;
   return (
     <AuthCard title="Set up Meally">
-      <p className="mb-4 text-sm text-muted">Create the first admin account. It also creates your household.</p>
+      <p className="mb-4 text-sm text-muted">Create the first admin account.</p>
       {status.isLoading ? (
         <Skeleton className="h-48 w-full" />
       ) : (

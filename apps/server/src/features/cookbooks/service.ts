@@ -15,28 +15,28 @@ type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 const notFound = () => new ApiError(404, "not_found", "Cookbook not found");
 const SMART_CAP = 100;
 
-async function freeSlug(tx: Tx, householdId: string, name: string, ignoreId?: string) {
+async function freeSlug(tx: Tx, userId: string, name: string, ignoreId?: string) {
   const base = slugify(name).replace(/^recipe$/, "cookbook");
   const rows = await tx
     .select({ id: cookbooks.id, slug: cookbooks.slug })
     .from(cookbooks)
-    .where(and(eq(cookbooks.householdId, householdId), or(eq(cookbooks.slug, base), like(cookbooks.slug, `${base}-%`))));
+    .where(and(eq(cookbooks.userId, userId), or(eq(cookbooks.slug, base), like(cookbooks.slug, `${base}-%`))));
   const taken = new Set(rows.filter((r) => r.id !== ignoreId).map((r) => r.slug));
   if (!taken.has(base)) return base;
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
-async function find(db: Db, householdId: string, slug: string): Promise<Row> {
-  const [row] = await db.select().from(cookbooks).where(and(eq(cookbooks.householdId, householdId), eq(cookbooks.slug, slug)));
+async function find(db: Db, userId: string, slug: string): Promise<Row> {
+  const [row] = await db.select().from(cookbooks).where(and(eq(cookbooks.userId, userId), eq(cookbooks.slug, slug)));
   if (!row) throw notFound();
   return row;
 }
 
-async function recipeBySlug(db: Db, householdId: string, slug: string) {
+async function recipeBySlug(db: Db, userId: string, slug: string) {
   const [r] = await db
     .select({ id: recipes.id })
     .from(recipes)
-    .where(and(eq(recipes.householdId, householdId), eq(recipes.slug, slug)));
+    .where(and(eq(recipes.userId, userId), eq(recipes.slug, slug)));
   if (!r) throw new ApiError(404, "not_found", "Recipe not found");
   return r.id;
 }
@@ -44,8 +44,8 @@ async function recipeBySlug(db: Db, householdId: string, slug: string) {
 const filterOf = (row: Row): CookbookFilter => cookbookFilterSchema.parse(row.filter ?? {});
 
 /** The library's list service with a smart cookbook's saved filter. Same code path as `GET /recipes`. */
-function smartList(db: Db, householdId: string, f: CookbookFilter, o: ListOpts, extra: { cursor?: string; limit: number }) {
-  return listRecipes(db, householdId, {
+function smartList(db: Db, userId: string, f: CookbookFilter, o: ListOpts, extra: { cursor?: string; limit: number }) {
+  return listRecipes(db, userId, {
     q: f.q,
     tag: f.tag,
     category: f.category,
@@ -58,12 +58,12 @@ function smartList(db: Db, householdId: string, f: CookbookFilter, o: ListOpts, 
   });
 }
 
-async function toCookbook(db: Db, householdId: string, row: Row, o: ListOpts): Promise<Cookbook> {
+async function toCookbook(db: Db, userId: string, row: Row, o: ListOpts): Promise<Cookbook> {
   let imgs: { slug: string; url: string }[] = [];
   let n = 0;
   let capped = false;
   if (row.kind === "smart") {
-    const res = await smartList(db, householdId, filterOf(row), o, { limit: SMART_CAP });
+    const res = await smartList(db, userId, filterOf(row), o, { limit: SMART_CAP });
     n = res.items.length;
     capped = res.nextCursor !== null;
     imgs = res.items.filter((i) => i.imageUrl).map((i) => ({ slug: i.slug, url: i.imageUrl! }));
@@ -101,27 +101,27 @@ async function toCookbook(db: Db, householdId: string, row: Row, o: ListOpts): P
   };
 }
 
-export async function listCookbooks(db: Db, householdId: string, o: ListOpts): Promise<Cookbook[]> {
+export async function listCookbooks(db: Db, userId: string, o: ListOpts): Promise<Cookbook[]> {
   const rows = await db
     .select()
     .from(cookbooks)
-    .where(eq(cookbooks.householdId, householdId))
+    .where(eq(cookbooks.userId, userId))
     .orderBy(asc(cookbooks.position), asc(cookbooks.createdAt));
-  return Promise.all(rows.map((r) => toCookbook(db, householdId, r, o)));
+  return Promise.all(rows.map((r) => toCookbook(db, userId, r, o)));
 }
 
-export async function getCookbook(db: Db, householdId: string, slug: string, o: ListOpts) {
-  return toCookbook(db, householdId, await find(db, householdId, slug), o);
+export async function getCookbook(db: Db, userId: string, slug: string, o: ListOpts) {
+  return toCookbook(db, userId, await find(db, userId, slug), o);
 }
 
-export async function createCookbook(db: Db, householdId: string, data: CookbookInput, o: ListOpts) {
-  const coverRecipeId = data.coverRecipe ? await recipeBySlug(db, householdId, data.coverRecipe) : null;
+export async function createCookbook(db: Db, userId: string, data: CookbookInput, o: ListOpts) {
+  const coverRecipeId = data.coverRecipe ? await recipeBySlug(db, userId, data.coverRecipe) : null;
   const slug = await db.transaction(async (tx) => {
-    const slug = await freeSlug(tx, householdId, data.name);
-    const [m] = await tx.select({ m: max(cookbooks.position) }).from(cookbooks).where(eq(cookbooks.householdId, householdId));
+    const slug = await freeSlug(tx, userId, data.name);
+    const [m] = await tx.select({ m: max(cookbooks.position) }).from(cookbooks).where(eq(cookbooks.userId, userId));
     await tx.insert(cookbooks).values({
       id: randomUUID(),
-      householdId,
+      userId,
       name: data.name,
       slug,
       description: data.description || null,
@@ -133,39 +133,39 @@ export async function createCookbook(db: Db, householdId: string, data: Cookbook
     });
     return slug;
   });
-  return getCookbook(db, householdId, slug, o);
+  return getCookbook(db, userId, slug, o);
 }
 
 export async function updateCookbook(
   db: Db,
-  householdId: string,
+  userId: string,
   slug: string,
   patch: Partial<Omit<CookbookInput, "kind">>,
   o: ListOpts,
 ) {
-  const row = await find(db, householdId, slug);
+  const row = await find(db, userId, slug);
   const set: Partial<typeof cookbooks.$inferInsert> = {};
   if (patch.description !== undefined) set.description = patch.description || null;
   if (patch.filter !== undefined && row.kind === "smart") set.filter = cookbookFilterSchema.parse(patch.filter);
-  if (patch.coverRecipe !== undefined) set.coverRecipeId = patch.coverRecipe ? await recipeBySlug(db, householdId, patch.coverRecipe) : null;
+  if (patch.coverRecipe !== undefined) set.coverRecipeId = patch.coverRecipe ? await recipeBySlug(db, userId, patch.coverRecipe) : null;
   let next = row.slug;
   await db.transaction(async (tx) => {
     if (patch.name !== undefined && patch.name !== row.name) {
       set.name = patch.name;
-      set.slug = next = await freeSlug(tx, householdId, patch.name, row.id);
+      set.slug = next = await freeSlug(tx, userId, patch.name, row.id);
     }
     if (Object.keys(set).length) await tx.update(cookbooks).set(set).where(eq(cookbooks.id, row.id));
   });
-  return getCookbook(db, householdId, next, o);
+  return getCookbook(db, userId, next, o);
 }
 
-export async function deleteCookbook(db: Db, householdId: string, slug: string) {
-  const row = await find(db, householdId, slug);
+export async function deleteCookbook(db: Db, userId: string, slug: string) {
+  const row = await find(db, userId, slug);
   await db.delete(cookbooks).where(eq(cookbooks.id, row.id));
 }
 
-export async function reorderCookbooks(db: Db, householdId: string, slugs: string[]) {
-  const rows = await db.select().from(cookbooks).where(eq(cookbooks.householdId, householdId));
+export async function reorderCookbooks(db: Db, userId: string, slugs: string[]) {
+  const rows = await db.select().from(cookbooks).where(eq(cookbooks.userId, userId));
   const bySlug = new Map(rows.map((r) => [r.slug, r.id]));
   if (slugs.some((s) => !bySlug.has(s))) throw notFound();
   const rest = rows
@@ -181,13 +181,13 @@ export async function reorderCookbooks(db: Db, householdId: string, slugs: strin
 /** Recipes in a cookbook: a smart filter goes through the library list service; a manual list is in its saved order. */
 export async function cookbookRecipesPage(
   db: Db,
-  householdId: string,
+  userId: string,
   slug: string,
   q: { cursor?: string; limit: number },
   o: ListOpts,
 ): Promise<RecipeListResponse> {
-  const row = await find(db, householdId, slug);
-  if (row.kind === "smart") return smartList(db, householdId, filterOf(row), o, q);
+  const row = await find(db, userId, slug);
+  if (row.kind === "smart") return smartList(db, userId, filterOf(row), o, q);
   // Manual: the cursor is an offset into the ordered list.
   const offset = q.cursor === undefined ? 0 : Number(q.cursor);
   if (!Number.isInteger(offset) || offset < 0) throw new ApiError(400, "invalid_cursor", "Invalid cursor");
@@ -199,16 +199,16 @@ export async function cookbookRecipesPage(
     .limit(q.limit + 1)
     .offset(offset);
   const ids = rows.slice(0, q.limit).map((r) => r.recipeId);
-  const res = ids.length ? await listRecipes(db, householdId, { sort: "updated", limit: ids.length, ids, ...o }) : { items: [], nextCursor: null };
+  const res = ids.length ? await listRecipes(db, userId, { sort: "updated", limit: ids.length, ids, ...o }) : { items: [], nextCursor: null };
   const order = new Map(ids.map((id, i) => [id, i]));
   res.items.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
   return { items: res.items, nextCursor: rows.length > q.limit ? String(offset + q.limit) : null };
 }
 
-export async function addToCookbook(db: Db, householdId: string, slug: string, recipeSlug: string) {
-  const row = await find(db, householdId, slug);
+export async function addToCookbook(db: Db, userId: string, slug: string, recipeSlug: string) {
+  const row = await find(db, userId, slug);
   if (row.kind !== "manual") throw new ApiError(409, "not_manual", "Only hand-picked cookbooks hold a fixed list");
-  const recipeId = await recipeBySlug(db, householdId, recipeSlug);
+  const recipeId = await recipeBySlug(db, userId, recipeSlug);
   await db.transaction(async (tx) => {
     const [m] = await tx.select({ m: max(cookbookRecipes.position) }).from(cookbookRecipes).where(eq(cookbookRecipes.cookbookId, row.id));
     await tx
@@ -218,15 +218,15 @@ export async function addToCookbook(db: Db, householdId: string, slug: string, r
   });
 }
 
-export async function removeFromCookbook(db: Db, householdId: string, slug: string, recipeSlug: string) {
-  const row = await find(db, householdId, slug);
-  const recipeId = await recipeBySlug(db, householdId, recipeSlug);
+export async function removeFromCookbook(db: Db, userId: string, slug: string, recipeSlug: string) {
+  const row = await find(db, userId, slug);
+  const recipeId = await recipeBySlug(db, userId, recipeSlug);
   await db.delete(cookbookRecipes).where(and(eq(cookbookRecipes.cookbookId, row.id), eq(cookbookRecipes.recipeId, recipeId)));
 }
 
 /** Reorders a manual cookbook: `slugs` is the new order; recipes not listed keep their relative order at the end. */
-export async function reorderCookbookRecipes(db: Db, householdId: string, slug: string, slugs: string[]) {
-  const row = await find(db, householdId, slug);
+export async function reorderCookbookRecipes(db: Db, userId: string, slug: string, slugs: string[]) {
+  const row = await find(db, userId, slug);
   if (row.kind !== "manual") throw new ApiError(409, "not_manual", "Only hand-picked cookbooks can be reordered");
   const members = await db
     .select({ id: cookbookRecipes.recipeId, slug: recipes.slug, position: cookbookRecipes.position })
@@ -248,13 +248,13 @@ export async function reorderCookbookRecipes(db: Db, householdId: string, slug: 
   });
 }
 
-/** Slugs of the household's manual cookbooks that hold a recipe (for the "Add to cookbook" picker). */
-export async function cookbooksWithRecipe(db: Db, householdId: string, recipeSlug: string): Promise<string[]> {
-  const recipeId = await recipeBySlug(db, householdId, recipeSlug);
+/** Slugs of the user's manual cookbooks that hold a recipe (for the "Add to cookbook" picker). */
+export async function cookbooksWithRecipe(db: Db, userId: string, recipeSlug: string): Promise<string[]> {
+  const recipeId = await recipeBySlug(db, userId, recipeSlug);
   const rows = await db
     .select({ slug: cookbooks.slug })
     .from(cookbookRecipes)
     .innerJoin(cookbooks, eq(cookbooks.id, cookbookRecipes.cookbookId))
-    .where(and(eq(cookbooks.householdId, householdId), eq(cookbookRecipes.recipeId, recipeId)));
+    .where(and(eq(cookbooks.userId, userId), eq(cookbookRecipes.recipeId, recipeId)));
   return rows.map((r) => r.slug);
 }

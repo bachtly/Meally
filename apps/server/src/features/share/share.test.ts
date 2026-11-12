@@ -59,7 +59,7 @@ describe("share links", () => {
     expect((await json(await call(A, "GET", `/recipes/${slug}/shares`))).items[0].viewCount).toBe(1);
   });
 
-  it("revokes, expires, isolates households, and requires auth", async () => {
+  it("revokes, expires, isolates users, and requires auth", async () => {
     const { o, A, B, call, pub, recipe, share, json } = await mk();
     const slug = await recipe("Soup");
     const token = await share(slug);
@@ -135,11 +135,11 @@ describe("share sets and cookbooks", () => {
     expect(s).toMatchObject({ kind: "set", title: "Weekend baking", note: "Try the bread first", sharedBy: "n", count: 2, recipe: null });
     expect(s.items.map((i: any) => i.slug)).toEqual([b, a]);
     expect(Object.keys(s.items[0]).sort()).toEqual(["imageUrl", "name", "servings", "slug", "totalMinutes"]);
-    expect(JSON.stringify(s)).not.toMatch(/householdId|"id"|example\.com/);
+    expect(JSON.stringify(s)).not.toMatch(/userId|"id"|example\.com/);
     const one = await pub(`/shares/${t}/recipes/${a}`);
     expect(one.status).toBe(200);
     expect(((await one.json()) as any).name).toBe("Apple pie");
-    // A recipe of the household that is not in the set is not reachable through the link.
+    // A recipe of the user that is not in the set is not reachable through the link.
     expect((await pub(`/shares/${t}/recipes/${outside}`)).status).toBe(404);
     // Sets are live until saved: a deleted recipe drops out.
     await call(A, "DELETE", `/recipes/${b}`);
@@ -158,7 +158,7 @@ describe("share sets and cookbooks", () => {
     expect((await call(A, "POST", "/shares", { recipeSlugs: [a, a] })).status).toBe(400);
     expect((await call(A, "POST", "/shares", { recipeSlugs: [a], note: "x".repeat(281) })).status).toBe(400);
     expect((await call(A, "POST", "/shares", { recipeSlugs: Array.from({ length: 101 }, (_, i) => `r${i}`) })).status).toBe(400);
-    // Another household's recipe can't be put in a set, even mixed with your own.
+    // Another user's recipe can't be put in a set, even mixed with your own.
     expect((await call(A, "POST", "/shares", { recipeSlugs: [a, b] })).status).toBe(400);
     expect((await call("", "POST", "/shares", { recipeSlugs: [a] })).status).toBe(401);
   });
@@ -208,7 +208,7 @@ describe("share sets and cookbooks", () => {
     expect((await off.call(off.A, "POST", "/cookbooks/x/shares", {})).status).toBe(404);
   });
 
-  it("lists every active link of the household only, and revokes any kind", async () => {
+  it("lists every active link of the user only, and revokes any kind", async () => {
     const { A, B, call, pub, json, recipe } = await mk();
     const a = await recipe("Soup");
     await call(A, "POST", `/recipes/${a}/shares`, {});

@@ -111,7 +111,7 @@ export function ShoppingListsPage() {
         open={edit?.kind === "delete"}
         onOpenChange={(o) => !o && setEdit(null)}
         title="Delete this list?"
-        description={edit?.kind === "delete" ? `${edit.list.name} and its items will be removed for everyone in your household.` : undefined}
+        description={edit?.kind === "delete" ? `${edit.list.name} and its items will be removed.` : undefined}
       >
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setEdit(null)}>

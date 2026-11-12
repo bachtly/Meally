@@ -27,7 +27,7 @@ const mine = {
 };
 
 let calls: { method: string; url: string; body?: string }[] = [];
-let cfg: { signedIn: boolean; share: object | null; status: { sameHousehold: boolean; saved: Record<string, string> }; signupMode: string };
+let cfg: { signedIn: boolean; share: object | null; status: { ownRecipe: boolean; saved: Record<string, string> }; signupMode: string };
 
 function renderAt(path: string) {
   vi.stubGlobal(
@@ -38,7 +38,7 @@ function renderAt(path: string) {
       calls.push({ method, url: u, body: init?.body as string | undefined });
       if (u.includes("/auth/me"))
         return cfg.signedIn
-          ? Response.json({ user: { id: "u2", email: "b@example.com", name: "Bob", role: "member", householdId: "h2" }, household: { id: "h2", name: "Bob's" } })
+          ? Response.json({ user: { id: "u2", email: "b@example.com", name: "Bob", role: "member" } })
           : Response.json({ error: "unauthenticated" }, { status: 401 });
       if (u.includes("/auth/status")) return Response.json({ needsSetup: false, signupMode: cfg.signupMode });
       if (u.includes("/features")) return Response.json({ features: { "share-links": on, cookbooks: on, pwa: on, "import-url": on } });
@@ -74,7 +74,7 @@ function renderAt(path: string) {
 beforeEach(() => {
   calls = [];
   localStorage.clear();
-  cfg = { signedIn: false, share: recipeLink, status: { sameHousehold: false, saved: {} }, signupMode: "open" };
+  cfg = { signedIn: false, share: recipeLink, status: { ownRecipe: false, saved: {} }, signupMode: "open" };
 });
 afterEach(() => {
   cleanup();
@@ -136,15 +136,15 @@ it("signed in: opens inside the app, saves the recipe, and lands on my copy with
   expect(localStorage.getItem("meally.install-card.dismissed")).toBe("1");
 });
 
-it("signed in: an already-saved recipe offers my copy, and my own household's link says so", async () => {
+it("signed in: an already-saved recipe offers my copy, and my own link says so", async () => {
   cfg.signedIn = true;
-  cfg.status = { sameHousehold: false, saved: { soup: "soup-2" } };
+  cfg.status = { ownRecipe: false, saved: { soup: "soup-2" } };
   renderAt("/s/abc");
   expect(await screen.findByRole("link", { name: "Open my copy" })).toHaveAttribute("href", "/recipes/soup-2");
   cleanup();
-  cfg.status = { sameHousehold: true, saved: { soup: "soup" } };
+  cfg.status = { ownRecipe: true, saved: { soup: "soup" } };
   renderAt("/s/abc");
-  expect(await screen.findByText("This recipe is already in your household.")).toBeInTheDocument();
+  expect(await screen.findByText("This is your own recipe.")).toBeInTheDocument();
 });
 
 it("after sign-up, ?save=1 saves the recipe by itself and opens my copy", async () => {
@@ -158,7 +158,7 @@ it("after sign-up, ?save=1 saves the recipe by itself and opens my copy", async 
 it("a set: grid of recipes, Save all in batches of 10 into one new cookbook", async () => {
   cfg.signedIn = true;
   cfg.share = setLink(12);
-  cfg.status = { sameHousehold: false, saved: { "r-2": "r-2-mine" } };
+  cfg.status = { ownRecipe: false, saved: { "r-2": "r-2-mine" } };
   const { router, view } = renderAt("/s/abc");
   expect(await screen.findByRole("heading", { name: "Weekend" })).toBeInTheDocument();
   expect(screen.getByText(/Shared recipes · 12 recipes/)).toBeInTheDocument();

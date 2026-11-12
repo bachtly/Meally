@@ -36,6 +36,6 @@ export type AppEnv = {
     aiFetch: AiFetch;
     authVia: "session" | "token";
     user: SessionUser;
-    householdId: string;
+    userId: string;
   };
 };

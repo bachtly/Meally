@@ -7,6 +7,7 @@ import { createDb, dbTarget } from "./db/index.js";
 import { createFlagsService } from "./features/features/service.js";
 import { backupSettings, startBackupScheduler } from "./features/backups/service.js";
 import { createNodePlatform } from "./adapters/node/index.js";
+import { moveLegacyImages } from "./lib/image-move.js";
 import { acquireLock } from "./lib/lock.js";
 
 acquireLock(config.DATA_DIR);
@@ -18,10 +19,13 @@ const webDist =
   config.NODE_ENV === "production" ? (process.env.WEB_DIST ?? path.resolve(here, "../../web/dist")) : undefined;
 
 // In-app instance backups snapshot the embedded database only; with DATABASE_URL use pg_dump instead.
-// Household recipe export is core (not flagged) and stays available.
+// Recipe export is core (not flagged) and stays available.
 const env = config.DATABASE_URL ? { ...process.env, MEALLY_FEATURE_BACKUPS: "false" } : process.env;
 const flags = createFlagsService(db, env);
 const platform = createNodePlatform({ dataDir: config.DATA_DIR });
+// Finish the household-to-user rekey (ADR 0003): move image folders. Safe to repeat; a no-op when nothing is left.
+const moved = await moveLegacyImages(db, platform.images);
+if (moved.folders > 0) console.log(`Moved ${moved.files} image files for ${moved.folders} users`);
 startBackupScheduler({
   db,
   dataDir: config.DATA_DIR,

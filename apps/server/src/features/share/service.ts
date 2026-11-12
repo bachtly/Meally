@@ -32,8 +32,8 @@ export interface ShareFlags {
   ratings: boolean;
 }
 
-async function recipeFor(db: Db, householdId: string, slug: string) {
-  const [r] = await db.select({ id: recipes.id }).from(recipes).where(and(eq(recipes.householdId, householdId), eq(recipes.slug, slug))).limit(1);
+async function recipeFor(db: Db, userId: string, slug: string) {
+  const [r] = await db.select({ id: recipes.id }).from(recipes).where(and(eq(recipes.userId, userId), eq(recipes.slug, slug))).limit(1);
   if (!r) throw new ApiError(404, "not_found", "Recipe not found");
   return r;
 }
@@ -41,7 +41,7 @@ async function recipeFor(db: Db, householdId: string, slug: string) {
 /** Inserts a link and returns its token, shown once. */
 async function insertLink(
   db: Db,
-  householdId: string,
+  userId: string,
   sharer: Sharer,
   target: Pick<Link, "kind"> & Partial<Pick<Link, "recipeId" | "cookbookId" | "title">>,
   opts: CreateShare,
@@ -54,7 +54,7 @@ async function insertLink(
   await db.transaction(async (tx) => {
     await tx.insert(shareLinks).values({
       id,
-      householdId,
+      userId,
       kind: target.kind,
       recipeId: target.recipeId ?? null,
       cookbookId: target.cookbookId ?? null,
@@ -71,52 +71,52 @@ async function insertLink(
   return token;
 }
 
-export async function createShare(db: Db, householdId: string, sharer: Sharer, slug: string, opts: CreateShare, now = new Date()) {
-  const recipe = await recipeFor(db, householdId, slug);
-  return insertLink(db, householdId, sharer, { kind: "recipe", recipeId: recipe.id }, opts, now);
+export async function createShare(db: Db, userId: string, sharer: Sharer, slug: string, opts: CreateShare, now = new Date()) {
+  const recipe = await recipeFor(db, userId, slug);
+  return insertLink(db, userId, sharer, { kind: "recipe", recipeId: recipe.id }, opts, now);
 }
 
-/** A hand-picked set. Every slug must be one of the household's recipes, else 400 (nothing is created). */
-export async function createSetShare(db: Db, householdId: string, sharer: Sharer, data: CreateShareSet, now = new Date()) {
+/** A hand-picked set. Every slug must be one of your recipes, else 400 (nothing is created). */
+export async function createSetShare(db: Db, userId: string, sharer: Sharer, data: CreateShareSet, now = new Date()) {
   const rows = await db
     .select({ id: recipes.id, slug: recipes.slug })
     .from(recipes)
-    .where(and(eq(recipes.householdId, householdId), inArray(recipes.slug, data.recipeSlugs)));
+    .where(and(eq(recipes.userId, userId), inArray(recipes.slug, data.recipeSlugs)));
   const bySlug = new Map(rows.map((r) => [r.slug, r.id]));
   const missing = data.recipeSlugs.filter((s) => !bySlug.has(s));
   if (missing.length) throw new ApiError(400, "unknown_recipes", `Recipes not found: ${missing.join(", ")}`);
   const ids = data.recipeSlugs.map((s) => bySlug.get(s)!);
-  return insertLink(db, householdId, sharer, { kind: "set", title: data.title ?? null }, data, now, ids);
+  return insertLink(db, userId, sharer, { kind: "set", title: data.title ?? null }, data, now, ids);
 }
 
-export async function createCookbookShare(db: Db, householdId: string, sharer: Sharer, slug: string, opts: CreateShare, now = new Date()) {
-  const [cb] = await db.select({ id: cookbooks.id }).from(cookbooks).where(and(eq(cookbooks.householdId, householdId), eq(cookbooks.slug, slug))).limit(1);
+export async function createCookbookShare(db: Db, userId: string, sharer: Sharer, slug: string, opts: CreateShare, now = new Date()) {
+  const [cb] = await db.select({ id: cookbooks.id }).from(cookbooks).where(and(eq(cookbooks.userId, userId), eq(cookbooks.slug, slug))).limit(1);
   if (!cb) throw new ApiError(404, "not_found", "Cookbook not found");
-  return insertLink(db, householdId, sharer, { kind: "cookbook", cookbookId: cb.id }, opts, now);
+  return insertLink(db, userId, sharer, { kind: "cookbook", cookbookId: cb.id }, opts, now);
 }
 
 const active = (r: Link, now: Date) => !r.revokedAt && (!r.expiresAt || r.expiresAt > now);
 
-export async function listShares(db: Db, householdId: string, slug: string, now = new Date()): Promise<ShareLink[]> {
-  const recipe = await recipeFor(db, householdId, slug);
+export async function listShares(db: Db, userId: string, slug: string, now = new Date()): Promise<ShareLink[]> {
+  const recipe = await recipeFor(db, userId, slug);
   const rows = await db
     .select()
     .from(shareLinks)
-    .where(and(eq(shareLinks.recipeId, recipe.id), eq(shareLinks.householdId, householdId), isNull(shareLinks.revokedAt)))
+    .where(and(eq(shareLinks.recipeId, recipe.id), eq(shareLinks.userId, userId), isNull(shareLinks.revokedAt)))
     .orderBy(asc(shareLinks.createdAt));
   return rows
     .filter((r) => active(r, now))
     .map((r) => ({ id: r.id, createdAt: r.createdAt.getTime(), expiresAt: r.expiresAt?.getTime() ?? null, viewCount: r.viewCount }));
 }
 
-/** Every active link of the household, newest first, for the Shared links page. */
-export async function listAllShares(db: Db, householdId: string, now = new Date()): Promise<ShareSummary[]> {
+/** Every active link of the user, newest first, for the Shared links page. */
+export async function listAllShares(db: Db, userId: string, now = new Date()): Promise<ShareSummary[]> {
   const rows = await db
     .select({ link: shareLinks, recipeName: recipes.name, recipeSlug: recipes.slug, cookbookName: cookbooks.name, cookbookSlug: cookbooks.slug })
     .from(shareLinks)
     .leftJoin(recipes, eq(recipes.id, shareLinks.recipeId))
     .leftJoin(cookbooks, eq(cookbooks.id, shareLinks.cookbookId))
-    .where(and(eq(shareLinks.householdId, householdId), isNull(shareLinks.revokedAt)))
+    .where(and(eq(shareLinks.userId, userId), isNull(shareLinks.revokedAt)))
     .orderBy(desc(shareLinks.createdAt), asc(shareLinks.id));
   const live = rows.filter((r) => active(r.link, now));
   const setIds = live.filter((r) => r.link.kind === "set").map((r) => r.link.id);
@@ -142,11 +142,11 @@ export async function listAllShares(db: Db, householdId: string, now = new Date(
   }));
 }
 
-export async function revokeShare(db: Db, householdId: string, id: string, now = new Date()) {
+export async function revokeShare(db: Db, userId: string, id: string, now = new Date()) {
   const rows = await db
     .update(shareLinks)
     .set({ revokedAt: now })
-    .where(and(eq(shareLinks.id, id), eq(shareLinks.householdId, householdId), isNull(shareLinks.revokedAt)))
+    .where(and(eq(shareLinks.id, id), eq(shareLinks.userId, userId), isNull(shareLinks.revokedAt)))
     .returning({ id: shareLinks.id });
   if (!rows.length) throw new ApiError(404, "not_found", "Link not found");
 }
@@ -159,7 +159,7 @@ export async function findActive(db: Db, token: string, now = new Date()) {
 }
 
 /**
- * The recipe ids a link shows, in order, all from the link's household; null when its target is gone or turned off.
+ * The recipe ids a link shows, in order, all from the link's owner; null when its target is gone or turned off.
  * A cookbook link is live: a smart cookbook re-runs its filter as the sharer (their favourites and ratings).
  */
 export async function linkRecipeIds(db: Db, link: Link, flags: ShareFlags): Promise<string[] | null> {
@@ -168,13 +168,13 @@ export async function linkRecipeIds(db: Db, link: Link, flags: ShareFlags): Prom
     const rows = await db
       .select({ id: shareLinkRecipes.recipeId })
       .from(shareLinkRecipes)
-      .innerJoin(recipes, and(eq(recipes.id, shareLinkRecipes.recipeId), eq(recipes.householdId, link.householdId)))
+      .innerJoin(recipes, and(eq(recipes.id, shareLinkRecipes.recipeId), eq(recipes.userId, link.userId)))
       .where(eq(shareLinkRecipes.shareLinkId, link.id))
       .orderBy(asc(shareLinkRecipes.position));
     return rows.map((r) => r.id);
   }
   if (!flags.cookbooks || !link.cookbookId) return null;
-  const [cb] = await db.select().from(cookbooks).where(and(eq(cookbooks.id, link.cookbookId), eq(cookbooks.householdId, link.householdId))).limit(1);
+  const [cb] = await db.select().from(cookbooks).where(and(eq(cookbooks.id, link.cookbookId), eq(cookbooks.userId, link.userId))).limit(1);
   if (!cb) return null;
   if (cb.kind === "manual") {
     const rows = await db
@@ -189,7 +189,7 @@ export async function linkRecipeIds(db: Db, link: Link, flags: ShareFlags): Prom
   // A favourites or rating filter belongs to the sharer. If their account is gone, show nothing rather than the
   // unfiltered library.
   if (flags.ratings && (f.favourites || f.minRating) && !link.createdBy) return [];
-  const res = await listRecipes(db, link.householdId, {
+  const res = await listRecipes(db, link.userId, {
     q: f.q,
     tag: f.tag,
     category: f.category,
@@ -240,7 +240,7 @@ export async function publicShare(db: Db, token: string, flags: ShareFlags, coun
   if (!link) return null;
   const ids = await linkRecipeIds(db, link, flags);
   if (!ids) return null;
-  const rows = ids.length ? await db.select().from(recipes).where(and(eq(recipes.householdId, link.householdId), inArray(recipes.id, ids))) : [];
+  const rows = ids.length ? await db.select().from(recipes).where(and(eq(recipes.userId, link.userId), inArray(recipes.id, ids))) : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
   const ordered = ids.map((id) => byId.get(id)).filter((r): r is RecipeRow => !!r);
   if (link.kind === "recipe" && !ordered.length) return null;
@@ -281,7 +281,7 @@ async function recipeInLink(db: Db, token: string, slug: string, flags: ShareFla
   const [r] = await db
     .select()
     .from(recipes)
-    .where(and(eq(recipes.householdId, link.householdId), eq(recipes.slug, slug), inArray(recipes.id, ids)))
+    .where(and(eq(recipes.userId, link.userId), eq(recipes.slug, slug), inArray(recipes.id, ids)))
     .limit(1);
   return r ?? null;
 }
@@ -293,7 +293,7 @@ export async function publicShareRecipe(db: Db, token: string, slug: string, fla
 
 export async function publicShareImage(db: Db, token: string, slug: string, flags: ShareFlags) {
   const r = await recipeInLink(db, token, slug, flags);
-  return r?.imageId ? { imageId: r.imageId, householdId: r.householdId } : null;
+  return r?.imageId ? { imageId: r.imageId, userId: r.userId } : null;
 }
 
 // ---- F16 single-recipe routes (`/public/recipes/:token`), kept for links already sent ----
@@ -301,7 +301,7 @@ export async function publicShareImage(db: Db, token: string, slug: string, flag
 async function singleRecipe(db: Db, token: string) {
   const link = await findActive(db, token);
   if (!link || link.kind !== "recipe" || !link.recipeId) return null;
-  const [r] = await db.select().from(recipes).where(and(eq(recipes.id, link.recipeId), eq(recipes.householdId, link.householdId))).limit(1);
+  const [r] = await db.select().from(recipes).where(and(eq(recipes.id, link.recipeId), eq(recipes.userId, link.userId))).limit(1);
   return r ? { link, r } : null;
 }
 
@@ -312,8 +312,8 @@ export async function publicRecipe(db: Db, token: string, scaling: boolean): Pro
   return toPublicRecipe(db, found.r, `/api/v1/public/recipes/${token}/image/800`, scaling);
 }
 
-/** The image id and owning household for a token's recipe; used by the public image route. */
+/** The image id and owner for a token's recipe; used by the public image route. */
 export async function publicImage(db: Db, token: string) {
   const found = await singleRecipe(db, token);
-  return found?.r.imageId ? { imageId: found.r.imageId, householdId: found.r.householdId } : null;
+  return found?.r.imageId ? { imageId: found.r.imageId, userId: found.r.userId } : null;
 }

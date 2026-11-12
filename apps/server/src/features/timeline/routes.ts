@@ -18,35 +18,28 @@ function parse<S extends z.ZodTypeAny>(raw: unknown, schema: S): z.output<S> {
   return p.data;
 }
 const json = (c: Context<AppEnv>) => c.req.json().catch(() => null);
-const who = (c: Context<AppEnv>) => {
-  const u = c.get("user");
-  return { id: u.id, householdRole: u.householdRole };
-};
 
-/** Mounted at /api/v1: /recipes/:slug/timeline, /timeline (household feed) and /timeline/:id. */
+/** Mounted at /api/v1: /recipes/:slug/timeline and /timeline/:id. */
 export const timelineRoutes = new Hono<AppEnv>();
-for (const p of ["/recipes/:slug/timeline", "/recipes/:slug/timeline/*", "/timeline", "/timeline/*"])
+for (const p of ["/recipes/:slug/timeline", "/recipes/:slug/timeline/*", "/timeline/*"])
   timelineRoutes.use(p, requireAuth, requireFeature("timeline"));
 
 timelineRoutes
   .get("/recipes/:slug/timeline", async (c) => {
-    const recipe = await findRow(c.get("db"), c.get("householdId"), c.req.param("slug"));
+    const recipe = await findRow(c.get("db"), c.get("userId"), c.req.param("slug"));
     const q = parse(c.req.query(), timelineListQuerySchema);
-    return c.json(await listTimeline(c.get("db"), c.get("householdId"), who(c), { ...q, recipeId: recipe.id }));
+    return c.json(await listTimeline(c.get("db"), c.get("userId"), { ...q, recipeId: recipe.id }));
   })
   .post("/recipes/:slug/timeline", async (c) => {
     const body = parse(await json(c), timelinePostSchema);
     const ratings = (await c.get("flags").getFeatures()).ratings.enabled;
-    return c.json(await addEvent(c.get("db"), c.get("householdId"), who(c), c.req.param("slug"), body, { ratings }), 201);
+    return c.json(await addEvent(c.get("db"), c.get("userId"), c.req.param("slug"), body, { ratings }), 201);
   })
-  .get("/timeline", async (c) =>
-    c.json(await listTimeline(c.get("db"), c.get("householdId"), who(c), parse(c.req.query(), timelineListQuerySchema))),
-  )
   .patch("/timeline/:id", async (c) =>
-    c.json(await updateEvent(c.get("db"), c.get("householdId"), who(c), c.req.param("id"), parse(await json(c), timelinePatchSchema))),
+    c.json(await updateEvent(c.get("db"), c.get("userId"), c.req.param("id"), parse(await json(c), timelinePatchSchema))),
   )
   .delete("/timeline/:id", async (c) => {
-    await deleteEvent(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"));
+    await deleteEvent(c.get("db"), c.get("platform").images, c.get("userId"), c.req.param("id"));
     return c.body(null, 204);
   })
   .post(
@@ -58,6 +51,6 @@ timelineRoutes
       },
     }),
     async (c) => {
-      return c.json(await setEventImage(c.get("db"), c.get("platform").images, c.get("householdId"), who(c), c.req.param("id"), await readImageUpload(c)), 201);
+      return c.json(await setEventImage(c.get("db"), c.get("platform").images, c.get("userId"), c.req.param("id"), await readImageUpload(c)), 201);
     },
   );

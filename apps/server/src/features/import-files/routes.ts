@@ -61,18 +61,17 @@ importFileRoutes.post("/files", async (c) => {
     throw e;
   }
   const db = c.get("db");
-  const user = c.get("user");
-  const householdId = c.get("householdId");
+  const userId = c.get("userId");
   const org = (await c.get("flags").getFeatures()).organizers.enabled;
   const features = await c.get("flags").getFeatures();
   const nutrition = features.nutrition.enabled;
   const ratings = features.ratings.enabled;
   const fetcher = c.get("fetcher");
-  const job = await createJob(db, householdId, user.id, plan.format, filename, plan.items.length);
+  const job = await createJob(db, userId, plan.format, filename, plan.items.length);
   // Fire and forget: the client polls GET /jobs/:id.
-  scheduleImport(c.get("platform").scheduler, { householdId, userId: user.id, org, nutrition, ratings, fetcher, jobId: job.id, file, plan });
+  scheduleImport(c.get("platform").scheduler, { userId, org, nutrition, ratings, fetcher, jobId: job.id, file, plan });
   return c.json(jobView(job), 202);
 });
 
-importFileRoutes.get("/jobs", async (c) => c.json({ items: (await listJobs(c.get("db"), c.get("householdId"))).map(jobView) }));
-importFileRoutes.get("/jobs/:id", async (c) => c.json(jobView(await getJob(c.get("db"), c.get("householdId"), c.req.param("id")))));
+importFileRoutes.get("/jobs", async (c) => c.json({ items: (await listJobs(c.get("db"), c.get("userId"))).map(jobView) }));
+importFileRoutes.get("/jobs/:id", async (c) => c.json(jobView(await getJob(c.get("db"), c.get("userId"), c.req.param("id")))));

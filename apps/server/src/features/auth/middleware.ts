@@ -20,11 +20,11 @@ export function clearSessionCookie(c: Context<AppEnv>) {
 }
 
 export function toSessionUser(u: SessionUser): SessionUser {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, householdId: u.householdId, householdRole: u.householdRole };
+  return { id: u.id, email: u.email, name: u.name, role: u.role };
 }
 
 /**
- * Requires a valid session cookie or `Authorization: Bearer mly_...`; sets `user`, `householdId` and `authVia`.
+ * Requires a valid session cookie or `Authorization: Bearer mly_...`; sets `user`, `userId` and `authVia`.
  * A request that carries both is rejected: the CSRF check keys on the cookie, so letting a bearer
  * override it would make the credential in use ambiguous. Bearer-only requests have no cookie and so no CSRF risk.
  */
@@ -46,7 +46,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
       throw new ApiError(403, "insufficient_scope", "This token is read-only");
     }
     c.set("user", toSessionUser(found.user));
-    c.set("householdId", found.user.householdId);
+    c.set("userId", found.user.id);
     c.set("authVia", "token");
     return next();
   }
@@ -58,7 +58,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
   if (session.refreshed) setSessionCookie(c, token);
   c.set("user", toSessionUser(session.user));
-  c.set("householdId", session.user.householdId);
+  c.set("userId", session.user.id);
   c.set("authVia", "session");
   await next();
 };

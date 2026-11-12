@@ -1,6 +1,5 @@
 import { Camera, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router";
 import type { TimelineEvent } from "@meally/shared";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, IconButton, Skeleton, useToast } from "../../ui";
 import { Textarea } from "../../ui/Form";
@@ -58,7 +57,7 @@ function Composer({ slug }: { slug: string }) {
   );
 }
 
-function EventItem({ ev, showRecipe, onPhoto }: { ev: TimelineEvent; showRecipe: boolean; onPhoto: (e: TimelineEvent) => void }) {
+function EventItem({ ev, onPhoto }: { ev: TimelineEvent; onPhoto: (e: TimelineEvent) => void }) {
   const { edit, remove } = useTimelineMutations(ev.recipeSlug);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(ev.text ?? "");
@@ -76,11 +75,6 @@ function EventItem({ ev, showRecipe, onPhoto }: { ev: TimelineEvent; showRecipe:
           {ev.kind === "made" && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-contrast">Made it</span>}
           {ev.kind === "note" && <span className="rounded-full bg-sunken px-2 py-0.5 text-xs">Note</span>}
         </p>
-        {showRecipe && (
-          <Link to={`/recipes/${ev.recipeSlug}`} className="text-sm text-accent underline">
-            {ev.recipeName}
-          </Link>
-        )}
         {editing ? (
           <form
             className="mt-1 flex flex-col gap-2"
@@ -131,7 +125,7 @@ function EventItem({ ev, showRecipe, onPhoto }: { ev: TimelineEvent; showRecipe:
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <Dialog open={confirm} onOpenChange={setConfirm} title="Delete this entry?" description="It will be removed for everyone in your household.">
+      <Dialog open={confirm} onOpenChange={setConfirm} title="Delete this entry?" description="It will be removed.">
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirm(false)}>
             Cancel
@@ -145,7 +139,7 @@ function EventItem({ ev, showRecipe, onPhoto }: { ev: TimelineEvent; showRecipe:
   );
 }
 
-export function EventList({ slug, empty }: { slug: string | null; empty: string }) {
+export function EventList({ slug, empty }: { slug: string; empty: string }) {
   const q = useTimeline(slug);
   const [photo, setPhoto] = useState<TimelineEvent | null>(null);
   if (q.isLoading) return <Skeleton className="h-24 w-full" />;
@@ -158,7 +152,7 @@ export function EventList({ slug, empty }: { slug: string | null; empty: string 
       ) : (
         <ul className="divide-y divide-line">
           {items.map((ev) => (
-            <EventItem key={ev.id} ev={ev} showRecipe={!slug} onPhoto={setPhoto} />
+            <EventItem key={ev.id} ev={ev} onPhoto={setPhoto} />
           ))}
         </ul>
       )}

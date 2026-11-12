@@ -33,7 +33,7 @@ async function mk(env: Record<string, string> = {}) {
     return r.headers.get("set-cookie")!.split(";")[0]!;
   };
   const A = await su("setup", "a@example.com"); // admin
-  const B = await su("register", "b@example.com"); // other household, not admin
+  const B = await su("register", "b@example.com"); // other user, not admin
   const req = (cookie: string, url: string, method = "GET", body?: unknown) =>
     app.request(`/api/v1${url}`, { method, headers: { ...H, cookie }, body: body ? JSON.stringify(body) : undefined });
   const json = async (r: Response) => (await r.json()) as any;
@@ -57,7 +57,7 @@ async function mk(env: Record<string, string> = {}) {
 }
 
 describe("export", () => {
-  it("zips one JSON-LD file per recipe plus images, for the caller's household only", async () => {
+  it("zips one JSON-LD file per recipe plus images, for the caller only", async () => {
     const t = await mk();
     const r1 = await t.recipe(t.A, "Bread");
     await t.recipe(t.A, "Soup");
@@ -93,7 +93,7 @@ describe("export", () => {
     expect(md).toContain('title: "He said \\"hi\\": ok"');
   });
 
-  it("exports a single recipe, 404s across households, and rejects bad formats", async () => {
+  it("exports a single recipe, 404s across users, and rejects bad formats", async () => {
     const t = await mk();
     const r = await t.recipe(t.A, "Bread");
     const files = await t.zipOf(await t.req(t.A, `/recipes/${r.slug}/export?format=markdown`));
@@ -151,7 +151,7 @@ describe("backup names", () => {
 describe("backup API", () => {
   it("is admin only", async () => {
     const t = await mk();
-    // B is the owner of its own household but not an instance admin.
+    // B is the a normal user, not an instance admin.
     expect((await t.req(t.B, "/admin/backups")).status).toBe(403);
     expect((await t.req(t.B, "/admin/backups", "POST")).status).toBe(403);
     expect((await t.req(t.B, "/admin/backups/meally-20261111T120000123Z.zip", "DELETE")).status).toBe(403);
@@ -235,7 +235,7 @@ describe("restore CLI", () => {
     expect(fs.existsSync(path.join(res.movedTo, "images", "old.webp"))).toBe(true);
     expect(fs.existsSync(path.join(target, "pgdata", "PG_VERSION"))).toBe(true);
     expect(fs.existsSync(path.join(target, "images", "old.webp"))).toBe(false);
-    expect(fs.readdirSync(path.join(target, "images")).length).toBe(1); // the household dir
+    expect(fs.readdirSync(path.join(target, "images")).length).toBe(1); // the user dir
 
     // The restored database opens and holds the recipe.
     const o = openDb(path.join(target, "pgdata"));

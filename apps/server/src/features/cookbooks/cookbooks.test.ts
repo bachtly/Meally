@@ -73,7 +73,7 @@ describe("cookbooks", () => {
     expect((await call(A, "GET", "/cookbooks/winter")).status).toBe(404);
   });
 
-  it("is isolated per household", async () => {
+  it("is isolated per user", async () => {
     const { call, A, reg } = await mk();
     const Z = await reg("z@example.com");
     await call(A, "POST", "/recipes", { name: "Soup" });

@@ -28,10 +28,10 @@ function setup(role: "admin" | "member" = "admin") {
         return Response.json({});
       }
       if (u.endsWith("/auth/me"))
-        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role, householdId: "h1", householdRole: "owner" }, household: { id: "h1", name: "Home" } });
+        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role } });
       if (u.endsWith("/auth/status")) return Response.json({ needsSetup: false, signupMode: "invite" });
       if (u.endsWith("/admin/info"))
-        return Response.json({ version: "0.0.0", nodeVersion: "v22", uptimeSeconds: 90, dbBytes: 2048, imagesBytes: 0, counts: { users: 1, households: 1, recipes: 0 }, migrations: 14, dataDir: "/data", backupSchedule: { hours: 24, keep: 7 } });
+        return Response.json({ version: "0.0.0", nodeVersion: "v22", uptimeSeconds: 90, dbBytes: 2048, imagesBytes: 0, counts: { users: 1, recipes: 0 }, migrations: 14, dataDir: "/data", backupSchedule: { hours: 24, keep: 7 } });
       if (u.endsWith("/admin/features"))
         return Response.json({
           features: [

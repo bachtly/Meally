@@ -14,6 +14,6 @@ ingredientRoutes.use("*", requireAuth, requireFeature("ingredient-parser"));
 ingredientRoutes.post("/parse", async (c) => {
   const parsed = bodySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) throw new ApiError(400, "invalid_body", "lines: expected an array of strings");
-  const vocab = (await c.get("flags").getFeatures())["foods-units"].enabled ? await parseVocab(c.get("db"), c.get("householdId")) : undefined;
+  const vocab = (await c.get("flags").getFeatures())["foods-units"].enabled ? await parseVocab(c.get("db"), c.get("userId")) : undefined;
   return c.json({ parsed: parsed.data.lines.map((l) => parseIngredient(l, vocab)) });
 });

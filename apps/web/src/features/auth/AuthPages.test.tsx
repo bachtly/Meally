@@ -12,8 +12,7 @@ afterEach(() => {
 });
 
 const me = {
-  user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" },
-  household: { id: "h1", name: "Home" },
+  user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" },
 };
 
 function setup(path: string, signedIn = false) {

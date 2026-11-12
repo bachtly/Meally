@@ -52,10 +52,10 @@ export async function readImageUpload(c: Context<AppEnv>): Promise<ImageInput> {
 }
 
 /** Stores an upload and returns the new image id. Unreadable originals surface as 415. */
-export async function storeImage(store: ImageStore, householdId: string, input: ImageInput | Buffer): Promise<string> {
+export async function storeImage(store: ImageStore, userId: string, input: ImageInput | Buffer): Promise<string> {
   try {
-    if (Buffer.isBuffer(input)) return await store.putOriginal(householdId, input);
-    return input.kind === "sized" ? await store.putSized(householdId, input.sizes) : await store.putOriginal(householdId, input.bytes);
+    if (Buffer.isBuffer(input)) return await store.putOriginal(userId, input);
+    return input.kind === "sized" ? await store.putSized(userId, input.sizes) : await store.putOriginal(userId, input.bytes);
   } catch (e) {
     if (e instanceof ApiError) throw e;
     throw bad("That file is not a readable image", 415);

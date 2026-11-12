@@ -5,7 +5,7 @@ import { parseIngredient, recipeInputSchema } from "@meally/shared";
 import { hashPassword } from "./features/auth/password.js";
 import { createRecipe } from "./features/recipes/service.js";
 import { createDb, dbTarget } from "./db/index.js";
-import { households, users } from "./db/schema/index.js";
+import { users } from "./db/schema/index.js";
 import { config } from "./lib/config.js";
 
 export const DEMO_EMAIL = "demo@meally.local";
@@ -104,19 +104,16 @@ export async function seed(db: Awaited<ReturnType<typeof createDb>>["db"]) {
   const [existing] = await db.select().from(users).where(eq(users.email, DEMO_EMAIL)).limit(1);
   if (existing) return { created: false };
   const now = new Date();
-  const householdId = randomUUID();
   const userId = randomUUID();
-  await db.insert(households).values({ id: householdId, name: "Demo household", createdAt: now });
   await db.insert(users).values({
     id: userId,
     email: DEMO_EMAIL,
     name: "Demo",
     passwordHash: await hashPassword(DEMO_PASSWORD),
     role: "admin",
-    householdId,
     createdAt: now,
   });
-  for (const r of SAMPLE_RECIPES) await createRecipe(db, householdId, userId, recipeInputSchema.parse(r));
+  for (const r of SAMPLE_RECIPES) await createRecipe(db, userId, recipeInputSchema.parse(r));
   return { created: true };
 }
 

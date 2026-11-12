@@ -10,7 +10,7 @@ export function createUnconfiguredImageStore(): ImageStore {
   const fail = (): never => {
     throw new ApiError(501, "not_configured", "Image storage is not configured on this deployment");
   };
-  return { acceptsPresized: false, putOriginal: async () => fail(), putSized: async () => fail(), put: async () => fail(), get: async () => fail(), delete: async () => fail() };
+  return { acceptsPresized: false, putOriginal: async () => fail(), putSized: async () => fail(), put: async () => fail(), get: async () => fail(), delete: async () => fail(), moveOwner: async () => fail() };
 }
 
 /** No timers on the edge: jobs are registered, and only run when something (a cron route) calls `runJob`. */

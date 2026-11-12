@@ -33,34 +33,34 @@ export function slugify(name: string): string {
   return s || "recipe";
 }
 
-async function uniqueSlug(tx: Tx, householdId: string, name: string): Promise<string> {
+async function uniqueSlug(tx: Tx, userId: string, name: string): Promise<string> {
   const base = slugify(name);
   const rows = await tx
     .select({ slug: recipes.slug })
     .from(recipes)
-    .where(and(eq(recipes.householdId, householdId), or(eq(recipes.slug, base), like(recipes.slug, `${base}-%`))));
+    .where(and(eq(recipes.userId, userId), or(eq(recipes.slug, base), like(recipes.slug, `${base}-%`))));
   const taken = new Set(rows.map((r) => r.slug));
   if (!taken.has(base)) return base;
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 /** The search vector (name A, description B, ingredients C) is written here, in the same transaction as the recipe. */
-async function reindex(tx: Tx, householdId: string, id: string, data: RecipeData) {
+async function reindex(tx: Tx, userId: string, id: string, data: RecipeData) {
   const ingredients = data.ingredients.map((i) => [i.raw, i.food].filter(Boolean).join(" ")).join(" ");
   await tx.execute(
     sql`UPDATE recipes SET search_vector =
           setweight(to_tsvector('simple', ${data.name}), 'A') ||
           setweight(to_tsvector('simple', ${data.description ?? ""}), 'B') ||
           setweight(to_tsvector('simple', ${ingredients}), 'C')
-        WHERE id = ${id} AND household_id = ${householdId}`,
+        WHERE id = ${id} AND user_id = ${userId}`,
   );
 }
 
-async function writeChildren(tx: Tx, householdId: string, id: string, data: RecipeData, o: Org) {
+async function writeChildren(tx: Tx, userId: string, id: string, data: RecipeData, o: Org) {
   await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, id));
   await tx.delete(recipeSteps).where(eq(recipeSteps.recipeId, id));
   if (data.ingredients.length) {
-    const foodIds = o.foods ? await linkFoods(tx, householdId, data.ingredients.map((i) => i.food)) : [];
+    const foodIds = o.foods ? await linkFoods(tx, userId, data.ingredients.map((i) => i.food)) : [];
     await tx
       .insert(recipeIngredients)
       .values(data.ingredients.map((i, position) => ({ ...i, foodId: foodIds[position] ?? null, recipeId: id, position })));
@@ -87,17 +87,17 @@ function nutritionCols(d: RecipeData, o: Org): { nutrition?: Nutrition | null } 
   return { nutrition: d.nutrition === null || isNutritionEmpty(d.nutrition) ? null : d.nutrition };
 }
 
-async function writeOrganizers(tx: Tx, householdId: string, id: string, data: RecipeData) {
-  if (data.tags) await setRecipeOrganizers(tx, "tags", householdId, id, data.tags);
-  if (data.categories) await setRecipeOrganizers(tx, "categories", householdId, id, data.categories);
-  if (data.tools) await setRecipeOrganizers(tx, "tools", householdId, id, data.tools);
+async function writeOrganizers(tx: Tx, userId: string, id: string, data: RecipeData) {
+  if (data.tags) await setRecipeOrganizers(tx, "tags", userId, id, data.tags);
+  if (data.categories) await setRecipeOrganizers(tx, "categories", userId, id, data.categories);
+  if (data.tools) await setRecipeOrganizers(tx, "tools", userId, id, data.tools);
 }
 
 async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Recipe> {
   const org = o.org;
   const rate =
     o.ratings && o.userId
-      ? { me: await getMe(db, o.userId, row.id), householdRating: await householdRating(db, row.householdId, row.id) }
+      ? { me: await getMe(db, o.userId, row.id), householdRating: await householdRating(db, row.id) }
       : {};
   const extra = org
     ? {
@@ -132,70 +132,70 @@ async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Reci
   };
 }
 
-export async function findRow(db: Pick<Db, "select">, householdId: string, slug: string): Promise<Row> {
-  const [row] = await db.select().from(recipes).where(and(eq(recipes.householdId, householdId), eq(recipes.slug, slug))).limit(1);
+export async function findRow(db: Pick<Db, "select">, userId: string, slug: string): Promise<Row> {
+  const [row] = await db.select().from(recipes).where(and(eq(recipes.userId, userId), eq(recipes.slug, slug))).limit(1);
   if (!row) throw new ApiError(404, "not_found", "Recipe not found");
   return row;
 }
 
-export async function createRecipe(db: Db, householdId: string, userId: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
+export async function createRecipe(db: Db, userId: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
   const now = new Date();
   const id = randomUUID();
   const row = await db.transaction(async (tx) => {
-    const slug = await uniqueSlug(tx, householdId, data.name);
+    const slug = await uniqueSlug(tx, userId, data.name);
     const [row] = await tx
       .insert(recipes)
-      .values({ id, householdId, slug, ...fields(data), ...nutritionCols(data, o), createdBy: userId, createdAt: now, updatedAt: now })
+      .values({ id, userId, slug, ...fields(data), ...nutritionCols(data, o), createdBy: userId, createdAt: now, updatedAt: now })
       .returning();
-    await writeChildren(tx, householdId, id, data, o);
-    if (o.org) await writeOrganizers(tx, householdId, id, data);
-    await reindex(tx, householdId, id, data);
+    await writeChildren(tx, userId, id, data, o);
+    if (o.org) await writeOrganizers(tx, userId, id, data);
+    await reindex(tx, userId, id, data);
     return row!;
   });
-  emitWebhookEvent(db, householdId, "recipe.created", { slug: row.slug, name: row.name });
+  emitWebhookEvent(db, userId, "recipe.created", { slug: row.slug, name: row.name });
   return load(db, row, o);
 }
 
-export async function getRecipe(db: Db, householdId: string, slug: string, o: Org = {}): Promise<Recipe> {
-  return load(db, await findRow(db, householdId, slug), o);
+export async function getRecipe(db: Db, userId: string, slug: string, o: Org = {}): Promise<Recipe> {
+  return load(db, await findRow(db, userId, slug), o);
 }
 
 /** Replaces the recipe fields, ingredients and steps in one transaction. The slug never changes. */
-export async function replaceRecipe(db: Db, householdId: string, slug: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
+export async function replaceRecipe(db: Db, userId: string, slug: string, data: RecipeData, o: Org = {}): Promise<Recipe> {
   const row = await db.transaction(async (tx) => {
-    const existing = await findRow(tx, householdId, slug);
+    const existing = await findRow(tx, userId, slug);
     const [row] = await tx
       .update(recipes)
       .set({ ...fields(data), ...nutritionCols(data, o), updatedAt: new Date() })
-      .where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)))
+      .where(and(eq(recipes.id, existing.id), eq(recipes.userId, userId)))
       .returning();
-    await writeChildren(tx, householdId, existing.id, data, o);
-    if (o.org) await writeOrganizers(tx, householdId, existing.id, data);
-    await reindex(tx, householdId, existing.id, data);
+    await writeChildren(tx, userId, existing.id, data, o);
+    if (o.org) await writeOrganizers(tx, userId, existing.id, data);
+    await reindex(tx, userId, existing.id, data);
     return row!;
   });
-  emitWebhookEvent(db, householdId, "recipe.updated", { slug: row.slug, name: row.name });
+  emitWebhookEvent(db, userId, "recipe.updated", { slug: row.slug, name: row.name });
   return load(db, row, o);
 }
 
-export async function deleteRecipe(db: Db, store: ImageStore, householdId: string, slug: string) {
+export async function deleteRecipe(db: Db, store: ImageStore, userId: string, slug: string) {
   const extra: string[] = [];
   let deleted = { slug, name: "" };
   const imageId = await db.transaction(async (tx) => {
-    const existing = await findRow(tx, householdId, slug);
+    const existing = await findRow(tx, userId, slug);
     deleted = { slug: existing.slug, name: existing.name };
     const tlImgs = (await tx.select({ id: timelineEvents.imageId }).from(timelineEvents).where(eq(timelineEvents.recipeId, existing.id)))
       .map((r) => r.id)
       .filter((x): x is string => !!x);
     extra.push(...tlImgs);
-    await tx.delete(recipes).where(and(eq(recipes.id, existing.id), eq(recipes.householdId, householdId)));
+    await tx.delete(recipes).where(and(eq(recipes.id, existing.id), eq(recipes.userId, userId)));
     if (existing.imageId) await tx.delete(images).where(eq(images.id, existing.imageId));
     if (tlImgs.length) await tx.delete(images).where(inArray(images.id, tlImgs));
     return existing.imageId;
   });
-  emitWebhookEvent(db, householdId, "recipe.deleted", deleted);
-  if (imageId) await store.delete(householdId, imageId);
-  for (const id of extra) await store.delete(householdId, id);
+  emitWebhookEvent(db, userId, "recipe.deleted", deleted);
+  if (imageId) await store.delete(userId, imageId);
+  for (const id of extra) await store.delete(userId, id);
 }
 
 /**
@@ -226,7 +226,7 @@ export function decode(cursor: string): [string | number, string] {
 
 export async function listRecipes(
   db: Db,
-  householdId: string,
+  userId: string,
   opts: {
     q?: string;
     sort: "updated" | "name" | "created" | "rating" | "last-made";
@@ -241,7 +241,7 @@ export async function listRecipes(
     ids?: string[];
   } & Org,
 ): Promise<RecipeListResponse> {
-  const conds: SQL[] = [eq(recipes.householdId, householdId)];
+  const conds: SQL[] = [eq(recipes.userId, userId)];
   if (opts.ids) conds.push(inArray(recipes.id, opts.ids));
   if (opts.q) {
     const match = searchQuery(opts.q);
@@ -250,9 +250,9 @@ export async function listRecipes(
   }
   // OR within a type, AND across types. Ignored when the flag is off.
   if (opts.org) {
-    if (opts.tag?.length) conds.push(hasAnyOf("tags", householdId, opts.tag, recipes.id));
-    if (opts.category?.length) conds.push(hasAnyOf("categories", householdId, opts.category, recipes.id));
-    if (opts.tool?.length) conds.push(hasAnyOf("tools", householdId, opts.tool, recipes.id));
+    if (opts.tag?.length) conds.push(hasAnyOf("tags", userId, opts.tag, recipes.id));
+    if (opts.category?.length) conds.push(hasAnyOf("categories", userId, opts.category, recipes.id));
+    if (opts.tool?.length) conds.push(hasAnyOf("tools", userId, opts.tool, recipes.id));
   }
   // Ratings are the caller's own; every ratings option is ignored when the flag is off.
   const rt = !!(opts.ratings && opts.userId);
@@ -310,22 +310,22 @@ export async function listRecipes(
 // ---- images ----
 
 /** Stores a new image and points the recipe at it. */
-export async function setRecipeImage(db: Db, store: ImageStore, householdId: string, slug: string, input: ImageInput | Buffer): Promise<string> {
-  const row = await findRow(db, householdId, slug);
-  const id = await storeImage(store, householdId, input);
+export async function setRecipeImage(db: Db, store: ImageStore, userId: string, slug: string, input: ImageInput | Buffer): Promise<string> {
+  const row = await findRow(db, userId, slug);
+  const id = await storeImage(store, userId, input);
   await db.transaction(async (tx) => {
-    await tx.insert(images).values({ id, householdId, createdAt: new Date() });
+    await tx.insert(images).values({ id, userId, createdAt: new Date() });
     await tx
       .update(recipes)
       .set({ imageId: id, updatedAt: new Date() })
-      .where(and(eq(recipes.id, row.id), eq(recipes.householdId, householdId)));
+      .where(and(eq(recipes.id, row.id), eq(recipes.userId, userId)));
     if (row.imageId) await tx.delete(images).where(eq(images.id, row.imageId));
   });
-  if (row.imageId) await store.delete(householdId, row.imageId);
+  if (row.imageId) await store.delete(userId, row.imageId);
   return id;
 }
 
-export async function findImage(db: Db, householdId: string, id: string) {
-  const [img] = await db.select().from(images).where(and(eq(images.id, id), eq(images.householdId, householdId))).limit(1);
+export async function findImage(db: Db, userId: string, id: string) {
+  const [img] = await db.select().from(images).where(and(eq(images.id, id), eq(images.userId, userId))).limit(1);
   return img ?? null;
 }
