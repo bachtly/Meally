@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { imageSizes, snapCreateSchema, snapListQuerySchema, snapPatchSchema, type ImageSize } from "@meally/shared";
+import { imageSizes, reactionParamSchema, snapCreateSchema, snapListQuerySchema, snapPatchSchema, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { viewerOf } from "../../lib/access.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { MAX_IMAGE_BYTES, readImageUpload } from "../recipes/image-input.js";
-import { createSnap, deleteSnap, getSnap, getSnapRecipe, listFeed, readSnapImage, relinkSnap, saveSnapRecipe } from "./service.js";
+import { addReaction, createSnap, deleteSnap, getSnap, getSnapRecipe, listFeed, readSnapImage, relinkSnap, removeReaction, saveSnapRecipe } from "./service.js";
 
 function invalid(issue?: { path: PropertyKey[]; message: string }) {
   return new ApiError(400, "invalid_body", `${issue?.path.length ? `${issue.path.join(".")}: ` : ""}${issue?.message ?? "Invalid request"}`);
@@ -60,6 +60,17 @@ snapRoutes
     const foods = (await c.get("flags").getFeatures())["foods-units"].enabled;
     const { slug, created } = await saveSnapRecipe(c.get("db"), c.get("platform").images, viewerOf(c), c.req.param("id"), foods);
     return c.json({ slug }, created ? 201 : 200);
+  })
+  .put("/:id/reactions/:emoji", async (c) => {
+    const p = reactionParamSchema.safeParse({ emoji: c.req.param("emoji") });
+    if (!p.success) throw invalid(p.error.issues[0]);
+    return c.json(await addReaction(c.get("db"), viewerOf(c), c.req.param("id"), p.data.emoji));
+  })
+  .delete("/:id/reactions/:emoji", async (c) => {
+    const p = reactionParamSchema.safeParse({ emoji: c.req.param("emoji") });
+    if (!p.success) throw invalid(p.error.issues[0]);
+    await removeReaction(c.get("db"), viewerOf(c), c.req.param("id"), p.data.emoji);
+    return c.body(null, 204);
   })
   .get("/:id/images/:imageId/:size", async (c) => {
     const size = Number(c.req.param("size")) as ImageSize;

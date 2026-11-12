@@ -40,7 +40,18 @@ Both are Friend paths: a non-friend, a pending Friendship and a removed Friendsh
 
 - `PATCH /api/v1/snaps/:id` `{ recipeId: string | null }`: author only, relinks or unlinks the Linked recipe. `200 Snap`. `404` when the recipe is not the author's own, and for a Friend, non-friend or pending Friendship. Caption, dish name and place stay fixed after posting (requirements).
 
-Deferred to later PRs: Reactions (F7), push (F8).
+### Reactions (F7)
+
+- `PUT /api/v1/snaps/:id/reactions/:emoji`: `200 Snap`, idempotent. `:emoji` is one of `heart yum fire clap wow laugh`, else `400`.
+- `DELETE /api/v1/snaps/:id/reactions/:emoji`: always `204`, even when the Reaction is not there (idempotent).
+- Both are Friend paths through `lib/access`: a non-friend, a pending and a removed Friendship get `404`.
+- The author sees every live Reaction on their Snap (`reactions`); everyone else sees only their own (`myReactions`).
+  The filter runs in SQL (Snap author is the viewer, or the reactor is the viewer), so other users' rows never leave the DB.
+- DELETE soft-deletes (`removed_at`); PUT after DELETE revives the same row. A push is queued (in `push_deliveries`, one per
+  author device) only when the row is first inserted, so DELETE then PUT never notifies twice. No push when the author
+  reacts to their own Snap. Sending the queued pushes is F8.
+
+Deferred to later PRs: push sending (F8).
 
 ## UI
 
