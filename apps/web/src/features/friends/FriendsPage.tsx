@@ -219,7 +219,6 @@ function OpenLinks() {
             <span className="text-muted">Expires {day(i.expiresAt)}</span>
             <Button
               variant="secondary"
-              size="sm"
               onClick={() =>
                 revoke.mutate(i.id, {
                   onError: (e) => toast(errMsg(e), "danger"),

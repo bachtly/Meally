@@ -22,6 +22,7 @@ interface Opts {
   accept?: [number, unknown];
   friends?: { userId: string; name: string; since: number }[];
   friendsStatus?: number;
+  register?: [number, unknown];
 }
 
 function setup(path: string, o: Opts = {}) {
@@ -37,6 +38,7 @@ function setup(path: string, o: Opts = {}) {
         return o.signedIn === false
           ? Response.json({ error: "unauthenticated" }, { status: 401 })
           : Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } });
+      if (u === "/auth/register" && o.register) return Response.json(o.register[1], { status: o.register[0] });
       if (u === "/auth/status") return Response.json({ needsSetup: false, signupMode: o.signupMode ?? "invite" });
       if (u === "/features") {
         const on = o.friendsOn !== false;
@@ -170,4 +172,14 @@ it("admin saves the Friend cap", async () => {
   await user.type(input, "30");
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(calls.find((c) => c.method === "PUT" && c.url === "/admin/settings")?.body).toEqual({ friendCap: 30 }));
+});
+
+it("sign-up shows a plain message when the inviter is at the friend cap", async () => {
+  setup("/signup?next=%2Finvite%2Ftok", { signedIn: false, register: [409, { error: "friend_cap", message: "At most 20 friends" }] });
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Your name"), "Bo");
+  await user.type(screen.getByLabelText("Email"), "bo@example.com");
+  await user.type(screen.getByLabelText(/Password/), "password123");
+  await user.click(screen.getByRole("button", { name: "Create account" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("your friend has reached their friend limit");
 });

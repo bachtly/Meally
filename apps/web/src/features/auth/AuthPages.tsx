@@ -71,7 +71,13 @@ function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra, redire
       setSession(me);
       navigate(redirectTo ?? next ?? "/", { replace: true });
     } catch (err) {
-      setFormError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setFormError(
+        err instanceof ApiRequestError && err.code === "friend_cap"
+          ? "This invite can't be used: your friend has reached their friend limit."
+          : err instanceof ApiRequestError
+            ? err.message
+            : "Something went wrong. Try again.",
+      );
     } finally {
       setBusy(false);
     }
