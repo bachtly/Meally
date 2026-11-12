@@ -102,7 +102,7 @@ export function ExportBackupsSection() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <h3 className="font-medium">Download my household's recipes</h3>
+        <h3 className="font-medium">Download my recipes</h3>
         <p className="text-sm text-muted">A zip with one file per recipe, plus photos.</p>
         <div className="flex flex-wrap gap-2">
           <LinkButton href="/api/v1/export/recipes?format=jsonld">JSON-LD</LinkButton>

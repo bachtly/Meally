@@ -163,10 +163,10 @@ function SaveOne({ token, slug, sharedBy }: { token: string; slug: string; share
   if (status.isPending) return <Skeleton className="h-11 w-48" />;
   if (status.isError) return <p className="text-sm text-danger">Could not check your recipes. Reload to try again.</p>;
   const mine = status.data.saved[slug];
-  if (status.data.sameHousehold)
+  if (status.data.ownRecipe)
     return (
       <p className="flex flex-wrap items-center gap-3 text-sm">
-        <span>This recipe is already in your household.</span>
+        <span>This is your own recipe.</span>
         <Link to={`/recipes/${encodeURIComponent(slug)}`} className={secondaryLink}>
           Open it
         </Link>
@@ -219,7 +219,7 @@ function SaveAll({ token, share, auto }: { token: string; share: PublicShare; au
       .catch((e: unknown) => toast(e instanceof ApiRequestError ? e.message : "Could not save everything. Try again.", "danger"));
 
   useEffect(() => {
-    if (!auto || started.current || !me || !status.data || status.data.sameHousehold || unsaved.length === 0) return;
+    if (!auto || started.current || !me || !status.data || status.data.ownRecipe || unsaved.length === 0) return;
     started.current = true;
     void run();
   });
@@ -234,7 +234,7 @@ function SaveAll({ token, share, auto }: { token: string; share: PublicShare; au
     );
   if (status.isPending) return <Skeleton className="h-11 w-48" />;
   if (status.isError) return <p className="text-sm text-danger">Could not check your recipes. Reload to try again.</p>;
-  if (status.data.sameHousehold) return <p className="text-sm text-muted">These recipes are already in your household.</p>;
+  if (status.data.ownRecipe) return <p className="text-sm text-muted">These are your own recipes.</p>;
   if (unsaved.length === 0)
     return (
       <p className="flex flex-wrap items-center gap-3">
@@ -312,7 +312,7 @@ function AutoSaveOne({ token, slug }: { token: string; slug: string }) {
     if (started.current || !me || !status.data) return;
     started.current = true;
     const mine = status.data.saved[slug];
-    if (status.data.sameHousehold) return;
+    if (status.data.ownRecipe) return;
     if (mine) {
       navigate(`/recipes/${encodeURIComponent(mine)}`, { replace: true });
       return;
@@ -372,7 +372,7 @@ export function SharePage() {
       ) : (
         <ul className={GRID}>
           {s.items.map((i) => (
-            <ShareCard key={i.slug} token={token} item={i} saved={!!(me && status.data?.saved[i.slug] && !status.data.sameHousehold)} />
+            <ShareCard key={i.slug} token={token} item={i} saved={!!(me && status.data?.saved[i.slug] && !status.data.ownRecipe)} />
           ))}
         </ul>
       )}

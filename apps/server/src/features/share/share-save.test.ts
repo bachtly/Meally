@@ -37,7 +37,7 @@ async function mk() {
 }
 
 describe("saving a share", () => {
-  it("copies recipes with their image into the viewer's household, with who shared them", async () => {
+  it("copies recipes with their image into the viewer's recipes, with who shared them", async () => {
     const { app, A, B, call, json, recipe, withImage, setLink } = await mk();
     const pie = await recipe("Pie");
     await withImage(pie);
@@ -65,7 +65,7 @@ describe("saving a share", () => {
     const a = await recipe("Soup");
     const b = await recipe("Stew");
     const t = await setLink([a, b]);
-    expect(await json(await call(B, "GET", `/shares/received/${t}`))).toEqual({ sameHousehold: false, saved: {} });
+    expect(await json(await call(B, "GET", `/shares/received/${t}`))).toEqual({ ownRecipe: false, saved: {} });
     const first = (await json(await call(B, "POST", `/shares/received/${t}/save`, { slugs: [a] }))).saved;
     const again = (await json(await call(B, "POST", `/shares/received/${t}/save`, { slugs: [a, b] }))).saved;
     expect(again[a]).toBe(first[a]);
@@ -93,13 +93,15 @@ describe("saving a share", () => {
     expect((await json(await call(B, "GET", `/recipes/${saved[a]}`))).savedFrom).toMatchObject({ name: null });
   });
 
-  it("refuses own-household saves, recipes outside the link, dead links, bad bodies and anonymous callers", async () => {
+  it("refuses saving your own recipes, recipes outside the link, dead links, bad bodies and anonymous callers", async () => {
     const { A, B, call, json, recipe, setLink } = await mk();
     const a = await recipe("Soup");
     const outside = await recipe("Secret");
     const t = await setLink([a]);
-    expect(await json(await call(A, "GET", `/shares/received/${t}`))).toEqual({ sameHousehold: true, saved: { [a]: a } });
-    expect((await call(A, "POST", `/shares/received/${t}/save`, { slugs: [a] })).status).toBe(409);
+    expect(await json(await call(A, "GET", `/shares/received/${t}`))).toEqual({ ownRecipe: true, saved: { [a]: a } });
+    const own = await call(A, "POST", `/shares/received/${t}/save`, { slugs: [a] });
+    expect(own.status).toBe(409);
+    expect((await json(own)).error).toBe("own_recipe");
     expect((await call(B, "POST", `/shares/received/${t}/save`, { slugs: [outside] })).status).toBe(404);
     expect((await call(B, "POST", `/shares/received/${t}/save`, { slugs: [] })).status).toBe(400);
     expect((await call(B, "POST", `/shares/received/${t}/save`, { slugs: Array.from({ length: 11 }, () => a) })).status).toBe(400);
@@ -108,7 +110,7 @@ describe("saving a share", () => {
     const [link] = (await json(await call(A, "GET", "/shares"))).items;
     await call(A, "DELETE", `/shares/${link.id}`);
     expect((await call(B, "POST", `/shares/received/${t}/save`, { slugs: [a] })).status).toBe(404);
-    // Nothing was written to B's household along the way.
+    // Nothing was written to B's recipes along the way.
     expect((await json(await call(B, "GET", "/recipes?limit=50"))).items).toEqual([]);
   });
 });

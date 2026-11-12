@@ -4,14 +4,14 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import type { TimelineEvent, TimelineKind, TimelineResponse } from "@meally/shared";
 import { api, postJson } from "../../lib/api";
 
-export function useTimeline(slug: string | null) {
+export function useTimeline(slug: string) {
   return useInfiniteQuery({
-    queryKey: ["timeline", slug ?? "feed"],
+    queryKey: ["timeline", slug],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => {
       const p = new URLSearchParams({ limit: "20" });
       if (pageParam) p.set("cursor", pageParam);
-      return api<TimelineResponse>(`${slug ? `/recipes/${encodeURIComponent(slug)}/timeline` : "/timeline"}?${p}`);
+      return api<TimelineResponse>(`/recipes/${encodeURIComponent(slug)}/timeline?${p}`);
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });

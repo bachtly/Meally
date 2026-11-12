@@ -57,7 +57,7 @@ async function mk(env: Record<string, string> = {}) {
 }
 
 describe("shopping bus", () => {
-  it("emits to the right list and household only, and unsubscribes", () => {
+  it("emits to the right list and user only, and unsubscribes", () => {
     const bus = new ShoppingBus();
     const got: string[] = [];
     const off = bus.subscribe("h1", "l1", (e) => got.push(`a:${e.type}`));
@@ -314,7 +314,7 @@ describe("shopping API", () => {
     await reader.cancel();
   });
 
-  it("isolates households", async () => {
+  it("isolates users", async () => {
     const { A, B, call, list, recipe } = await mk();
     const id = await list();
     const item = (await (

@@ -48,9 +48,9 @@ export function cleanNames(names: readonly string[], max = 30): string[] {
   return out.slice(0, max);
 }
 
-async function freeSlug(tx: Tx, type: OrganizerType, householdId: string, name: string, ignoreId?: string) {
+async function freeSlug(tx: Tx, type: OrganizerType, userId: string, name: string, ignoreId?: string) {
   const { table } = kind(type);
-  const rows = await tx.select({ id: table.id, slug: table.slug }).from(table).where(eq(table.householdId, householdId));
+  const rows = await tx.select({ id: table.id, slug: table.slug }).from(table).where(eq(table.userId, userId));
   const taken = new Set(rows.filter((r) => r.id !== ignoreId).map((r) => r.slug));
   const base = organizerSlug(name);
   if (!taken.has(base)) return base;
@@ -58,16 +58,16 @@ async function freeSlug(tx: Tx, type: OrganizerType, householdId: string, name: 
 }
 
 /** Finds an item by name (case-insensitive) or creates it. */
-async function upsertByName(tx: Tx, type: OrganizerType, householdId: string, name: string): Promise<string> {
+async function upsertByName(tx: Tx, type: OrganizerType, userId: string, name: string): Promise<string> {
   const { table } = kind(type);
   const [hit] = await tx
     .select({ id: table.id })
     .from(table)
-    .where(and(eq(table.householdId, householdId), sql`lower(${table.name}) = ${name.toLowerCase()}`))
+    .where(and(eq(table.userId, userId), sql`lower(${table.name}) = ${name.toLowerCase()}`))
     .limit(1);
   if (hit) return hit.id;
   const id = randomUUID();
-  await tx.insert(table).values({ id, householdId, name, slug: await freeSlug(tx, type, householdId, name) });
+  await tx.insert(table).values({ id, userId, name, slug: await freeSlug(tx, type, userId, name) });
   return id;
 }
 
@@ -75,14 +75,14 @@ async function upsertByName(tx: Tx, type: OrganizerType, householdId: string, na
 export async function setRecipeOrganizers(
   tx: Tx,
   type: OrganizerType,
-  householdId: string,
+  userId: string,
   recipeId: string,
   names: readonly string[],
 ) {
   const { link, col } = kind(type);
   await tx.delete(link).where(eq(link.recipeId, recipeId));
   const ids: string[] = [];
-  for (const n of cleanNames(names)) ids.push(await upsertByName(tx, type, householdId, n));
+  for (const n of cleanNames(names)) ids.push(await upsertByName(tx, type, userId, n));
   if (ids.length) await tx.insert(link).values(ids.map((id) => ({ recipeId, [col]: id })));
 }
 
@@ -106,39 +106,39 @@ export async function loadRefs(db: Q, type: OrganizerType, recipeIds: string[]):
 }
 
 /** SQL condition: the recipe has at least one item of this type whose slug is in `slugs`. */
-export function hasAnyOf(type: OrganizerType, householdId: string, slugs: string[], recipeIdCol: unknown): SQL {
+export function hasAnyOf(type: OrganizerType, userId: string, slugs: string[], recipeIdCol: unknown): SQL {
   const { table, link, col } = kind(type);
   return sql`${recipeIdCol} IN (SELECT ${link.recipeId} FROM ${link} INNER JOIN ${table} ON ${table.id} = ${link[col]}
-    WHERE ${table.householdId} = ${householdId} AND ${inArray(table.slug, slugs)})`;
+    WHERE ${table.userId} = ${userId} AND ${inArray(table.slug, slugs)})`;
 }
 
 // ---- management ----
 
-export async function listOrganizers(db: Db, type: OrganizerType, householdId: string) {
+export async function listOrganizers(db: Db, type: OrganizerType, userId: string) {
   const { table, link, col } = kind(type);
   const rows = await db
     .select({ name: table.name, slug: table.slug, count: sql<number>`count(${link.recipeId})` })
     .from(table)
     .leftJoin(link, eq(link[col], table.id))
-    .where(eq(table.householdId, householdId))
+    .where(eq(table.userId, userId))
     .groupBy(table.id)
     .orderBy(asc(sql`lower(${table.name})`));
   return rows.map((r) => ({ ...r, count: Number(r.count) }));
 }
 
-async function find(db: Q, type: OrganizerType, householdId: string, slug: string) {
+async function find(db: Q, type: OrganizerType, userId: string, slug: string) {
   const { table, label } = kind(type);
-  const [row] = await db.select().from(table).where(and(eq(table.householdId, householdId), eq(table.slug, slug))).limit(1);
+  const [row] = await db.select().from(table).where(and(eq(table.userId, userId), eq(table.slug, slug))).limit(1);
   if (!row) throw new ApiError(404, "not_found", `${label} not found`);
   return row;
 }
 
-async function nameTaken(tx: Q, type: OrganizerType, householdId: string, name: string, exceptId?: string) {
+async function nameTaken(tx: Q, type: OrganizerType, userId: string, name: string, exceptId?: string) {
   const { table } = kind(type);
   const rows = await tx
     .select({ id: table.id })
     .from(table)
-    .where(and(eq(table.householdId, householdId), sql`lower(${table.name}) = ${name.toLowerCase()}`));
+    .where(and(eq(table.userId, userId), sql`lower(${table.name}) = ${name.toLowerCase()}`));
   return rows.some((r) => r.id !== exceptId);
 }
 
@@ -148,52 +148,52 @@ function requireName(raw: string): string {
   return name;
 }
 
-export async function createOrganizer(db: Db, type: OrganizerType, householdId: string, rawName: string) {
+export async function createOrganizer(db: Db, type: OrganizerType, userId: string, rawName: string) {
   const name = requireName(rawName);
   const { table, label } = kind(type);
   return db.transaction(async (tx) => {
-    if (await nameTaken(tx, type, householdId, name)) throw new ApiError(409, "conflict", `${label} already exists`);
-    const slug = await freeSlug(tx, type, householdId, name);
-    await tx.insert(table).values({ id: randomUUID(), householdId, name, slug });
+    if (await nameTaken(tx, type, userId, name)) throw new ApiError(409, "conflict", `${label} already exists`);
+    const slug = await freeSlug(tx, type, userId, name);
+    await tx.insert(table).values({ id: randomUUID(), userId, name, slug });
     return { name, slug, count: 0 };
   });
 }
 
 /** Renames. The slug follows the name (unless it would collide), so links by slug change with it. */
-export async function renameOrganizer(db: Db, type: OrganizerType, householdId: string, slug: string, rawName: string) {
+export async function renameOrganizer(db: Db, type: OrganizerType, userId: string, slug: string, rawName: string) {
   const name = requireName(rawName);
   const { table, link, col, label } = kind(type);
   return db.transaction(async (tx) => {
-    const row = await find(tx, type, householdId, slug);
-    if (await nameTaken(tx, type, householdId, name, row.id)) throw new ApiError(409, "conflict", `${label} already exists`);
-    const next = await freeSlug(tx, type, householdId, name, row.id);
-    await tx.update(table).set({ name, slug: next }).where(and(eq(table.id, row.id), eq(table.householdId, householdId)));
+    const row = await find(tx, type, userId, slug);
+    if (await nameTaken(tx, type, userId, name, row.id)) throw new ApiError(409, "conflict", `${label} already exists`);
+    const next = await freeSlug(tx, type, userId, name, row.id);
+    await tx.update(table).set({ name, slug: next }).where(and(eq(table.id, row.id), eq(table.userId, userId)));
     const [c] = await tx.select({ n: sql<number>`count(*)` }).from(link).where(eq(link[col], row.id));
     return { name, slug: next, count: Number(c?.n ?? 0) };
   });
 }
 
-export async function deleteOrganizer(db: Db, type: OrganizerType, householdId: string, slug: string) {
+export async function deleteOrganizer(db: Db, type: OrganizerType, userId: string, slug: string) {
   const { table } = kind(type);
   await db.transaction(async (tx) => {
-    const row = await find(tx, type, householdId, slug);
-    await tx.delete(table).where(and(eq(table.id, row.id), eq(table.householdId, householdId)));
+    const row = await find(tx, type, userId, slug);
+    await tx.delete(table).where(and(eq(table.id, row.id), eq(table.userId, userId)));
   });
 }
 
 /** Moves every recipe from `slug` to `into`, then removes `slug`. A recipe that has both keeps one link. */
-export async function mergeOrganizers(db: Db, type: OrganizerType, householdId: string, slug: string, into: string) {
+export async function mergeOrganizers(db: Db, type: OrganizerType, userId: string, slug: string, into: string) {
   if (slug === into) throw new ApiError(400, "invalid_body", "Choose a different item to merge into");
   const { table, link, col, sqlCol } = kind(type);
   await db.transaction(async (tx) => {
-    const from = await find(tx, type, householdId, slug);
-    const to = await find(tx, type, householdId, into);
+    const from = await find(tx, type, userId, slug);
+    const to = await find(tx, type, userId, into);
     await tx.execute(
       sql`INSERT INTO ${link} (recipe_id, ${sql.raw(sqlCol)})
           SELECT recipe_id, ${to.id} FROM ${link} WHERE ${link[col]} = ${from.id}
           ON CONFLICT DO NOTHING`,
     );
-    await tx.delete(table).where(and(eq(table.id, from.id), eq(table.householdId, householdId)));
+    await tx.delete(table).where(and(eq(table.id, from.id), eq(table.userId, userId)));
   });
-  return (await listOrganizers(db, type, householdId)).find((o) => o.slug === into)!;
+  return (await listOrganizers(db, type, userId)).find((o) => o.slug === into)!;
 }

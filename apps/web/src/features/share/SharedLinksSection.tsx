@@ -11,7 +11,7 @@ function what(s: ShareSummary) {
   return { label: s.title || `${n} ${n === 1 ? "recipe" : "recipes"}`, to: null, kind: s.title ? `${n} ${n === 1 ? "recipe" : "recipes"}` : "Recipes" };
 }
 
-/** Every active link the household has made, with revoke. */
+/** Every active link you have made, with revoke. */
 export function SharedLinksSection() {
   const toast = useToast();
   const q = useAllShares();

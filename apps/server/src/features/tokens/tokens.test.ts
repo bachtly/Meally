@@ -104,7 +104,7 @@ describe("api tokens", () => {
     expect((await json(await cookie(A, "GET", "/tokens"))).items).toHaveLength(1);
   });
 
-  it("scopes a token to its owner's household", async () => {
+  it("scopes a token to its owner", async () => {
     const { A, B, cookie, bearer, mint } = await mk();
     await cookie(A, "POST", "/recipes", { name: "Secret", ingredients: [{ raw: "1 egg" }], steps: [{ text: "Boil" }] });
     const b = await mint(B, "read");

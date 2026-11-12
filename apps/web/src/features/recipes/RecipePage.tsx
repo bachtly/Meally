@@ -205,7 +205,7 @@ export function RecipePage() {
             · saved {new Date(r.savedFrom.at).toLocaleDateString(undefined, { dateStyle: "medium" })}
           </p>
         )}
-        {r.me && <div className="print:hidden"><StarRating slug={r.slug} rating={r.me.rating} household={r.householdRating} /></div>}
+        {r.me && <div className="print:hidden"><StarRating slug={r.slug} rating={r.me.rating} /></div>}
         {r.description && <p className="mt-2 max-w-prose text-lg text-muted">{r.description}</p>}
         <RecipeChips categories={r.categories} tags={r.tags} tools={r.tools} />
         <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -369,7 +369,7 @@ export function RecipePage() {
         open={confirm}
         onOpenChange={setConfirm}
         title="Delete this recipe?"
-        description={`${r.name} will be removed for everyone in your household. This cannot be undone.`}
+        description={`${r.name} will be removed. This cannot be undone.`}
       >
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirm(false)}>

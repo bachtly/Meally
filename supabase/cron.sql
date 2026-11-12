@@ -25,3 +25,11 @@ select cron.schedule('meally-shares-cleanup', '17 3 * * *', $job$
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'meally_jobs_secret')),
     body := '{}'::jsonb, timeout_milliseconds := 20000);
 $job$);
+
+-- Finishes the household-to-user image rekey (ADR 0003). A no-op once `image_moves` is empty.
+select cron.schedule('meally-images-move', '* * * * *', $job$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'meally_project_url') || '/functions/v1/meally/api/v1/internal/jobs/images.move',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'meally_jobs_secret')),
+    body := '{}'::jsonb, timeout_milliseconds := 20000);
+$job$);

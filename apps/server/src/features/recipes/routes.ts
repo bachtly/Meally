@@ -40,25 +40,25 @@ recipeRoutes
   .get("/", async (c) => {
     const raw = { ...c.req.query(), tag: c.req.queries("tag"), category: c.req.queries("category"), tool: c.req.queries("tool") };
     const query = parse(raw, recipeListQuerySchema);
-    return c.json(await listRecipes(c.get("db"), c.get("householdId"), { ...query, ...(await opts(c)) }));
+    return c.json(await listRecipes(c.get("db"), c.get("userId"), { ...query, ...(await opts(c)) }));
   })
   .post("/", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await createRecipe(c.get("db"), c.get("householdId"), c.get("user").id, data, await opts(c)), 201);
+    return c.json(await createRecipe(c.get("db"), c.get("userId"), data, await opts(c)), 201);
   })
-  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), await opts(c))))
+  .get("/:slug", async (c) => c.json(await getRecipe(c.get("db"), c.get("userId"), c.req.param("slug"), await opts(c))))
   .put("/:slug", async (c) => {
     const data = parse(await json(c), recipeInputSchema);
-    return c.json(await replaceRecipe(c.get("db"), c.get("householdId"), c.req.param("slug"), data, await opts(c)));
+    return c.json(await replaceRecipe(c.get("db"), c.get("userId"), c.req.param("slug"), data, await opts(c)));
   })
   .put("/:slug/me", async (c) => {
     if (!(await ratingsOn(c))) throw new ApiError(404, "not_found", "Not found");
     const patch = parse(await json(c), recipeMeInputSchema);
-    const recipe = await getRecipe(c.get("db"), c.get("householdId"), c.req.param("slug")); // 404 across households
+    const recipe = await getRecipe(c.get("db"), c.get("userId"), c.req.param("slug")); // 404 for another user
     return c.json(await setMe(c.get("db"), c.get("user").id, recipe.id, patch));
   })
   .delete("/:slug", async (c) => {
-    await deleteRecipe(c.get("db"), c.get("platform").images, c.get("householdId"), c.req.param("slug"));
+    await deleteRecipe(c.get("db"), c.get("platform").images, c.get("userId"), c.req.param("slug"));
     return c.body(null, 204);
   })
   .post(
@@ -71,11 +71,11 @@ recipeRoutes
     }),
     async (c) => {
       const db = c.get("db");
-      const householdId = c.get("householdId");
+      const userId = c.get("userId");
       const slug = c.req.param("slug");
-      await getRecipe(db, householdId, slug); // 404 before touching the upload
-      await setRecipeImage(db, c.get("platform").images, householdId, slug, await readImageUpload(c));
-      return c.json(await getRecipe(db, householdId, slug, await opts(c)), 201);
+      await getRecipe(db, userId, slug); // 404 before touching the upload
+      await setRecipeImage(db, c.get("platform").images, userId, slug, await readImageUpload(c));
+      return c.json(await getRecipe(db, userId, slug, await opts(c)), 201);
     },
   );
 
@@ -84,11 +84,11 @@ imageRoutes.use("*", requireAuth);
 imageRoutes.get("/:id/:size", async (c) => {
   const size = Number(c.req.param("size")) as ImageSize;
   if (!imageSizes.includes(size)) throw new ApiError(404, "not_found", "Image not found");
-  const householdId = c.get("householdId");
+  const userId = c.get("userId");
   const id = c.req.param("id");
-  const img = await findImage(c.get("db"), householdId, id);
+  const img = await findImage(c.get("db"), userId, id);
   if (!img) throw new ApiError(404, "not_found", "Image not found");
-  const data = await c.get("platform").images.get(householdId, id, size);
+  const data = await c.get("platform").images.get(userId, id, size);
   if (!data) throw new ApiError(404, "not_found", "Image not found");
   // Bytes, not a redirect to a signed Storage URL: the URL would change on every load, so neither the browser nor the
   // service worker could keep the image. An image never changes and ids are never reused, so cache it for a year

@@ -41,7 +41,7 @@ const routes = [{ element: (<><Outlet /><Where /></>), children: appRoutes }];
 
 function renderAt(path: string) {
   const info = { enabled: true, locked: false, source: "default", label: "x", description: "y" };
-  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } };
+  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {

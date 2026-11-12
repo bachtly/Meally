@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { MealPlanEntry, MealPlanEntryInput, MealPlanEntryPatch, MealPlanRule, MealPlanRuleInput, MealPlanRecipeSummary, MealType } from "@meally/shared";
 import type { Db } from "../../db/index.js";
-import { householdFeedTokens, mealPlanEntries, mealPlanRules, recipes } from "../../db/schema/index.js";
+import { userFeedTokens, mealPlanEntries, mealPlanRules, recipes } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { imageUrl } from "../recipes/service.js";
 import { loadRefs } from "../organizers/service.js";
@@ -15,19 +15,19 @@ export const today = () => new Date().toISOString().slice(0, 10);
 export const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 const dayOfWeek = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay();
 
-async function summaries(db: Db, householdId: string, ids: string[]): Promise<Map<string, MealPlanRecipeSummary>> {
+async function summaries(db: Db, userId: string, ids: string[]): Promise<Map<string, MealPlanRecipeSummary>> {
   const out = new Map<string, MealPlanRecipeSummary>();
   if (!ids.length) return out;
   const rows = await db
     .select()
     .from(recipes)
-    .where(and(eq(recipes.householdId, householdId), inArray(recipes.id, ids)));
+    .where(and(eq(recipes.userId, userId), inArray(recipes.id, ids)));
   for (const r of rows) out.set(r.id, { id: r.id, name: r.name, slug: r.slug, imageUrl: imageUrl(r.imageId, 320), totalMinutes: r.totalMinutes });
   return out;
 }
 
-async function hydrate(db: Db, householdId: string, rows: Row[]): Promise<MealPlanEntry[]> {
-  const map = await summaries(db, householdId, [...new Set(rows.flatMap((r) => (r.recipeId ? [r.recipeId] : [])))]);
+async function hydrate(db: Db, userId: string, rows: Row[]): Promise<MealPlanEntry[]> {
+  const map = await summaries(db, userId, [...new Set(rows.flatMap((r) => (r.recipeId ? [r.recipeId] : [])))]);
   return rows.map((r) => ({
     id: r.id,
     date: r.date,
@@ -39,56 +39,56 @@ async function hydrate(db: Db, householdId: string, rows: Row[]): Promise<MealPl
   }));
 }
 
-export async function listEntries(db: Db, householdId: string, from: string, to: string): Promise<MealPlanEntry[]> {
+export async function listEntries(db: Db, userId: string, from: string, to: string): Promise<MealPlanEntry[]> {
   const rows = await db
     .select()
     .from(mealPlanEntries)
-    .where(and(eq(mealPlanEntries.householdId, householdId), gte(mealPlanEntries.date, from), lte(mealPlanEntries.date, to)))
+    .where(and(eq(mealPlanEntries.userId, userId), gte(mealPlanEntries.date, from), lte(mealPlanEntries.date, to)))
     .orderBy(asc(mealPlanEntries.date), asc(mealPlanEntries.mealType), asc(mealPlanEntries.position), asc(mealPlanEntries.createdAt));
-  return hydrate(db, householdId, rows);
+  return hydrate(db, userId, rows);
 }
 
-async function assertRecipe(db: Db, householdId: string, id: string) {
-  const [r] = await db.select({ id: recipes.id }).from(recipes).where(and(eq(recipes.id, id), eq(recipes.householdId, householdId)));
+async function assertRecipe(db: Db, userId: string, id: string) {
+  const [r] = await db.select({ id: recipes.id }).from(recipes).where(and(eq(recipes.id, id), eq(recipes.userId, userId)));
   if (!r) throw new ApiError(400, "invalid_body", "recipeId: Recipe not found");
 }
 
-const slotWhere = (householdId: string, date: string, mealType: string) =>
-  and(eq(mealPlanEntries.householdId, householdId), eq(mealPlanEntries.date, date), eq(mealPlanEntries.mealType, mealType));
+const slotWhere = (userId: string, date: string, mealType: string) =>
+  and(eq(mealPlanEntries.userId, userId), eq(mealPlanEntries.date, date), eq(mealPlanEntries.mealType, mealType));
 
-async function nextPosition(db: Db, householdId: string, date: string, mealType: string): Promise<number> {
-  const [r] = await db.select({ m: sql<number | null>`max(${mealPlanEntries.position})` }).from(mealPlanEntries).where(slotWhere(householdId, date, mealType));
+async function nextPosition(db: Db, userId: string, date: string, mealType: string): Promise<number> {
+  const [r] = await db.select({ m: sql<number | null>`max(${mealPlanEntries.position})` }).from(mealPlanEntries).where(slotWhere(userId, date, mealType));
   return r?.m == null ? 0 : r.m + 1;
 }
 
-export async function createEntry(db: Db, householdId: string, userId: string, input: MealPlanEntryInput): Promise<MealPlanEntry> {
-  if (input.recipeId) await assertRecipe(db, householdId, input.recipeId);
+export async function createEntry(db: Db, userId: string, input: MealPlanEntryInput): Promise<MealPlanEntry> {
+  if (input.recipeId) await assertRecipe(db, userId, input.recipeId);
   const id = randomUUID();
   await db.insert(mealPlanEntries).values({
     id,
-    householdId,
+    userId,
     date: input.date,
     mealType: input.mealType,
     recipeId: input.recipeId ?? null,
     title: input.title ?? null,
     note: input.note ?? null,
-    position: await nextPosition(db, householdId, input.date, input.mealType),
+    position: await nextPosition(db, userId, input.date, input.mealType),
     createdBy: userId,
     createdAt: new Date(),
   });
-  return getEntry(db, householdId, id);
+  return getEntry(db, userId, id);
 }
 
-export async function getEntry(db: Db, householdId: string, id: string): Promise<MealPlanEntry> {
-  const [row] = await db.select().from(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.householdId, householdId)));
+export async function getEntry(db: Db, userId: string, id: string): Promise<MealPlanEntry> {
+  const [row] = await db.select().from(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.userId, userId)));
   if (!row) throw notFound();
-  return (await hydrate(db, householdId, [row]))[0]!;
+  return (await hydrate(db, userId, [row]))[0]!;
 }
 
-export async function patchEntry(db: Db, householdId: string, id: string, p: MealPlanEntryPatch): Promise<MealPlanEntry> {
-  const [row] = await db.select().from(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.householdId, householdId)));
+export async function patchEntry(db: Db, userId: string, id: string, p: MealPlanEntryPatch): Promise<MealPlanEntry> {
+  const [row] = await db.select().from(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.userId, userId)));
   if (!row) throw notFound();
-  if (p.recipeId) await assertRecipe(db, householdId, p.recipeId);
+  if (p.recipeId) await assertRecipe(db, userId, p.recipeId);
   const date = p.date ?? row.date;
   const mealType = p.mealType ?? row.mealType;
   const recipeId = p.recipeId !== undefined ? p.recipeId : row.recipeId;
@@ -101,20 +101,20 @@ export async function patchEntry(db: Db, householdId: string, id: string, p: Mea
     await db
       .update(mealPlanEntries)
       .set({ position: sql`${mealPlanEntries.position} + 1` })
-      .where(and(slotWhere(householdId, date, mealType), gte(mealPlanEntries.position, p.position), sql`${mealPlanEntries.id} <> ${id}`));
+      .where(and(slotWhere(userId, date, mealType), gte(mealPlanEntries.position, p.position), sql`${mealPlanEntries.id} <> ${id}`));
     position = p.position;
   } else if (moved) {
-    position = await nextPosition(db, householdId, date, mealType);
+    position = await nextPosition(db, userId, date, mealType);
   }
   await db
     .update(mealPlanEntries)
     .set({ date, mealType, recipeId, title, note: p.note !== undefined ? p.note : row.note, position })
     .where(eq(mealPlanEntries.id, id));
-  return getEntry(db, householdId, id);
+  return getEntry(db, userId, id);
 }
 
-export async function deleteEntry(db: Db, householdId: string, id: string) {
-  const res = await db.delete(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.householdId, householdId))).returning({ id: mealPlanEntries.id });
+export async function deleteEntry(db: Db, userId: string, id: string) {
+  const res = await db.delete(mealPlanEntries).where(and(eq(mealPlanEntries.id, id), eq(mealPlanEntries.userId, userId))).returning({ id: mealPlanEntries.id });
   if (!res.length) throw notFound();
 }
 
@@ -128,16 +128,16 @@ const toRule = (r: typeof mealPlanRules.$inferSelect): MealPlanRule => ({
   categories: r.categorySlugs,
 });
 
-export async function listRules(db: Db, householdId: string): Promise<MealPlanRule[]> {
-  const rows = await db.select().from(mealPlanRules).where(eq(mealPlanRules.householdId, householdId)).orderBy(asc(mealPlanRules.createdAt));
+export async function listRules(db: Db, userId: string): Promise<MealPlanRule[]> {
+  const rows = await db.select().from(mealPlanRules).where(eq(mealPlanRules.userId, userId)).orderBy(asc(mealPlanRules.createdAt));
   return rows.map(toRule);
 }
 
-export async function createRule(db: Db, householdId: string, input: MealPlanRuleInput): Promise<MealPlanRule> {
+export async function createRule(db: Db, userId: string, input: MealPlanRuleInput): Promise<MealPlanRule> {
   const id = randomUUID();
   await db.insert(mealPlanRules).values({
     id,
-    householdId,
+    userId,
     mealType: input.mealType,
     dayOfWeek: input.dayOfWeek,
     tagSlugs: input.tags,
@@ -147,18 +147,18 @@ export async function createRule(db: Db, householdId: string, input: MealPlanRul
   return { id, ...input };
 }
 
-export async function updateRule(db: Db, householdId: string, id: string, input: MealPlanRuleInput): Promise<MealPlanRule> {
+export async function updateRule(db: Db, userId: string, id: string, input: MealPlanRuleInput): Promise<MealPlanRule> {
   const res = await db
     .update(mealPlanRules)
     .set({ mealType: input.mealType, dayOfWeek: input.dayOfWeek, tagSlugs: input.tags, categorySlugs: input.categories })
-    .where(and(eq(mealPlanRules.id, id), eq(mealPlanRules.householdId, householdId)))
+    .where(and(eq(mealPlanRules.id, id), eq(mealPlanRules.userId, userId)))
     .returning({ id: mealPlanRules.id });
   if (!res.length) throw notFound();
   return { id, ...input };
 }
 
-export async function deleteRule(db: Db, householdId: string, id: string) {
-  const res = await db.delete(mealPlanRules).where(and(eq(mealPlanRules.id, id), eq(mealPlanRules.householdId, householdId))).returning({ id: mealPlanRules.id });
+export async function deleteRule(db: Db, userId: string, id: string) {
+  const res = await db.delete(mealPlanRules).where(and(eq(mealPlanRules.id, id), eq(mealPlanRules.userId, userId))).returning({ id: mealPlanRules.id });
   if (!res.length) throw notFound();
 }
 
@@ -172,11 +172,11 @@ export const RECENT_DAYS = 7;
  * list is no constraint). `useRules` is false when the organisers flag is off. Recipes planned in the previous
  * RECENT_DAYS days are skipped unless that would leave nothing.
  */
-export async function suggest(db: Db, householdId: string, date: string, mealType: MealType, useRules: boolean, rand: () => number = Math.random): Promise<MealPlanRecipeSummary | null> {
-  const all = await db.select().from(recipes).where(eq(recipes.householdId, householdId));
+export async function suggest(db: Db, userId: string, date: string, mealType: MealType, useRules: boolean, rand: () => number = Math.random): Promise<MealPlanRecipeSummary | null> {
+  const all = await db.select().from(recipes).where(eq(recipes.userId, userId));
   if (!all.length) return null;
   const dow = dayOfWeek(date);
-  const rules = useRules ? (await listRules(db, householdId)).filter((r) => (r.mealType === "any" || r.mealType === mealType) && (r.dayOfWeek === null || r.dayOfWeek === dow)) : [];
+  const rules = useRules ? (await listRules(db, userId)).filter((r) => (r.mealType === "any" || r.mealType === mealType) && (r.dayOfWeek === null || r.dayOfWeek === dow)) : [];
   let pool = all;
   if (rules.length) {
     const ids = all.map((r) => r.id);
@@ -192,7 +192,7 @@ export async function suggest(db: Db, householdId: string, date: string, mealTyp
   const recent = await db
     .select({ recipeId: mealPlanEntries.recipeId })
     .from(mealPlanEntries)
-    .where(and(eq(mealPlanEntries.householdId, householdId), gte(mealPlanEntries.date, addDays(date, -RECENT_DAYS)), lte(mealPlanEntries.date, addDays(date, -1))));
+    .where(and(eq(mealPlanEntries.userId, userId), gte(mealPlanEntries.date, addDays(date, -RECENT_DAYS)), lte(mealPlanEntries.date, addDays(date, -1))));
   const seen = new Set(recent.map((r) => r.recipeId));
   const fresh = pool.filter((r) => !seen.has(r.id));
   const from = fresh.length ? fresh : pool;
@@ -202,21 +202,21 @@ export async function suggest(db: Db, householdId: string, date: string, mealTyp
 
 // ---- feed token ----
 
-export async function getFeedToken(db: Db, householdId: string): Promise<string> {
-  const [row] = await db.select().from(householdFeedTokens).where(eq(householdFeedTokens.householdId, householdId));
-  return row?.token ?? rotateFeedToken(db, householdId);
+export async function getFeedToken(db: Db, userId: string): Promise<string> {
+  const [row] = await db.select().from(userFeedTokens).where(eq(userFeedTokens.userId, userId));
+  return row?.token ?? rotateFeedToken(db, userId);
 }
 
-export async function rotateFeedToken(db: Db, householdId: string): Promise<string> {
+export async function rotateFeedToken(db: Db, userId: string): Promise<string> {
   const token = randomBytes(24).toString("base64url");
   await db
-    .insert(householdFeedTokens)
-    .values({ householdId, token, createdAt: new Date() })
-    .onConflictDoUpdate({ target: householdFeedTokens.householdId, set: { token, createdAt: new Date() } });
+    .insert(userFeedTokens)
+    .values({ userId, token, createdAt: new Date() })
+    .onConflictDoUpdate({ target: userFeedTokens.userId, set: { token, createdAt: new Date() } });
   return token;
 }
 
-export async function householdForToken(db: Db, token: string): Promise<string | null> {
-  const [row] = await db.select().from(householdFeedTokens).where(eq(householdFeedTokens.token, token));
-  return row?.householdId ?? null;
+export async function userForToken(db: Db, token: string): Promise<string | null> {
+  const [row] = await db.select().from(userFeedTokens).where(eq(userFeedTokens.token, token));
+  return row?.userId ?? null;
 }

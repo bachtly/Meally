@@ -39,39 +39,39 @@ export const cookbookRoutes = new Hono<AppEnv>();
 cookbookRoutes.use("*", requireAuth, requireFeature("cookbooks"));
 
 cookbookRoutes
-  .get("/", async (c) => c.json({ items: await listCookbooks(c.get("db"), c.get("householdId"), await opts(c)) }))
+  .get("/", async (c) => c.json({ items: await listCookbooks(c.get("db"), c.get("userId"), await opts(c)) }))
   .post("/", async (c) =>
-    c.json(await createCookbook(c.get("db"), c.get("householdId"), parse(await json(c), cookbookInputSchema), await opts(c)), 201),
+    c.json(await createCookbook(c.get("db"), c.get("userId"), parse(await json(c), cookbookInputSchema), await opts(c)), 201),
   )
   .put("/order", async (c) => {
-    await reorderCookbooks(c.get("db"), c.get("householdId"), parse(await json(c), orderBody).slugs);
+    await reorderCookbooks(c.get("db"), c.get("userId"), parse(await json(c), orderBody).slugs);
     return c.body(null, 204);
   })
   .get("/containing/:recipeSlug", async (c) =>
-    c.json({ items: await cookbooksWithRecipe(c.get("db"), c.get("householdId"), c.req.param("recipeSlug")) }),
+    c.json({ items: await cookbooksWithRecipe(c.get("db"), c.get("userId"), c.req.param("recipeSlug")) }),
   )
-  .get("/:slug", async (c) => c.json(await getCookbook(c.get("db"), c.get("householdId"), c.req.param("slug"), await opts(c))))
+  .get("/:slug", async (c) => c.json(await getCookbook(c.get("db"), c.get("userId"), c.req.param("slug"), await opts(c))))
   .put("/:slug", async (c) =>
     c.json(
-      await updateCookbook(c.get("db"), c.get("householdId"), c.req.param("slug"), parse(await json(c), cookbookPatchSchema), await opts(c)),
+      await updateCookbook(c.get("db"), c.get("userId"), c.req.param("slug"), parse(await json(c), cookbookPatchSchema), await opts(c)),
     ),
   )
   .delete("/:slug", async (c) => {
-    await deleteCookbook(c.get("db"), c.get("householdId"), c.req.param("slug"));
+    await deleteCookbook(c.get("db"), c.get("userId"), c.req.param("slug"));
     return c.body(null, 204);
   })
   .get("/:slug/recipes", async (c) =>
-    c.json(await cookbookRecipesPage(c.get("db"), c.get("householdId"), c.req.param("slug"), parse(c.req.query(), pageQuery), await opts(c))),
+    c.json(await cookbookRecipesPage(c.get("db"), c.get("userId"), c.req.param("slug"), parse(c.req.query(), pageQuery), await opts(c))),
   )
   .post("/:slug/recipes", async (c) => {
-    await addToCookbook(c.get("db"), c.get("householdId"), c.req.param("slug"), parse(await json(c), slugBody).slug);
+    await addToCookbook(c.get("db"), c.get("userId"), c.req.param("slug"), parse(await json(c), slugBody).slug);
     return c.body(null, 204);
   })
   .delete("/:slug/recipes/:recipeSlug", async (c) => {
-    await removeFromCookbook(c.get("db"), c.get("householdId"), c.req.param("slug"), c.req.param("recipeSlug"));
+    await removeFromCookbook(c.get("db"), c.get("userId"), c.req.param("slug"), c.req.param("recipeSlug"));
     return c.body(null, 204);
   })
   .put("/:slug/order", async (c) => {
-    await reorderCookbookRecipes(c.get("db"), c.get("householdId"), c.req.param("slug"), parse(await json(c), orderBody).slugs);
+    await reorderCookbookRecipes(c.get("db"), c.get("userId"), c.req.param("slug"), parse(await json(c), orderBody).slugs);
     return c.body(null, 204);
   });

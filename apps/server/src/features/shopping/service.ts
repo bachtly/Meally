@@ -91,12 +91,12 @@ const toItem = (r: ItemRow): ShoppingItem => ({
 
 export async function listAisles(
   db: Db,
-  householdId: string,
+  userId: string,
 ): Promise<AisleLabel[]> {
   let rows = await db
     .select()
     .from(aisleLabels)
-    .where(eq(aisleLabels.householdId, householdId))
+    .where(eq(aisleLabels.userId, userId))
     .orderBy(asc(aisleLabels.position));
   if (rows.length === 0) {
     await db
@@ -104,7 +104,7 @@ export async function listAisles(
       .values(
         DEFAULT_AISLES.map((name, position) => ({
           id: randomUUID(),
-          householdId,
+          userId,
           name,
           position,
           color: null,
@@ -113,7 +113,7 @@ export async function listAisles(
     rows = await db
       .select()
       .from(aisleLabels)
-      .where(eq(aisleLabels.householdId, householdId))
+      .where(eq(aisleLabels.userId, userId))
       .orderBy(asc(aisleLabels.position));
   }
   return rows.map(({ id, name, position, color }) => ({
@@ -126,13 +126,13 @@ export async function listAisles(
 
 export async function createAisle(
   db: Db,
-  householdId: string,
+  userId: string,
   input: { name: string; color: string | null },
 ): Promise<AisleLabel> {
-  const all = await listAisles(db, householdId);
+  const all = await listAisles(db, userId);
   const row = {
     id: randomUUID(),
-    householdId,
+    userId,
     name: input.name,
     color: input.color,
     position: all.length,
@@ -146,12 +146,12 @@ export async function createAisle(
   };
 }
 
-async function getAisle(db: Db, householdId: string, id: string) {
+async function getAisle(db: Db, userId: string, id: string) {
   const [r] = await db
     .select()
     .from(aisleLabels)
     .where(
-      and(eq(aisleLabels.id, id), eq(aisleLabels.householdId, householdId)),
+      and(eq(aisleLabels.id, id), eq(aisleLabels.userId, userId)),
     );
   if (!r) throw notFound();
   return r;
@@ -159,11 +159,11 @@ async function getAisle(db: Db, householdId: string, id: string) {
 
 export async function updateAisle(
   db: Db,
-  householdId: string,
+  userId: string,
   id: string,
   p: { name?: string; color?: string | null },
 ): Promise<AisleLabel> {
-  const cur = await getAisle(db, householdId, id);
+  const cur = await getAisle(db, userId, id);
   const next = {
     name: p.name ?? cur.name,
     color: p.color === undefined ? cur.color : p.color,
@@ -172,31 +172,31 @@ export async function updateAisle(
   return { id, name: next.name, color: next.color, position: cur.position };
 }
 
-export async function deleteAisle(db: Db, householdId: string, id: string) {
-  await getAisle(db, householdId, id);
+export async function deleteAisle(db: Db, userId: string, id: string) {
+  await getAisle(db, userId, id);
   await db
     .update(shoppingItems)
     .set({ aisle: null })
     .where(
       and(
         eq(shoppingItems.aisle, id),
-        eq(shoppingItems.householdId, householdId),
+        eq(shoppingItems.userId, userId),
       ),
     );
   await db
     .delete(foodAisles)
     .where(
-      and(eq(foodAisles.aisleId, id), eq(foodAisles.householdId, householdId)),
+      and(eq(foodAisles.aisleId, id), eq(foodAisles.userId, userId)),
     );
   await db.delete(aisleLabels).where(eq(aisleLabels.id, id));
 }
 
 export async function reorderAisles(
   db: Db,
-  householdId: string,
+  userId: string,
   ids: string[],
 ): Promise<AisleLabel[]> {
-  const all = await listAisles(db, householdId);
+  const all = await listAisles(db, userId);
   const known = new Set(all.map((a) => a.id));
   if (new Set(ids).size !== ids.length || ids.some((i) => !known.has(i)))
     throw new ApiError(400, "invalid_body", "ids: unknown or repeated aisle");
@@ -209,12 +209,12 @@ export async function reorderAisles(
       .update(aisleLabels)
       .set({ position })
       .where(eq(aisleLabels.id, id));
-  return listAisles(db, householdId);
+  return listAisles(db, userId);
 }
 
 async function rememberedAisle(
   db: Db,
-  householdId: string,
+  userId: string,
   food: string | null,
 ): Promise<string | null> {
   if (!food) return null;
@@ -223,26 +223,26 @@ async function rememberedAisle(
     .from(foodAisles)
     .where(
       and(
-        eq(foodAisles.householdId, householdId),
+        eq(foodAisles.userId, userId),
         eq(foodAisles.food, normalizeFood(food)),
       ),
     );
   if (r?.a) return r.a;
-  // No remembered choice: fall back to the built-in guess, if the household still has that aisle.
+  // No remembered choice: fall back to the built-in guess, if the user still has that aisle.
   const guess = guessAisle(food);
   if (!guess) return null;
   const [g] = await db
     .select({ id: aisleLabels.id })
     .from(aisleLabels)
     .where(
-      and(eq(aisleLabels.householdId, householdId), eq(aisleLabels.name, guess)),
+      and(eq(aisleLabels.userId, userId), eq(aisleLabels.name, guess)),
     );
   return g?.id ?? null;
 }
 
 async function rememberAisle(
   db: Db,
-  householdId: string,
+  userId: string,
   food: string,
   aisleId: string | null,
 ) {
@@ -251,37 +251,37 @@ async function rememberAisle(
     await db
       .delete(foodAisles)
       .where(
-        and(eq(foodAisles.householdId, householdId), eq(foodAisles.food, f)),
+        and(eq(foodAisles.userId, userId), eq(foodAisles.food, f)),
       );
     return;
   }
   await db
     .insert(foodAisles)
-    .values({ householdId, food: f, aisleId })
+    .values({ userId, food: f, aisleId })
     .onConflictDoUpdate({
-      target: [foodAisles.householdId, foodAisles.food],
+      target: [foodAisles.userId, foodAisles.food],
       set: { aisleId },
     });
 }
 
 // ---- lists ----
 
-async function getList(db: Db, householdId: string, id: string) {
+async function getList(db: Db, userId: string, id: string) {
   const [r] = await db
     .select()
     .from(shoppingLists)
     .where(
-      and(eq(shoppingLists.id, id), eq(shoppingLists.householdId, householdId)),
+      and(eq(shoppingLists.id, id), eq(shoppingLists.userId, userId)),
     );
   if (!r) throw notFound();
   return r;
 }
-export const assertList = async (db: Db, householdId: string, id: string) =>
-  void (await getList(db, householdId, id));
+export const assertList = async (db: Db, userId: string, id: string) =>
+  void (await getList(db, userId, id));
 
 async function counts(
   db: Db,
-  householdId: string,
+  userId: string,
 ): Promise<Map<string, { total: number; checked: number }>> {
   const rows = await db
     .select({
@@ -290,7 +290,7 @@ async function counts(
       checked: sql<number>`(count(*) filter (where ${shoppingItems.checked}))::int`,
     })
     .from(shoppingItems)
-    .where(eq(shoppingItems.householdId, householdId))
+    .where(eq(shoppingItems.userId, userId))
     .groupBy(shoppingItems.listId);
   return new Map(
     rows.map((r) => [
@@ -314,26 +314,26 @@ const toList = (
 
 export async function listLists(
   db: Db,
-  householdId: string,
+  userId: string,
 ): Promise<ShoppingList[]> {
   const rows = await db
     .select()
     .from(shoppingLists)
-    .where(eq(shoppingLists.householdId, householdId))
+    .where(eq(shoppingLists.userId, userId))
     .orderBy(asc(shoppingLists.createdAt));
-  const c = await counts(db, householdId);
+  const c = await counts(db, userId);
   return rows.map((r) => toList(r, c.get(r.id)));
 }
 
 export async function createList(
   db: Db,
-  householdId: string,
+  userId: string,
   name: string,
 ): Promise<ShoppingList> {
   const now = new Date();
   const row = {
     id: randomUUID(),
-    householdId,
+    userId,
     name,
     createdAt: now,
     updatedAt: now,
@@ -344,33 +344,33 @@ export async function createList(
 
 export async function renameList(
   db: Db,
-  householdId: string,
+  userId: string,
   id: string,
   name: string,
 ): Promise<ShoppingList> {
-  await getList(db, householdId, id);
+  await getList(db, userId, id);
   await db
     .update(shoppingLists)
     .set({ name, updatedAt: new Date() })
     .where(eq(shoppingLists.id, id));
-  shoppingBusFor(db)?.emit(householdId, id, "list");
-  return (await listLists(db, householdId)).find((l) => l.id === id)!;
+  shoppingBusFor(db)?.emit(userId, id, "list");
+  return (await listLists(db, userId)).find((l) => l.id === id)!;
 }
 
-export async function deleteList(db: Db, householdId: string, id: string) {
-  await getList(db, householdId, id);
+export async function deleteList(db: Db, userId: string, id: string) {
+  await getList(db, userId, id);
   await db.delete(shoppingItems).where(eq(shoppingItems.listId, id));
   await db.delete(shoppingLists).where(eq(shoppingLists.id, id));
-  shoppingBusFor(db)?.emit(householdId, id, "deleted");
+  shoppingBusFor(db)?.emit(userId, id, "deleted");
 }
 
 export async function getListWithItems(
   db: Db,
-  householdId: string,
+  userId: string,
   id: string,
 ) {
-  const l = await getList(db, householdId, id);
-  const items = await loadItems(db, householdId, id);
+  const l = await getList(db, userId, id);
+  const items = await loadItems(db, userId, id);
   return {
     list: toList(l, {
       total: items.length,
@@ -380,27 +380,27 @@ export async function getListWithItems(
   };
 }
 
-async function loadRows(db: Db, householdId: string, listId: string) {
+async function loadRows(db: Db, userId: string, listId: string) {
   return db
     .select()
     .from(shoppingItems)
     .where(
       and(
         eq(shoppingItems.listId, listId),
-        eq(shoppingItems.householdId, householdId),
+        eq(shoppingItems.userId, userId),
       ),
     )
     .orderBy(asc(shoppingItems.position), asc(shoppingItems.id));
 }
-const loadItems = async (db: Db, householdId: string, listId: string) =>
-  (await loadRows(db, householdId, listId)).map(toItem);
+const loadItems = async (db: Db, userId: string, listId: string) =>
+  (await loadRows(db, userId, listId)).map(toItem);
 
-async function changed(db: Db, householdId: string, listId: string) {
+async function changed(db: Db, userId: string, listId: string) {
   await db
     .update(shoppingLists)
     .set({ updatedAt: new Date() })
     .where(eq(shoppingLists.id, listId));
-  shoppingBusFor(db)?.emit(householdId, listId, "items");
+  shoppingBusFor(db)?.emit(userId, listId, "items");
 }
 
 // ---- items ----
@@ -417,12 +417,12 @@ interface Incoming {
 /** Add ingredients to a list, merging into unchecked items with the same food and a convertible unit. */
 async function addIncoming(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   incoming: Incoming[],
 ): Promise<ShoppingItem[]> {
-  await listAisles(db, householdId); // seeds the defaults on first use
-  const rows = await loadRows(db, householdId, listId);
+  await listAisles(db, userId); // seeds the defaults on first use
+  const rows = await loadRows(db, userId, listId);
   let nextPos = rows.reduce((m, r) => Math.max(m, r.position), -1) + 1;
   const touched = new Set<string>();
   const now = new Date();
@@ -454,13 +454,13 @@ async function addIncoming(
     const row: ItemRow = {
       id: randomUUID(),
       listId,
-      householdId,
+      userId,
       text: itemText(inc.quantity, inc.unit, inc.food, inc.note, inc.raw),
       quantity: inc.quantity,
       unit: inc.unit,
       food: inc.food,
       note: inc.note,
-      aisle: await rememberedAisle(db, householdId, inc.food),
+      aisle: await rememberedAisle(db, userId, inc.food),
       checked: false,
       position: nextPos++,
       recipeRefs: inc.ref ? [inc.ref] : [],
@@ -483,19 +483,19 @@ async function addIncoming(
       })
       .where(eq(shoppingItems.id, r.id));
   }
-  await changed(db, householdId, listId);
+  await changed(db, userId, listId);
   return rows.filter((r) => touched.has(r.id)).map(toItem);
 }
 
 export async function addFreeText(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   text: string,
 ): Promise<ShoppingItem[]> {
-  await getList(db, householdId, listId);
+  await getList(db, userId, listId);
   const p = parseIngredient(text);
-  return addIncoming(db, householdId, listId, [
+  return addIncoming(db, userId, listId, [
     {
       quantity: p.quantity,
       unit: p.unit,
@@ -509,7 +509,7 @@ export async function addFreeText(
 
 async function recipeIncoming(
   db: Db,
-  householdId: string,
+  userId: string,
   recipeId: string,
   factor: number | null,
   ref: ShoppingRecipeRef,
@@ -520,7 +520,7 @@ async function recipeIncoming(
     .where(eq(recipeIngredients.recipeId, recipeId))
     .orderBy(asc(recipeIngredients.position));
   // Ingredients linked to a catalogue food use its name, so different spellings merge.
-  const names = await foodNames(db, householdId, ings.flatMap((i) => (i.foodId ? [i.foodId] : [])));
+  const names = await foodNames(db, userId, ings.flatMap((i) => (i.foodId ? [i.foodId] : [])));
   return ings.map((i) => ({
     quantity:
       i.quantity == null
@@ -536,23 +536,23 @@ async function recipeIncoming(
 
 export async function addRecipe(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   slug: string,
   servings?: number,
 ): Promise<ShoppingItem[]> {
-  await getList(db, householdId, listId);
+  await getList(db, userId, listId);
   const [r] = await db
     .select()
     .from(recipes)
-    .where(and(eq(recipes.slug, slug), eq(recipes.householdId, householdId)));
+    .where(and(eq(recipes.slug, slug), eq(recipes.userId, userId)));
   if (!r) throw notFound();
   const factor = servings && r.servings ? servings / r.servings : null;
   return addIncoming(
     db,
-    householdId,
+    userId,
     listId,
-    await recipeIncoming(db, householdId, r.id, factor, {
+    await recipeIncoming(db, userId, r.id, factor, {
       slug: r.slug,
       name: r.name,
     }),
@@ -561,18 +561,18 @@ export async function addRecipe(
 
 export async function addMealPlan(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   from: string,
   to: string,
 ): Promise<ShoppingItem[]> {
-  await getList(db, householdId, listId);
+  await getList(db, userId, listId);
   const entries = await db
     .select({ recipeId: mealPlanEntries.recipeId })
     .from(mealPlanEntries)
     .where(
       and(
-        eq(mealPlanEntries.householdId, householdId),
+        eq(mealPlanEntries.userId, userId),
         gte(mealPlanEntries.date, from),
         lte(mealPlanEntries.date, to),
         isNotNull(mealPlanEntries.recipeId),
@@ -589,22 +589,22 @@ export async function addMealPlan(
       .select()
       .from(recipes)
       .where(
-        and(eq(recipes.id, e.recipeId!), eq(recipes.householdId, householdId)),
+        and(eq(recipes.id, e.recipeId!), eq(recipes.userId, userId)),
       );
     if (r)
       incoming.push(
-        ...(await recipeIncoming(db, householdId, r.id, null, {
+        ...(await recipeIncoming(db, userId, r.id, null, {
           slug: r.slug,
           name: r.name,
         })),
       );
   }
-  return addIncoming(db, householdId, listId, incoming);
+  return addIncoming(db, userId, listId, incoming);
 }
 
 async function getItem(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   id: string,
 ) {
@@ -615,7 +615,7 @@ async function getItem(
       and(
         eq(shoppingItems.id, id),
         eq(shoppingItems.listId, listId),
-        eq(shoppingItems.householdId, householdId),
+        eq(shoppingItems.userId, userId),
       ),
     );
   if (!r) throw notFound();
@@ -624,7 +624,7 @@ async function getItem(
 
 export async function patchItem(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   id: string,
   p: {
@@ -634,7 +634,7 @@ export async function patchItem(
     position?: number;
   },
 ): Promise<ShoppingItem> {
-  const cur = await getItem(db, householdId, listId, id);
+  const cur = await getItem(db, userId, listId, id);
   const set: Partial<ItemRow> = { updatedAt: new Date() };
   if (p.checked !== undefined) set.checked = p.checked;
   if (p.position !== undefined) set.position = p.position;
@@ -649,45 +649,45 @@ export async function patchItem(
     });
   }
   if (p.aisle !== undefined) {
-    if (p.aisle) await getAisle(db, householdId, p.aisle);
+    if (p.aisle) await getAisle(db, userId, p.aisle);
     set.aisle = p.aisle;
   }
   await db.update(shoppingItems).set(set).where(eq(shoppingItems.id, id));
   const food = set.food !== undefined ? set.food : cur.food;
   if (p.aisle !== undefined && food)
-    await rememberAisle(db, householdId, food, p.aisle);
-  await changed(db, householdId, listId);
-  if (p.checked === true && !cur.checked) emitWebhookEvent(db, householdId, "shopping.item_checked", { listId, itemId: id, text: cur.text });
-  return toItem(await getItem(db, householdId, listId, id));
+    await rememberAisle(db, userId, food, p.aisle);
+  await changed(db, userId, listId);
+  if (p.checked === true && !cur.checked) emitWebhookEvent(db, userId, "shopping.item_checked", { listId, itemId: id, text: cur.text });
+  return toItem(await getItem(db, userId, listId, id));
 }
 
 export async function deleteItem(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
   id: string,
 ) {
-  await getItem(db, householdId, listId, id);
+  await getItem(db, userId, listId, id);
   await db.delete(shoppingItems).where(eq(shoppingItems.id, id));
-  await changed(db, householdId, listId);
+  await changed(db, userId, listId);
 }
 
 export async function clearChecked(
   db: Db,
-  householdId: string,
+  userId: string,
   listId: string,
 ): Promise<number> {
-  await getList(db, householdId, listId);
+  await getList(db, userId, listId);
   const gone = await db
     .delete(shoppingItems)
     .where(
       and(
         eq(shoppingItems.listId, listId),
-        eq(shoppingItems.householdId, householdId),
+        eq(shoppingItems.userId, userId),
         eq(shoppingItems.checked, true),
       ),
     )
     .returning({ id: shoppingItems.id });
-  await changed(db, householdId, listId);
+  await changed(db, userId, listId);
   return gone.length;
 }

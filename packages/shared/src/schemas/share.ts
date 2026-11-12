@@ -101,8 +101,8 @@ export type SaveShare = z.infer<typeof saveShareSchema>;
 
 /** What the signed-in viewer already has from a link. `saved` maps the link's slug to the viewer's own copy. */
 export interface ShareStatus {
-  /** The link belongs to the viewer's household: nothing to save, open the recipes directly. */
-  sameHousehold: boolean;
+  /** The link is the viewer's own: nothing to save, open the recipes directly. */
+  ownRecipe: boolean;
   saved: Record<string, string>;
 }
 

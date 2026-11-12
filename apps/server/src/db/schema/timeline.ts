@@ -1,5 +1,5 @@
 import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { households, users } from "./auth.js";
+import { users } from "./auth.js";
 import { images, recipes } from "./recipes.js";
 
 /** Cooking journal: "made it" logs, comments and notes on a recipe. */
@@ -7,13 +7,12 @@ export const timelineEvents = pgTable(
   "timeline_events",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
-      .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
     recipeId: text("recipe_id")
       .notNull()
       .references(() => recipes.id, { onDelete: "cascade" }),
-    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["made", "comment", "note"] }).notNull(),
     text: text("text"),
     imageId: text("image_id").references(() => images.id, { onDelete: "set null" }),
@@ -23,6 +22,6 @@ export const timelineEvents = pgTable(
   },
   (t) => [
     index("timeline_recipe_idx").on(t.recipeId, t.createdAt),
-    index("timeline_household_idx").on(t.householdId, t.createdAt),
+    index("timeline_user_idx").on(t.userId, t.createdAt),
   ],
 );

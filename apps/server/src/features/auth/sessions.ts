@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
-import { households, sessions, users } from "../../db/schema/index.js";
+import { sessions, users } from "../../db/schema/index.js";
 
 export const SESSION_COOKIE = "meally_session";
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -29,14 +29,13 @@ export async function deleteSession(db: Db, token: string) {
   await db.delete(sessions).where(eq(sessions.id, hashToken(token)));
 }
 
-/** Resolves a cookie token to its user and household; slides the expiry. Null when unknown or expired. */
+/** Resolves a cookie token to its user; slides the expiry. Null when unknown or expired. */
 export async function resolveSession(db: Db, token: string) {
   const id = hashToken(token);
   const [row] = await db
-    .select({ expiresAt: sessions.expiresAt, user: users, household: households })
+    .select({ expiresAt: sessions.expiresAt, user: users })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .innerJoin(households, eq(households.id, users.householdId))
     .where(eq(sessions.id, id))
     .limit(1);
   if (!row) return null;
@@ -53,5 +52,5 @@ export async function resolveSession(db: Db, token: string) {
       .where(eq(sessions.id, id));
     refreshed = true;
   }
-  return { user: row.user, household: row.household, refreshed };
+  return { user: row.user, refreshed };
 }

@@ -96,7 +96,7 @@ describe("recipes and organisers", () => {
     expect((await json(await call(A, "GET", "/recipes/salad"))).categories).toEqual([]);
   });
 
-  it("isolates households", async () => {
+  it("isolates users", async () => {
     expect((await json(await call(B, "GET", "/organizers/tags"))).items).toEqual([]);
     expect((await call(B, "PATCH", "/organizers/tags/vegan", { name: "X" })).status).toBe(404);
     expect((await call(B, "DELETE", "/organizers/tags/vegan")).status).toBe(404);

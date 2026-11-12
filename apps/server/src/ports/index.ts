@@ -20,7 +20,7 @@ export interface SizedImage {
 }
 
 /**
- * Stores household images. `putOriginal` accepts an upload and does the processing (the Node
+ * Stores user images. `putOriginal` accepts an upload and does the processing (the Node
  * adapter resizes with sharp); `put` stores bytes that were already resized, which is what a
  * platform without sharp would call after resizing elsewhere.
  */
@@ -28,13 +28,19 @@ export interface ImageStore {
   /** True when clients should resize in the browser and upload ready-made sizes (no sharp on this platform). */
   readonly acceptsPresized: boolean;
   /** Processes an uploaded original into every size and returns the new image id. */
-  putOriginal(householdId: string, original: Uint8Array): Promise<string>;
+  putOriginal(userId: string, original: Uint8Array): Promise<string>;
   /** Stores a complete set of ready-made sizes under a new image id and returns it. Partial sets are cleaned up. */
-  putSized(householdId: string, sizes: Record<ImageSize, SizedImage>): Promise<string>;
-  put(householdId: string, imageId: string, size: ImageSize, bytes: Uint8Array, contentType: string): Promise<void>;
-  get(householdId: string, imageId: string, size: ImageSize): Promise<StoredImage | null>;
+  putSized(userId: string, sizes: Record<ImageSize, SizedImage>): Promise<string>;
+  put(userId: string, imageId: string, size: ImageSize, bytes: Uint8Array, contentType: string): Promise<void>;
+  get(userId: string, imageId: string, size: ImageSize): Promise<StoredImage | null>;
   /** Removes every size of the image. Missing files are not an error. */
-  delete(householdId: string, imageId: string): Promise<void>;
+  delete(userId: string, imageId: string): Promise<void>;
+  /**
+   * Moves every stored file of one owner folder to another (the rekey from household ids to user ids).
+   * Copies before it deletes and skips files already copied, so a crashed run is safe to repeat.
+   * Returns the number of files it copied or removed.
+   */
+  moveOwner(fromOwnerId: string, toOwnerId: string): Promise<number>;
   /** Set when images live in a local directory, so backups can read them. */
   readonly localDir?: string;
 }

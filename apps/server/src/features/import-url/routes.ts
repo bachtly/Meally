@@ -41,12 +41,12 @@ importRoutes.post("/", async (c) => {
     input.tags = cleanNames(found.keywords, 10);
     input.categories = cleanNames(found.categories, 10);
   }
-  const recipe = await createRecipe(db, c.get("householdId"), c.get("user").id, input, { org, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled, foods: (await c.get("flags").getFeatures())["foods-units"].enabled });
+  const recipe = await createRecipe(db, c.get("userId"), input, { org, nutrition: (await c.get("flags").getFeatures()).nutrition.enabled, foods: (await c.get("flags").getFeatures())["foods-units"].enabled });
   if (found.imageUrl) {
     // A missing or bad image never fails the import.
     try {
       const img = await c.get("fetcher")(found.imageUrl, { kind: "image" });
-      await setRecipeImage(db, c.get("platform").images, c.get("householdId"), recipe.slug, img.body);
+      await setRecipeImage(db, c.get("platform").images, c.get("userId"), recipe.slug, img.body);
     } catch {
       /* keep the recipe without a photo */
     }

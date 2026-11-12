@@ -31,20 +31,20 @@ organizerRoutes.use("/:type/*", async (c, next) => {
 const type = (c: Context<AppEnv>) => c.req.param("type") as OrganizerType;
 
 organizerRoutes
-  .get("/:type", async (c) => c.json({ items: await listOrganizers(c.get("db"), type(c), c.get("householdId")) }))
+  .get("/:type", async (c) => c.json({ items: await listOrganizers(c.get("db"), type(c), c.get("userId")) }))
   .post("/:type", async (c) => {
     const { name } = body(await json(c), nameBody);
-    return c.json(await createOrganizer(c.get("db"), type(c), c.get("householdId"), name), 201);
+    return c.json(await createOrganizer(c.get("db"), type(c), c.get("userId"), name), 201);
   })
   .patch("/:type/:slug", async (c) => {
     const { name } = body(await json(c), nameBody);
-    return c.json(await renameOrganizer(c.get("db"), type(c), c.get("householdId"), c.req.param("slug"), name));
+    return c.json(await renameOrganizer(c.get("db"), type(c), c.get("userId"), c.req.param("slug"), name));
   })
   .delete("/:type/:slug", async (c) => {
-    await deleteOrganizer(c.get("db"), type(c), c.get("householdId"), c.req.param("slug"));
+    await deleteOrganizer(c.get("db"), type(c), c.get("userId"), c.req.param("slug"));
     return c.body(null, 204);
   })
   .post("/:type/:slug/merge", async (c) => {
     const { into } = body(await json(c), mergeBody);
-    return c.json(await mergeOrganizers(c.get("db"), type(c), c.get("householdId"), c.req.param("slug"), into));
+    return c.json(await mergeOrganizers(c.get("db"), type(c), c.get("userId"), c.req.param("slug"), into));
   });

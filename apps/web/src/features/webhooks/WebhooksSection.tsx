@@ -4,7 +4,6 @@ import { useState } from "react";
 import { webhookEvents, type Webhook, type WebhookDelivery, type WebhookWithSecret } from "@meally/shared";
 import { api, ApiRequestError, postJson } from "../../lib/api";
 import { Button, Dialog, Field, Input, Sheet, Skeleton, Textarea, useToast } from "../../ui";
-import { useSession } from "../auth/useSession";
 
 const KEY = ["webhooks"] as const;
 const LABELS: Record<string, string> = {
@@ -166,14 +165,12 @@ function Deliveries({ hook, onClose }: { hook: Webhook | null; onClose: () => vo
 }
 
 export function WebhooksSection() {
-  const { user } = useSession();
   const qc = useQueryClient();
   const toast = useToast();
   const [editing, setEditing] = useState<{ hook: Webhook | null } | null>(null);
   const [viewing, setViewing] = useState<Webhook | null>(null);
   const [deleting, setDeleting] = useState<Webhook | null>(null);
-  const isOwner = user?.householdRole === "owner";
-  const q = useQuery({ queryKey: KEY, enabled: isOwner, queryFn: () => api<{ items: Webhook[] }>("/webhooks").then((r) => r.items) });
+  const q = useQuery({ queryKey: KEY, queryFn: () => api<{ items: Webhook[] }>("/webhooks").then((r) => r.items) });
   const test = useMutation({
     mutationFn: (id: string) => postJson<{ ok: boolean; statusCode: number | null; error: string | null }>(`/webhooks/${id}/test`),
     onSuccess: (r) => {
@@ -187,10 +184,9 @@ export function WebhooksSection() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
     onError: () => toast("Could not delete the webhook", "danger"),
   });
-  if (!isOwner) return <p className="text-sm text-muted">Only household owners can manage webhooks.</p>;
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted">Call a URL when things happen in your household.</p>
+      <p className="text-sm text-muted">Call a URL when things happen in your recipes.</p>
       {q.isPending ? (
         <Skeleton className="h-12" />
       ) : q.isError ? (

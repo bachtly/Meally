@@ -8,10 +8,7 @@ import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";
 import { decode, encode, findRow, imageUrl } from "../recipes/service.js";
 
-export type Actor = { id: string; householdRole: "owner" | "member" };
-
-function present(r: { e: typeof timelineEvents.$inferSelect; userName: string | null; slug: string; recipeName: string }, who: Actor): TimelineEvent {
-  const mine = r.e.userId === who.id;
+function present(r: { e: typeof timelineEvents.$inferSelect; userName: string | null; slug: string; recipeName: string }): TimelineEvent {
   return {
     id: r.e.id,
     kind: r.e.kind,
@@ -20,13 +17,13 @@ function present(r: { e: typeof timelineEvents.$inferSelect; userName: string | 
     imageUrl: imageUrl(r.e.imageId, 800),
     thumbUrl: imageUrl(r.e.imageId, 320),
     userId: r.e.userId,
-    userName: r.userName ?? "Former member",
+    userName: r.userName ?? "Former user",
     recipeSlug: r.slug,
     recipeName: r.recipeName,
     createdAt: r.e.createdAt.getTime(),
     editedAt: r.e.editedAt?.getTime() ?? null,
-    canEdit: mine,
-    canDelete: mine || who.householdRole === "owner",
+    canEdit: true,
+    canDelete: true,
   };
 }
 
@@ -40,11 +37,10 @@ const select = (db: Db) =>
 /** Newest first; keyset pagination on (created_at, id). `recipeId` narrows to one recipe's timeline. */
 export async function listTimeline(
   db: Db,
-  householdId: string,
-  who: Actor,
+  userId: string,
   opts: { recipeId?: string; cursor?: string; limit: number },
 ): Promise<TimelineResponse> {
-  const conds: SQL[] = [eq(timelineEvents.householdId, householdId)];
+  const conds: SQL[] = [eq(timelineEvents.userId, userId)];
   if (opts.recipeId) conds.push(eq(timelineEvents.recipeId, opts.recipeId));
   if (opts.cursor) {
     const [v, id] = decode(opts.cursor);
@@ -58,26 +54,25 @@ export async function listTimeline(
   const page = rows.slice(0, opts.limit);
   const last = page[page.length - 1];
   return {
-    items: page.map((r) => present(r, who)),
+    items: page.map((r) => present(r)),
     nextCursor: rows.length > opts.limit && last ? encode(last.e.createdAt.getTime(), last.e.id) : null,
   };
 }
 
-async function getOne(db: Db, householdId: string, id: string, who: Actor) {
-  const [r] = await select(db).where(and(eq(timelineEvents.id, id), eq(timelineEvents.householdId, householdId))).limit(1);
+async function getOne(db: Db, userId: string, id: string) {
+  const [r] = await select(db).where(and(eq(timelineEvents.id, id), eq(timelineEvents.userId, userId))).limit(1);
   if (!r) throw new ApiError(404, "not_found", "Event not found");
-  return { raw: r.e, event: present(r, who) };
+  return { raw: r.e, event: present(r) };
 }
 
 export async function addEvent(
   db: Db,
-  householdId: string,
-  who: Actor,
+  userId: string,
   slug: string,
   input: { kind: TimelineKind; text?: string | undefined; rating?: number | null | undefined },
   o: { ratings: boolean },
 ): Promise<TimelineEvent> {
-  const recipe = await findRow(db, householdId, slug);
+  const recipe = await findRow(db, userId, slug);
   const now = new Date();
   const id = randomUUID();
   await db.transaction(async (tx) => {
@@ -87,31 +82,29 @@ export async function addEvent(
         const [mine] = await tx
           .select({ rating: recipeUserData.rating })
           .from(recipeUserData)
-          .where(and(eq(recipeUserData.userId, who.id), eq(recipeUserData.recipeId, recipe.id)));
+          .where(and(eq(recipeUserData.userId, userId), eq(recipeUserData.recipeId, recipe.id)));
         rating = mine?.rating ?? null;
       }
       await tx
         .insert(recipeUserData)
-        .values({ userId: who.id, recipeId: recipe.id, favourite: false, rating: null, lastMadeAt: now, updatedAt: now })
+        .values({ userId, recipeId: recipe.id, favourite: false, rating: null, lastMadeAt: now, updatedAt: now })
         .onConflictDoUpdate({ target: [recipeUserData.userId, recipeUserData.recipeId], set: { lastMadeAt: now } });
     }
     await tx.insert(timelineEvents).values({
       id,
-      householdId,
+      userId,
       recipeId: recipe.id,
-      userId: who.id,
       kind: input.kind,
       text: input.text || null,
       rating,
       createdAt: now,
     });
   });
-  return (await getOne(db, householdId, id, who)).event;
+  return (await getOne(db, userId, id)).event;
 }
 
-export async function updateEvent(db: Db, householdId: string, who: Actor, id: string, patch: { text?: string | undefined; rating?: number | null | undefined }) {
-  const { raw } = await getOne(db, householdId, id, who);
-  if (raw.userId !== who.id) throw new ApiError(403, "forbidden", "Only the author can edit this");
+export async function updateEvent(db: Db, userId: string, id: string, patch: { text?: string | undefined; rating?: number | null | undefined }) {
+  const { raw } = await getOne(db, userId, id);
   if (patch.text === "" && raw.kind !== "made") throw new ApiError(400, "invalid_body", "text: Write something first");
   await db
     .update(timelineEvents)
@@ -120,29 +113,27 @@ export async function updateEvent(db: Db, householdId: string, who: Actor, id: s
       ...(patch.rating !== undefined && raw.kind === "made" ? { rating: patch.rating } : {}),
       editedAt: new Date(),
     })
-    .where(and(eq(timelineEvents.id, id), eq(timelineEvents.householdId, householdId)));
-  return (await getOne(db, householdId, id, who)).event;
+    .where(and(eq(timelineEvents.id, id), eq(timelineEvents.userId, userId)));
+  return (await getOne(db, userId, id)).event;
 }
 
-export async function deleteEvent(db: Db, store: ImageStore, householdId: string, who: Actor, id: string) {
-  const { raw, event } = await getOne(db, householdId, id, who);
-  if (!event.canDelete) throw new ApiError(403, "forbidden", "Only the author or a household owner can delete this");
+export async function deleteEvent(db: Db, store: ImageStore, userId: string, id: string) {
+  const { raw } = await getOne(db, userId, id);
   await db.transaction(async (tx) => {
-    await tx.delete(timelineEvents).where(and(eq(timelineEvents.id, id), eq(timelineEvents.householdId, householdId)));
+    await tx.delete(timelineEvents).where(and(eq(timelineEvents.id, id), eq(timelineEvents.userId, userId)));
     if (raw.imageId) await tx.delete(images).where(eq(images.id, raw.imageId));
   });
-  if (raw.imageId) await store.delete(householdId, raw.imageId);
+  if (raw.imageId) await store.delete(userId, raw.imageId);
 }
 
-export async function setEventImage(db: Db, store: ImageStore, householdId: string, who: Actor, id: string, input: ImageInput | Buffer) {
-  const { raw } = await getOne(db, householdId, id, who);
-  if (raw.userId !== who.id) throw new ApiError(403, "forbidden", "Only the author can edit this");
-  const imageId = await storeImage(store, householdId, input);
+export async function setEventImage(db: Db, store: ImageStore, userId: string, id: string, input: ImageInput | Buffer) {
+  const { raw } = await getOne(db, userId, id);
+  const imageId = await storeImage(store, userId, input);
   await db.transaction(async (tx) => {
-    await tx.insert(images).values({ id: imageId, householdId, createdAt: new Date() });
+    await tx.insert(images).values({ id: imageId, userId, createdAt: new Date() });
     await tx.update(timelineEvents).set({ imageId }).where(eq(timelineEvents.id, id));
     if (raw.imageId) await tx.delete(images).where(eq(images.id, raw.imageId));
   });
-  if (raw.imageId) await store.delete(householdId, raw.imageId);
-  return (await getOne(db, householdId, id, who)).event;
+  if (raw.imageId) await store.delete(userId, raw.imageId);
+  return (await getOne(db, userId, id)).event;
 }

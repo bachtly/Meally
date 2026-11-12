@@ -18,7 +18,7 @@ function renderImport(opts: { configured: boolean; role?: string; aiOn?: boolean
     vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url);
       if (u.includes("/auth/me"))
-        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: opts.role ?? "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } });
+        return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: opts.role ?? "admin" } });
       if (u.includes("/features")) return Response.json({ features: { ai: info(opts.aiOn ?? true), "import-url": info(true) } });
       if (u.includes("/ai/status")) return Response.json(opts.configured ? { configured: true, provider: "anthropic", model: "m" } : { configured: false });
       if (u.includes("/ai/recipe-from-text")) {

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { households, users } from "./auth.js";
+import { users } from "./auth.js";
 import { cookbooks } from "./cookbooks.js";
 import { recipes } from "./recipes.js";
 
@@ -12,9 +12,9 @@ export const shareLinks = pgTable(
   "share_links",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["recipe", "set", "cookbook"] }).notNull().default("recipe"),
     recipeId: text("recipe_id").references(() => recipes.id, { onDelete: "cascade" }),
     cookbookId: text("cookbook_id").references(() => cookbooks.id, { onDelete: "cascade" }),
@@ -33,7 +33,7 @@ export const shareLinks = pgTable(
   (t) => [
     uniqueIndex("share_links_token_hash_uq").on(t.tokenHash),
     index("share_links_recipe_idx").on(t.recipeId),
-    index("share_links_household_idx").on(t.householdId),
+    index("share_links_user_idx").on(t.userId),
     check(
       "share_links_target_ck",
       sql`(${t.kind} = 'recipe' AND ${t.recipeId} IS NOT NULL AND ${t.cookbookId} IS NULL)

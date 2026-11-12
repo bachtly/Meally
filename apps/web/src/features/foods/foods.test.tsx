@@ -13,7 +13,7 @@ let calls: Array<{ method: string; url: string; body: unknown }> = [];
 
 function renderAt(path: string, on = true) {
   const info = (enabled: boolean) => ({ enabled, locked: false, source: "default", label: "x", description: "y" });
-  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1" }, household: { id: "h1", name: "Home" } };
+  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
   const foods = [
     { id: "f1", name: "Scallion", pluralName: null, aliases: ["green onion"], aisleId: null, count: 2 },
     { id: "f2", name: "Spring onion", pluralName: null, aliases: [], aisleId: null, count: 0 },

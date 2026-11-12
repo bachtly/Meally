@@ -21,25 +21,25 @@ const mergeBody = z.object({ into: z.string().trim().min(1).max(100) });
 export const foodRoutes = new Hono<AppEnv>();
 foodRoutes.use("*", requireAuth, requireFeature("foods-units"));
 foodRoutes
-  .get("/", async (c) => c.json({ items: await listFoods(c.get("db"), c.get("householdId"), c.req.query("q")) }))
-  .post("/", async (c) => c.json(await createFood(c.get("db"), c.get("householdId"), body(await json(c), foodCreateSchema)), 201))
-  .patch("/:id", async (c) => c.json(await updateFood(c.get("db"), c.get("householdId"), c.req.param("id"), body(await json(c), foodPatchSchema))))
+  .get("/", async (c) => c.json({ items: await listFoods(c.get("db"), c.get("userId"), c.req.query("q")) }))
+  .post("/", async (c) => c.json(await createFood(c.get("db"), c.get("userId"), body(await json(c), foodCreateSchema)), 201))
+  .patch("/:id", async (c) => c.json(await updateFood(c.get("db"), c.get("userId"), c.req.param("id"), body(await json(c), foodPatchSchema))))
   .delete("/:id", async (c) => {
-    await deleteFood(c.get("db"), c.get("householdId"), c.req.param("id"), force(c));
+    await deleteFood(c.get("db"), c.get("userId"), c.req.param("id"), force(c));
     return c.body(null, 204);
   })
   .post("/:id/merge", async (c) => {
     const { into } = body(await json(c), mergeBody);
-    return c.json(await mergeFood(c.get("db"), c.get("householdId"), c.req.param("id"), into));
+    return c.json(await mergeFood(c.get("db"), c.get("userId"), c.req.param("id"), into));
   });
 
 export const unitRoutes = new Hono<AppEnv>();
 unitRoutes.use("*", requireAuth, requireFeature("foods-units"));
 unitRoutes
-  .get("/", async (c) => c.json({ items: await listUnits(c.get("db"), c.get("householdId")) }))
-  .post("/", async (c) => c.json(await createUnit(c.get("db"), c.get("householdId"), body(await json(c), unitCreateSchema)), 201))
-  .patch("/:id", async (c) => c.json(await updateUnit(c.get("db"), c.get("householdId"), c.req.param("id"), body(await json(c), unitPatchSchema))))
+  .get("/", async (c) => c.json({ items: await listUnits(c.get("db"), c.get("userId")) }))
+  .post("/", async (c) => c.json(await createUnit(c.get("db"), c.get("userId"), body(await json(c), unitCreateSchema)), 201))
+  .patch("/:id", async (c) => c.json(await updateUnit(c.get("db"), c.get("userId"), c.req.param("id"), body(await json(c), unitPatchSchema))))
   .delete("/:id", async (c) => {
-    await deleteUnit(c.get("db"), c.get("householdId"), c.req.param("id"), force(c));
+    await deleteUnit(c.get("db"), c.get("userId"), c.req.param("id"), force(c));
     return c.body(null, 204);
   });

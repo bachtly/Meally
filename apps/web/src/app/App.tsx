@@ -14,7 +14,6 @@ import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
 import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
 import { PlanPage } from "../features/meal-plan/PlanPage";
 import { SettingsPage } from "../features/households/SettingsPage";
-import { AcceptInvitePage } from "../features/households/AcceptInvitePage";
 import { CookbookPage } from "../features/cookbooks/CookbookPage";
 import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
 import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
@@ -23,7 +22,6 @@ import { OrganizersPage } from "../features/organizers/OrganizersPage";
 import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { SharePage, ShareLayout, ShareRecipePage } from "../features/share/SharePage";
-import { ActivityPage } from "../features/timeline/ActivityPage";
 import { AdminPage } from "../features/admin/AdminPage";
 import { MorePage } from "./pages/Placeholders";
 
@@ -111,14 +109,6 @@ export const appRoutes = createRoutesFromElements(
           }
         />
         <Route
-          path="/activity"
-          element={
-            <FeatureRoute on="timeline">
-              <ActivityPage />
-            </FeatureRoute>
-          }
-        />
-        <Route
           path="/foods"
           element={
             <FeatureRoute on="foods-units">
@@ -158,14 +148,6 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="import-files">
               <ImportFilesPage />
-            </FeatureRoute>
-          }
-        />
-        <Route
-          path="/invite/:token"
-          element={
-            <FeatureRoute on="households">
-              <AcceptInvitePage />
             </FeatureRoute>
           }
         />

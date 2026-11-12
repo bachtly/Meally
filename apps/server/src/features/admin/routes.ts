@@ -4,7 +4,7 @@ import { Hono, type Context } from "hono";
 import { FEATURES, featureEnvVar, isFeatureKey, signupModes, userRoles, z } from "@meally/shared";
 import { version } from "../../app-core.js";
 import { countAppliedMigrations } from "../../db/core.js";
-import { households, instanceSettings, recipes, sessions, users } from "../../db/schema/index.js";
+import { instanceSettings, recipes, sessions, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { backupSettings } from "../backups/settings.js";
@@ -90,13 +90,11 @@ adminRoutes.get("/users", async (c) => {
       email: users.email,
       name: users.name,
       role: users.role,
-      householdId: users.householdId,
-      householdName: households.name,
       createdAt: users.createdAt,
-      lastExpiry: sql<Date | null>`(SELECT max(${sessions.expiresAt}) FROM ${sessions} WHERE ${sessions.userId} = ${users.id})`.mapWith(sessions.expiresAt),
+      // Column refs render unqualified in a single-table select, so spell out the outer users.id.
+      lastExpiry: sql<Date | null>`(SELECT max(s.expires_at) FROM sessions s WHERE s.user_id = "users"."id")`.mapWith(sessions.expiresAt),
     })
     .from(users)
-    .innerJoin(households, eq(households.id, users.householdId))
     .where(where)
     .orderBy(users.createdAt, users.id)
     .limit(limit)
@@ -139,14 +137,6 @@ adminRoutes.delete("/users/:id", async (c) => {
   await db.transaction(async (tx) => {
     await tx.delete(sessions).where(eq(sessions.userId, u.id));
     await tx.delete(users).where(eq(users.id, u.id));
-    const left = await tx.select().from(users).where(eq(users.householdId, u.householdId)).orderBy(users.createdAt);
-    if (left.length === 0) {
-      const [r] = await tx.select({ n: count() }).from(recipes).where(eq(recipes.householdId, u.householdId));
-      // An empty household goes with its last member; one with recipes stays so the data is not lost.
-      if (!r?.n) await tx.delete(households).where(eq(households.id, u.householdId));
-    } else if (u.householdRole === "owner" && !left.some((x) => x.householdRole === "owner")) {
-      await tx.update(users).set({ householdRole: "owner" }).where(eq(users.id, left[0]!.id));
-    }
   });
   return c.body(null, 204);
 });
@@ -169,7 +159,7 @@ adminRoutes.post("/users/:id/reset-password", async (c) => {
 adminRoutes.get("/info", async (c) => {
   const db = c.get("db");
   const dataDir = c.get("dataDir");
-  const n = async (t: typeof users | typeof households | typeof recipes) => (await db.select({ n: count() }).from(t))[0]?.n ?? 0;
+  const n = async (t: typeof users | typeof recipes) => (await db.select({ n: count() }).from(t))[0]?.n ?? 0;
   const mig = (await countAppliedMigrations(db)) ?? 0;
   const platform = c.get("platform");
   const host = (await platform.info?.(dataDir)) ?? { runtime: platform.name, uptimeSeconds: 0, dbBytes: 0, imagesBytes: 0, dataDir: "" };
@@ -179,7 +169,7 @@ adminRoutes.get("/info", async (c) => {
     uptimeSeconds: host.uptimeSeconds,
     dbBytes: host.dbBytes,
     imagesBytes: host.imagesBytes,
-    counts: { users: await n(users), households: await n(households), recipes: await n(recipes) },
+    counts: { users: await n(users), recipes: await n(recipes) },
     migrations: mig,
     dataDir: host.dataDir,
     backupSchedule: backupSettings(c.get("env")),

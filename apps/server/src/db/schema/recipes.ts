@@ -1,14 +1,14 @@
 import type { Nutrition } from "@meally/shared";
 import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { households, users } from "./auth.js";
+import { users } from "./auth.js";
 import { foods } from "./foods.js";
 
-/** Stored image metadata; the files live under $DATA_DIR/images/<householdId>/. */
+/** Stored image metadata; the files live under $DATA_DIR/images/<userId>/. */
 export const images = pgTable("images", {
   id: text("id").primaryKey(),
-  householdId: text("household_id")
-    .notNull()
-    .references(() => households.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
@@ -16,9 +16,9 @@ export const recipes = pgTable(
   "recipes",
   {
     id: text("id").primaryKey(),
-    householdId: text("household_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     description: text("description"),
@@ -37,13 +37,13 @@ export const recipes = pgTable(
     /** Saved from a share link: the sharer's name as the link showed it (null when hidden) and when it was saved. */
     savedFromName: text("saved_from_name"),
     savedAt: timestamp("saved_at", { withTimezone: true, mode: "date" }),
-    /** The shared recipe this is a copy of, in another household. Internal (dedupe only); no FK, never returned. */
+    /** The shared recipe this is a copy of, of another user. Internal (dedupe only); no FK, never returned. */
     originRecipeId: text("origin_recipe_id"),
   },
   (t) => [
-    uniqueIndex("recipes_household_slug_uq").on(t.householdId, t.slug),
-    index("recipes_household_updated_idx").on(t.householdId, t.updatedAt),
-    index("recipes_household_origin_idx").on(t.householdId, t.originRecipeId),
+    uniqueIndex("recipes_user_slug_uq").on(t.userId, t.slug),
+    index("recipes_user_updated_idx").on(t.userId, t.updatedAt),
+    index("recipes_user_origin_idx").on(t.userId, t.originRecipeId),
   ],
 );
 
@@ -82,7 +82,7 @@ export const recipeSteps = pgTable(
   (t) => [index("recipe_steps_recipe_idx").on(t.recipeId, t.position)],
 );
 
-/** Per-user favourite and rating for a recipe (ratings flag). Household averages are computed from these rows. */
+/** Per-user favourite and rating for a recipe (ratings flag). Averages are computed from these rows. */
 export const recipeUserData = pgTable(
   "recipe_user_data",
   {

@@ -51,7 +51,7 @@ function renderAt(path: string) {
       const u = String(url);
       const method = init?.method ?? "GET";
       calls.push(`${method} ${u}`);
-      if (u.includes("/auth/me")) return Response.json({ user: { id: "u", email: "a@b.c", name: "A", role: "admin", householdId: "h" }, household: { id: "h", name: "H" } });
+      if (u.includes("/auth/me")) return Response.json({ user: { id: "u", email: "a@b.c", name: "A", role: "admin" } });
       if (u.includes("/features")) return Response.json({ features: { "shopping-lists": info(flagOn) } });
       if (u.endsWith("/recipes/soup")) return Response.json(recipe);
       if (u.includes("/shopping/aisles")) return Response.json({ items: aisles });

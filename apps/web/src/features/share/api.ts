@@ -27,7 +27,7 @@ export function useShares(slug: string, enabled: boolean) {
   });
 }
 
-/** Every active link of the household (Settings, Shared links). */
+/** Every active link you made (Settings, Shared links). */
 export function useAllShares() {
   return useQuery({ queryKey: [...ALL, "all"], queryFn: () => api<{ items: ShareSummary[] }>("/shares").then((r) => r.items) });
 }

@@ -1,22 +1,22 @@
 import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
-import { households } from "./auth.js";
+import { users } from "./auth.js";
 
 const hh = () =>
-  text("household_id")
-    .notNull()
-    .references(() => households.id, { onDelete: "cascade" });
+  text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" });
 const ts = (n: string) => timestamp(n, { withTimezone: true, mode: "date" }).notNull();
 
 export const aisleLabels = pgTable(
   "aisle_labels",
-  { id: text("id").primaryKey(), householdId: hh(), name: text("name").notNull(), position: integer("position").notNull(), color: text("color") },
-  (t) => [index("aisle_labels_household_idx").on(t.householdId, t.position)],
+  { id: text("id").primaryKey(), userId: hh(), name: text("name").notNull(), position: integer("position").notNull(), color: text("color") },
+  (t) => [index("aisle_labels_user_idx").on(t.userId, t.position)],
 );
 
 export const shoppingLists = pgTable(
   "shopping_lists",
-  { id: text("id").primaryKey(), householdId: hh(), name: text("name").notNull(), createdAt: ts("created_at"), updatedAt: ts("updated_at") },
-  (t) => [index("shopping_lists_household_idx").on(t.householdId)],
+  { id: text("id").primaryKey(), userId: hh(), name: text("name").notNull(), createdAt: ts("created_at"), updatedAt: ts("updated_at") },
+  (t) => [index("shopping_lists_user_idx").on(t.userId)],
 );
 
 export const shoppingItems = pgTable(
@@ -26,7 +26,7 @@ export const shoppingItems = pgTable(
     listId: text("list_id")
       .notNull()
       .references(() => shoppingLists.id, { onDelete: "cascade" }),
-    householdId: hh(),
+    userId: hh(),
     text: text("text").notNull(),
     quantity: doublePrecision("quantity"),
     unit: text("unit"),
@@ -46,11 +46,11 @@ export const shoppingItems = pgTable(
 export const foodAisles = pgTable(
   "food_aisles",
   {
-    householdId: hh(),
+    userId: hh(),
     food: text("food").notNull(),
     aisleId: text("aisle_id")
       .notNull()
       .references(() => aisleLabels.id, { onDelete: "cascade" }),
   },
-  (t) => [primaryKey({ columns: [t.householdId, t.food] })],
+  (t) => [primaryKey({ columns: [t.userId, t.food] })],
 );

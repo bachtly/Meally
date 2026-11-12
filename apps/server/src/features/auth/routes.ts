@@ -9,16 +9,14 @@ import {
   signupModes,
   z,
   type AuthStatus,
-  type InviteLookup,
   type MeResponse,
   type SignupMode,
 } from "@meally/shared";
 import type { Db } from "../../db/index.js";
-import { households, instanceSettings, users } from "../../db/schema/index.js";
+import { instanceSettings, users } from "../../db/schema/index.js";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { clearSessionCookie, requireAuth, setSessionCookie, toSessionUser } from "./middleware.js";
-import { consumeInvite, findValidInvite } from "../households/service.js";
 import { createSession, deleteSession, SESSION_COOKIE } from "./sessions.js";
 
 export const SIGNUP_KEY = "signup_mode";
@@ -62,14 +60,11 @@ function limit(c: Context<AppEnv>, kind: "login" | "register") {
 async function createAccount(
   c: Context<AppEnv>,
   input: { email: string; name: string; password: string },
-  opts: { role: "admin" | "member"; householdName: string; requireEmpty?: boolean; inviteToken?: string },
+  opts: { role: "admin" | "member"; requireEmpty?: boolean },
 ) {
   const db = c.get("db");
   const passwordHash = await c.get("platform").hasher.hash(input.password);
   const now = new Date();
-  let householdId: string = randomUUID();
-  let householdRole: "owner" | "member" = "owner";
-  let householdName = opts.householdName;
   const userId = randomUUID();
   await db.transaction(async (tx) => {
     // Serialise sign-ups so the "first user" and unique-email checks cannot interleave across connections.
@@ -80,31 +75,17 @@ async function createAccount(
     if ((await tx.select().from(users).where(eq(users.email, input.email)).limit(1)).length > 0) {
       throw new ApiError(409, "email_taken", "An account with this email already exists");
     }
-    if (opts.inviteToken) {
-      const joined = await consumeInvite(tx, opts.inviteToken, input.email);
-      householdId = joined.householdId;
-      householdRole = joined.role;
-      const [h] = await tx.select().from(households).where(eq(households.id, householdId)).limit(1);
-      householdName = h!.name;
-    } else {
-      await tx.insert(households).values({ id: householdId, name: householdName, createdAt: now });
-    }
     await tx.insert(users).values({
       id: userId,
       email: input.email,
       name: input.name,
       passwordHash,
       role: opts.role,
-      householdId,
-      householdRole,
       createdAt: now,
     });
   });
   setSessionCookie(c, await createSession(db, userId, c.req.header("user-agent")));
-  const res: MeResponse = {
-    user: { id: userId, email: input.email, name: input.name, role: opts.role, householdId, householdRole },
-    household: { id: householdId, name: householdName },
-  };
+  const res: MeResponse = { user: { id: userId, email: input.email, name: input.name, role: opts.role } };
   return c.json(res, 201);
 }
 
@@ -124,11 +105,7 @@ export const authRoutes = new Hono<AppEnv>()
     limit(c, "register");
     const input = await body(c, setupSchema);
     if (!(await needsSetup(c.get("db")))) throw new ApiError(409, "setup_done", "Setup has already been completed");
-    return createAccount(c, input, {
-      role: "admin",
-      householdName: input.householdName ?? `${input.name}'s household`,
-      requireEmpty: true,
-    });
+    return createAccount(c, input, { role: "admin", requireEmpty: true });
   })
   .post("/register", async (c) => {
     limit(c, "register");
@@ -137,26 +114,9 @@ export const authRoutes = new Hono<AppEnv>()
     const mode = await resolveSignupMode(db, c.get("auth").lockedSignupMode);
     if (mode === "closed") throw new ApiError(403, "signup_closed", "Sign-ups are closed");
     const input = await body(c, registerSchema);
-    // A valid invite token works in every mode except closed; invite mode requires one.
-    // Invites belong to the households feature, so with the flag off the token is ignored.
-    const useInvite = !!input.inviteToken && (await c.get("flags").getFeatures()).households.enabled;
-    if (mode === "invite" && !useInvite) throw new ApiError(403, "invite_required", "An invitation is required to sign up");
-    return createAccount(c, input, {
-      role: "member",
-      householdName: `${input.name}'s household`,
-      inviteToken: useInvite ? input.inviteToken : undefined,
-    });
-  })
-  .get("/invite/:token", async (c) => {
-    const r = c.get("auth").inviteLimiter.hit(clientIp(c));
-    if (!r.ok) {
-      c.header("Retry-After", String(r.retryAfterSec));
-      throw new ApiError(429, "rate_limited", "Too many attempts. Try again later.");
-    }
-    const on = (await c.get("flags").getFeatures()).households.enabled;
-    const found = on ? await findValidInvite(c.get("db"), c.req.param("token")) : null;
-    const res: InviteLookup = { householdName: found?.householdName ?? "", valid: !!found };
-    return c.json(res);
+    // Invite mode needs an invitation. The Friendship invite link that carries one arrives with the Friends work.
+    if (mode === "invite") throw new ApiError(403, "invite_required", "An invitation is required to sign up");
+    return createAccount(c, input, { role: "member" });
   })
   .post("/login", async (c) => {
     limit(c, "login");
@@ -170,8 +130,7 @@ export const authRoutes = new Hono<AppEnv>()
     // Rehash on login: move the stored hash to this platform's preferred scheme and cost.
     if (needsRehash) await db.update(users).set({ passwordHash: await hasher.hash(input.password) }).where(eq(users.id, user.id));
     setSessionCookie(c, await createSession(db, user.id, c.req.header("user-agent")));
-    const [household] = await db.select().from(households).where(eq(households.id, user.householdId)).limit(1);
-    const res: MeResponse = { user: toSessionUser(user), household: { id: household!.id, name: household!.name } };
+    const res: MeResponse = { user: toSessionUser(user) };
     return c.json(res);
   })
   .post("/logout", async (c) => {
@@ -181,7 +140,6 @@ export const authRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   .get("/me", requireAuth, async (c) => {
-    const [household] = await c.get("db").select().from(households).where(eq(households.id, c.get("householdId"))).limit(1);
-    const res: MeResponse = { user: c.get("user"), household: { id: household!.id, name: household!.name } };
+    const res: MeResponse = { user: c.get("user") };
     return c.json(res);
   });

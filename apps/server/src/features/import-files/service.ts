@@ -29,22 +29,22 @@ export const jobView = (j: Job) => ({
   finishedAt: j.finishedAt?.getTime() ?? null,
 });
 
-export async function createJob(db: Db, householdId: string, userId: string, format: string, filename: string, total: number) {
+export async function createJob(db: Db, userId: string, format: string, filename: string, total: number) {
   const [job] = await db
     .insert(importJobs)
-    .values({ id: randomUUID(), householdId, userId, format, filename: filename.slice(0, 200), status: "queued", total, createdAt: new Date() })
+    .values({ id: randomUUID(), userId, format, filename: filename.slice(0, 200), status: "queued", total, createdAt: new Date() })
     .returning();
   return job!;
 }
 
-export async function getJob(db: Db, householdId: string, id: string) {
-  const [j] = await db.select().from(importJobs).where(and(eq(importJobs.id, id), eq(importJobs.householdId, householdId))).limit(1);
+export async function getJob(db: Db, userId: string, id: string) {
+  const [j] = await db.select().from(importJobs).where(and(eq(importJobs.id, id), eq(importJobs.userId, userId))).limit(1);
   if (!j) throw new ApiError(404, "not_found", "Import not found");
   return j;
 }
 
-export async function listJobs(db: Db, householdId: string, limit = 20) {
-  return db.select().from(importJobs).where(eq(importJobs.householdId, householdId)).orderBy(desc(importJobs.createdAt)).limit(limit);
+export async function listJobs(db: Db, userId: string, limit = 20) {
+  return db.select().from(importJobs).where(eq(importJobs.userId, userId)).orderBy(desc(importJobs.createdAt)).limit(limit);
 }
 
 /** Jobs left running by a previous process can never finish; mark them failed on startup. */
@@ -66,7 +66,6 @@ export function enqueue(task: () => Promise<void>): Promise<void> {
 interface Ctx {
   db: Db;
   images: ImageStore;
-  householdId: string;
   userId: string;
   org: boolean;
   nutrition: boolean;
@@ -81,13 +80,13 @@ interface Ctx {
   plan: Plan;
 }
 
-async function exists(db: Db, householdId: string, name: string, sourceUrl: string | null) {
+async function exists(db: Db, userId: string, name: string, sourceUrl: string | null) {
   const [row] = await db
     .select({ id: recipes.id })
     .from(recipes)
     .where(
       and(
-        eq(recipes.householdId, householdId),
+        eq(recipes.userId, userId),
         eq(recipes.name, name),
         sourceUrl ? eq(recipes.sourceUrl, sourceUrl) : isNull(recipes.sourceUrl),
       ),
@@ -130,7 +129,7 @@ export async function runJob(ctx: Ctx) {
             continue;
           }
           const input = parsed.data;
-          if (await exists(db, ctx.householdId, input.name, input.sourceUrl)) {
+          if (await exists(db, ctx.userId, input.name, input.sourceUrl)) {
             skipped++;
             continue;
           }
@@ -138,7 +137,7 @@ export async function runJob(ctx: Ctx) {
             input.tags = cleanNames(extracted.keywords, 10);
             input.categories = cleanNames(extracted.categories, 10);
           }
-          const recipe = await createRecipe(db, ctx.householdId, ctx.userId, input, { org: ctx.org, nutrition: ctx.nutrition });
+          const recipe = await createRecipe(db, ctx.userId, input, { org: ctx.org, nutrition: ctx.nutrition });
           imported++;
           if (rating && ctx.ratings) await setMe(db, ctx.userId, recipe.id, { rating }).catch(() => {});
           // A bad or slow photo never fails the recipe. At most one image per recipe.
@@ -152,7 +151,7 @@ export async function runJob(ctx: Ctx) {
                 imageTimeLeft -= Date.now() - t0;
               }
             }
-            if (bytes?.length) await setRecipeImage(db, ctx.images, ctx.householdId, recipe.slug, bytes);
+            if (bytes?.length) await setRecipeImage(db, ctx.images, ctx.userId, recipe.slug, bytes);
           } catch {
             /* keep the recipe without a photo */
           }

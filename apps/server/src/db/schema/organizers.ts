@@ -1,5 +1,5 @@
 import { index, pgTable, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
-import { households } from "./auth.js";
+import { users } from "./auth.js";
 import { recipes } from "./recipes.js";
 
 function organizer(table: string) {
@@ -7,13 +7,13 @@ function organizer(table: string) {
     table,
     {
       id: text("id").primaryKey(),
-      householdId: text("household_id")
-        .notNull()
-        .references(() => households.id, { onDelete: "cascade" }),
+      userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
       name: text("name").notNull(),
       slug: text("slug").notNull(),
     },
-    (t) => [uniqueIndex(`${table}_household_slug_uq`).on(t.householdId, t.slug)],
+    (t) => [uniqueIndex(`${table}_user_slug_uq`).on(t.userId, t.slug)],
   );
 }
 

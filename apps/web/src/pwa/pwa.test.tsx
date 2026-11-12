@@ -131,7 +131,7 @@ describe("runtime caching rules", () => {
     "/api/v1/admin/features",
     "/api/v1/shopping/lists/1/events",
     "/api/v1/recipes/pasta/image",
-    "/api/v1/household",
+    "/api/v1/shares",
     "/api/v1/public/recipes/tok",
   ])("never caches %s", (p) => expect(first(ctx(p))).toEqual([]));
   it("never caches non-GET requests", () => {

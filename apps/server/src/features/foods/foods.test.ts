@@ -142,7 +142,7 @@ describe("parser vocab", () => {
 });
 
 describe("isolation and flag", () => {
-  it("hides another household's foods and units", async () => {
+  it("hides another user's foods and units", async () => {
     const f = byName(await foods(), "Garlic");
     expect((await json(await call(B, "GET", "/foods"))).items).toEqual([]);
     expect((await call(B, "PATCH", `/foods/${f.id}`, { name: "x" })).status).toBe(404);

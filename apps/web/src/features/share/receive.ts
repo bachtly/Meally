@@ -34,7 +34,7 @@ export interface SaveProgress {
 }
 
 /**
- * Saves recipes of a link into the viewer's household, in batches of 10 so a big cookbook stays within request limits.
+ * Saves recipes of a link into the viewer's recipes, in batches of 10 so a big cookbook stays within request limits.
  * With `cookbook`, the first batch creates a hand-picked cookbook by that name and later batches fill it.
  */
 export function useSaveShare(token: string) {

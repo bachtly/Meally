@@ -90,7 +90,7 @@ describe("webhook routes", () => {
       expect((await t.call(t.A, "POST", "/webhooks", bad)).status).toBe(400);
   });
 
-  it("is isolated per household", async () => {
+  it("is isolated per user", async () => {
     const t = await mk();
     const w = await t.create();
     const cases: Array<[string, string]> = [["GET", ""], ["PUT", ""], ["DELETE", ""], ["POST", "/test"], ["GET", "/deliveries"]];
@@ -98,12 +98,11 @@ describe("webhook routes", () => {
     expect((await t.json(await t.call(t.B, "GET", "/webhooks"))).items).toEqual([]);
   });
 
-  it("is owner only", async () => {
+  it("lets any signed-in user manage their own webhooks", async () => {
     const t = await mk();
-    const inv = await t.json(await t.call(t.A, "POST", "/household/invites", {}));
-    const M = await t.su("register", "m@example.com", { inviteToken: inv.token });
-    expect((await t.call(M, "GET", "/webhooks")).status).toBe(403);
-    expect((await t.call(M, "POST", "/webhooks", GOOD)).status).toBe(403);
+    expect((await t.call(t.B, "GET", "/webhooks")).status).toBe(200);
+    expect((await t.call(t.B, "POST", "/webhooks", GOOD)).status).toBe(201);
+    expect((await t.json(await t.call(t.A, "GET", "/webhooks"))).items).toEqual([]);
   });
 
   it("is hidden when the flag is off", async () => {
@@ -125,7 +124,7 @@ describe("webhook routes", () => {
     expect(s.headers["X-Meally-Signature"]).toBe(sign(w.secret, s.body, ts));
     expect(verifyWebhook(s.body, s.headers["X-Meally-Signature"], w.secret, ts)).toBe(true);
     expect(s.headers["X-Meally-Signature-256"]).toBe(legacySign(w.secret, s.body));
-    expect(JSON.parse(s.body)).toMatchObject({ event: "ping", household: { name: expect.any(String) } });
+    expect(JSON.parse(s.body)).toMatchObject({ event: "ping", user: { name: expect.any(String) } });
     expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}/deliveries`))).items).toHaveLength(1);
     expect((await t.json(await t.call(t.A, "GET", `/webhooks/${w.id}`))).lastStatus).toBe(200);
   });

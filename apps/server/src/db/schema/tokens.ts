@@ -1,5 +1,5 @@
 import { index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { households, users } from "./auth.js";
+import { users } from "./auth.js";
 
 /** Personal API tokens. Only the SHA-256 of the token is stored; `prefix` is for display. */
 export const apiTokens = pgTable(
@@ -9,9 +9,6 @@ export const apiTokens = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    householdId: text("household_id")
-      .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     tokenHash: text("token_hash").notNull(),
     prefix: text("prefix").notNull(),

@@ -13,7 +13,7 @@ afterEach(() => {
 
 function setup(role: "owner" | "member", items: unknown[] = []) {
   const calls: Array<{ url: string; method: string }> = [];
-  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin", householdId: "h1", householdRole: role }, household: { id: "h1", name: "Home" } };
+  const me = { user: { id: "u1", email: "a@example.com", name: "Ada", role: "admin" } };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -53,12 +53,6 @@ it("shows the time fields only when the daily digest is checked", async () => {
   expect(screen.queryByLabelText("Digest time")).toBeNull();
   await userEvent.click(screen.getByRole("checkbox", { name: "Daily meal plan digest" }));
   expect(screen.getByLabelText("Digest time")).toBeInTheDocument();
-});
-
-it("tells members only owners can manage webhooks", async () => {
-  const calls = setup("member");
-  expect(await screen.findByText(/Only household owners/)).toBeInTheDocument();
-  expect(calls.some((c) => c.url.endsWith("/webhooks"))).toBe(false);
 });
 
 it("deletes only after confirming in the app's dialog, not window.confirm", async () => {

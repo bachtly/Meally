@@ -18,7 +18,7 @@ export default defineConfig({
       manifest: {
         name: "Meally",
         short_name: "Meally",
-        description: "Your household's recipes, meal plan and shopping list.",
+        description: "Your recipes, meal plan and shopping list.",
         start_url: "/",
         scope: "/",
         display: "standalone",

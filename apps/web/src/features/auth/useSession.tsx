@@ -62,7 +62,6 @@ export function useSession() {
   return {
     me: q.data ?? null,
     user: q.data?.user ?? null,
-    household: q.data?.household ?? null,
     isLoading: q.isLoading,
     isError: q.isError,
     retry: () => void q.refetch(),
