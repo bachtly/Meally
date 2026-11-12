@@ -267,14 +267,15 @@ describe("Reactions", () => {
     await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
     await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`);
     await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
-    const rows = await o.db.select().from(pushDeliveries);
+    const reactionPushes = async () => (await o.db.select().from(pushDeliveries)).filter((r) => (r.payload as { type: string }).type === "reaction");
+    const rows = await reactionPushes();
     expect(rows).toHaveLength(1);
     expect(rows[0]!.subscriptionId).toBe(`sub-${await id(A)}`);
     expect(rows[0]!.payload).toEqual({ type: "reaction", snapId: s.id, from: "Bo", emoji: "heart" });
     await call(B, "PUT", `/snaps/${s.id}/reactions/yum`);
-    expect(await o.db.select().from(pushDeliveries)).toHaveLength(2);
+    expect(await reactionPushes()).toHaveLength(2);
     await call(A, "PUT", `/snaps/${s.id}/reactions/heart`);
-    expect(await o.db.select().from(pushDeliveries)).toHaveLength(2);
+    expect(await reactionPushes()).toHaveLength(2);
   });
 });
 

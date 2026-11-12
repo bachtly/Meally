@@ -45,7 +45,7 @@ describe("jobs route auth", () => {
 
   it("registers the standard jobs, with import.run a safe no-op and shares.cleanup re-entrant", async () => {
     const t = await mk(() => createEdgePlatform({ pbkdf2Iterations: 1000 }));
-    for (const n of ["import.run", "shares.cleanup", "webhooks.retry", "mealplan.digest"]) expect((await post(t, n, `Bearer ${SECRET}`)).status).toBe(200);
+    for (const n of ["import.run", "shares.cleanup", "webhooks.retry", "mealplan.digest", "push.deliver"]) expect((await post(t, n, `Bearer ${SECRET}`)).status).toBe(200);
     const both = await Promise.all([post(t, "shares.cleanup", `Bearer ${SECRET}`), post(t, "shares.cleanup", `Bearer ${SECRET}`)]);
     expect(both.map((r) => r.status)).toEqual([200, 200]);
   });

@@ -17,7 +17,7 @@ export interface FetchResult {
 export interface FetchOptions {
   /** `post` sends `body` with `headers` and never follows redirects (used by webhooks). */
   kind: "html" | "image" | "post";
-  body?: string;
+  body?: string | Uint8Array;
   headers?: Record<string, string>;
 }
 
@@ -30,7 +30,7 @@ export type Fetcher = (url: string, opts: FetchOptions) => Promise<FetchResult>;
 export interface TransportRequest {
   url: URL;
   method?: "GET" | "POST";
-  body?: string;
+  body?: string | Uint8Array;
   /** The vetted address to connect to. */
   ip: string;
   headers: Record<string, string>;
@@ -60,7 +60,7 @@ const failed = (msg: string) => new ApiError(502, "fetch_failed", msg);
  * so private ranges are only blocked by hostname there (see `vet`); the edge sandbox has no private network.
  */
 const fetchTransport: Transport = async ({ url, headers, signal, method = "GET", body }) => {
-  const res = await fetch(url, { method, headers, signal, body, redirect: "manual" });
+  const res = await fetch(url, { method, headers, signal, body: body as never, redirect: "manual" });
   const h: Record<string, string | undefined> = {};
   res.headers.forEach((v, k) => (h[k] = v));
   const reader = res.body?.getReader();

@@ -12,6 +12,13 @@ select cron.schedule('meally-webhooks-retry', '* * * * *', $job$
     body := '{}'::jsonb, timeout_milliseconds := 20000);
 $job$);
 
+select cron.schedule('meally-push-deliver', '* * * * *', $job$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'meally_project_url') || '/functions/v1/meally/api/v1/internal/jobs/push.deliver',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'meally_jobs_secret')),
+    body := '{}'::jsonb, timeout_milliseconds := 20000);
+$job$);
+
 select cron.schedule('meally-mealplan-digest', '*/15 * * * *', $job$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'meally_project_url') || '/functions/v1/meally/api/v1/internal/jobs/mealplan.digest',

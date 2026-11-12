@@ -23,7 +23,7 @@ async function mk(status: number | "throw" = 200) {
   const sent: Array<{ url: string; body: string; headers: Record<string, string> }> = [];
   const state = { status };
   const fetcher: Fetcher = async (url, opts) => {
-    sent.push({ url, body: opts.body!, headers: opts.headers! });
+    sent.push({ url, body: opts.body as string, headers: opts.headers! });
     if (state.status === "throw") throw new Error("boom");
     return { body: Buffer.alloc(0), contentType: "", finalUrl: url, status: state.status as number };
   };

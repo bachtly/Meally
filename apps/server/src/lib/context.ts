@@ -3,6 +3,7 @@ import type { Db } from "../db/index.js";
 import type { FlagsService } from "../features/features/service.js";
 import type { Fetcher } from "../features/import-url/fetch.js";
 import type { AiFetch } from "../features/ai/client.js";
+import type { PushService } from "../features/push/service.js";
 import type { Dispatcher } from "../features/webhooks/service.js";
 import type { Platform } from "../ports/index.js";
 import type { RateLimiter } from "./rate-limit.js";
@@ -29,6 +30,7 @@ export type AppEnv = {
     auth: AuthSettings;
     fetcher: Fetcher;
     webhooks: Dispatcher;
+    push: PushService;
     importLimiter: RateLimiter;
     shareLimiter: RateLimiter;
     tokenLimiter: RateLimiter;

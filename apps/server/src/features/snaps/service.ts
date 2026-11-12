@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { ImageSize, ReactionKey, Recipe, Snap, SnapCreate, SnapListResponse } from "@meally/shared";
 import { ms, type Db } from "../../db/core.js";
-import { images, pushDeliveries, pushSubscriptions, reactions, recipes, snaps, users } from "../../db/schema/index.js";
+import { images, reactions, recipes, snaps, users } from "../../db/schema/index.js";
 import { authoredByViewerOrFriend, type Viewer } from "../../lib/access.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ImageStore } from "../../ports/index.js";
 import { storeImage, type ImageInput } from "../recipes/image-input.js";
 import { decode, encode, load } from "../recipes/service.js";
+import { enqueueReactionPush, enqueueSnapPush } from "../push/service.js";
 import { copyRecipe } from "../share/save.js";
 
 /** Immutable-cache safe: the URL carries the image id, and an image never changes under an id. */
@@ -176,6 +177,7 @@ export async function createSnap(
         .onConflictDoNothing({ target: [snaps.userId, snaps.clientId] })
         .returning({ id: snaps.id });
       if (!inserted.length) throw new LostRace();
+      await enqueueSnapPush(tx, userId, id, now);
     });
   } catch (e) {
     await store.delete(userId, imageId).catch(() => {});
@@ -312,11 +314,7 @@ export async function addReaction(db: Db, viewer: Viewer, snapId: string, emoji:
       return;
     }
     if (snap.userId === viewer.userId) return;
-    const [from] = await tx.select({ name: users.name }).from(users).where(eq(users.id, viewer.userId)).limit(1);
-    const subs = await tx.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, snap.userId));
-    if (!subs.length) return;
-    const payload = { type: "reaction", snapId, from: (from?.name ?? "Someone").slice(0, 100), emoji };
-    await tx.insert(pushDeliveries).values(subs.map((x) => ({ id: randomUUID(), subscriptionId: x.id, payload, nextAt: now })));
+    await enqueueReactionPush(tx, snap.userId, viewer.userId, snapId, emoji, now);
   });
   return getSnap(db, viewer, snapId);
 }

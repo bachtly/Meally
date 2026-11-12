@@ -27,6 +27,8 @@ import { friendRoutes } from "./features/friends/routes.js";
 import { snapRoutes } from "./features/snaps/routes.js";
 import { webhookRoutes } from "./features/webhooks/routes.js";
 import { createDispatcher } from "./features/webhooks/service.js";
+import { pushRoutes } from "./features/push/routes.js";
+import { createPushService } from "./features/push/service.js";
 import { tokenRoutes } from "./features/tokens/routes.js";
 import { jobRoutes, defineCoreJobs } from "./features/jobs/routes.js";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
@@ -79,8 +81,12 @@ export function createCoreApp(opts: CoreAppOptions) {
   };
   const fetcher = opts.fetcher ?? createFetcher({ allowPrivate: allowPrivateUrls(env), version });
   const webhooks = createDispatcher({ db, fetcher, flags, scheduler: platform.scheduler, allowPrivate: allowPrivateUrls(env) });
+  const push = createPushService({ db, fetcher, flags, scheduler: platform.scheduler, env, allowPrivate: allowPrivateUrls(env) });
   defineCoreJobs(platform.scheduler, db, platform.images);
-  if (opts.webhookScheduler) webhooks.start();
+  if (opts.webhookScheduler) {
+    webhooks.start();
+    push.start();
+  }
   const importLimiter = createRateLimiter({ max: 20, windowMs: 60 * 60_000 });
   const shareLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
   const tokenLimiter = createRateLimiter({ max: opts.tokenLimit ?? 600, windowMs: 10 * 60_000 });
@@ -101,6 +107,7 @@ export function createCoreApp(opts: CoreAppOptions) {
     c.set("auth", auth);
     c.set("fetcher", fetcher);
     c.set("webhooks", webhooks);
+    c.set("push", push);
     c.set("importLimiter", importLimiter);
     c.set("shareLimiter", shareLimiter);
     c.set("tokenLimiter", tokenLimiter);
@@ -133,6 +140,7 @@ export function createCoreApp(opts: CoreAppOptions) {
   api.route("/webhooks", webhookRoutes);
   api.route("/friends", friendRoutes);
   api.route("/snaps", snapRoutes);
+  api.route("/push", pushRoutes);
   api.route("/cookbooks", cookbookRoutes);
   api.route("/ingredients", ingredientRoutes);
   api.route("/import/url", importRoutes);
