@@ -13,7 +13,7 @@ import { RecipeImportPage } from "../features/import-url/ImportPage";
 import { ShoppingListsPage } from "../features/shopping/ShoppingLists";
 import { ShoppingListPage } from "../features/shopping/ShoppingListPage";
 import { PlanPage } from "../features/meal-plan/PlanPage";
-import { SettingsPage } from "../features/households/SettingsPage";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { CookbookPage } from "../features/cookbooks/CookbookPage";
 import { CookbooksPage } from "../features/cookbooks/CookbooksPage";
 import { ImportFilesPage } from "../features/import-files/ImportFilesPage";
