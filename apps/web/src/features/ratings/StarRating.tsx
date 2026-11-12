@@ -9,11 +9,9 @@ const STARS = [1, 2, 3, 4, 5];
 export function StarRating({
   slug,
   rating,
-  household,
 }: {
   slug: string;
   rating: number | null;
-  household?: { average: number | null; count: number };
 }) {
   const { mutate } = useSetMine(slug);
   const set = (v: number | null) => mutate({ rating: v });
@@ -47,11 +45,6 @@ export function StarRating({
         <button type="button" className="min-h-11 text-sm text-muted underline" onClick={() => set(null)}>
           Clear
         </button>
-      )}
-      {household && household.count > 0 && household.average !== null && (
-        <span className="text-sm text-muted">
-          {household.average.toFixed(1)} &middot; {household.count} {household.count === 1 ? "rating" : "ratings"}
-        </span>
       )}
     </div>
   );

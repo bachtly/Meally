@@ -33,7 +33,7 @@ function renderAt(path: string) {
         me = { ...me, ...JSON.parse(String(init.body)) };
         return Response.json(me);
       }
-      if (u.includes("/recipes/tomato-soup")) return Response.json({ ...base, me, householdRating: { average: 4.33, count: 3 } });
+      if (u.includes("/recipes/tomato-soup")) return Response.json({ ...base, me });
       if (u.includes("/recipes?"))
         return Response.json({ items: [{ id: "r1", slug: "tomato-soup", name: "Tomato soup", imageUrl: null, totalMinutes: 20, servings: 2, updatedAt: 1, favourite: me.favourite, rating: me.rating }], nextCursor: null });
       return Response.json({});
