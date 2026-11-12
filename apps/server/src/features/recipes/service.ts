@@ -7,7 +7,7 @@ import { isNutritionEmpty } from "@meally/shared";
 import { ms, type Db } from "../../db/core.js";
 import { images, recipeIngredients, recipes, recipeSteps, recipeUserData, timelineEvents } from "../../db/schema/index.js";
 import { ApiError } from "../../lib/errors.js";
-import { getMe, householdRating } from "../ratings/service.js";
+import { getMe } from "../ratings/service.js";
 import { linkFoods } from "../foods/service.js";
 import { hasAnyOf, loadRefs, setRecipeOrganizers } from "../organizers/service.js";
 
@@ -97,7 +97,7 @@ async function load(db: Pick<Db, "select">, row: Row, o: Org = {}): Promise<Reci
   const org = o.org;
   const rate =
     o.ratings && o.userId
-      ? { me: await getMe(db, o.userId, row.id), householdRating: await householdRating(db, row.id) }
+      ? { me: await getMe(db, o.userId, row.id) }
       : {};
   const extra = org
     ? {

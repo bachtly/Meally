@@ -31,7 +31,7 @@ feature to its place in Meally.
   (`print`), timeline and comments (`timeline`).
 - **Planning:** meal planner with suggestions and a calendar feed (`meal-plan`), shopping lists with live updates
   (`shopping-lists`).
-- **Sharing:** households and invites (`households`), public share links (`share-links`).
+- **Sharing:** public share links (`share-links`).
 - **Running it:** export and backups (`backups`), installable offline app (`pwa`), API tokens (`api-tokens`) and
   [API docs](docs/api.md), webhooks (`webhooks`), admin console, AI helpers (`ai`, off by default).
 

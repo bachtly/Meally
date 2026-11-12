@@ -35,7 +35,7 @@ export interface ShareLink {
   viewCount: number;
 }
 
-/** Every active link of the household (the Shared links page). Never the token. */
+/** Every active link of the user (the Shared links page). Never the token. */
 export interface ShareSummary extends ShareLink {
   kind: ShareKind;
   /** The recipe's or cookbook's current name, or the set's title (null when untitled). */
@@ -48,7 +48,7 @@ export interface ShareSummary extends ShareLink {
   note: string | null;
 }
 
-/** The read-only recipe view served at a public link: no ids, no household or user data. */
+/** The read-only recipe view served at a public link: no ids, no user data. */
 export interface PublicRecipe {
   name: string;
   description: string | null;
