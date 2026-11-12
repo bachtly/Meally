@@ -8,6 +8,8 @@ import { instanceSettings, recipes, sessions, users } from "../../db/schema/inde
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { backupSettings } from "../backups/settings.js";
+import { MAX_FRIEND_CAP } from "../friends/service.js";
+import { friendCapState, setFriendCap } from "../friends/admin.js";
 import { requireAdmin, requireAuth } from "../auth/middleware.js";
 import { resolveSignupMode, SIGNUP_KEY } from "../auth/routes.js";
 import { SESSION_TTL_MS } from "../auth/sessions.js";
@@ -51,23 +53,36 @@ adminRoutes.put("/features/:key", async (c) => {
 
 // ---- sign-up setting ----
 
-async function signupState(c: Context<AppEnv>) {
+async function settingsState(c: Context<AppEnv>) {
   const locked = c.get("auth").lockedSignupMode;
-  return { signupMode: await resolveSignupMode(c.get("db"), locked), locked: locked !== null, envVar: "MEALLY_SIGNUP_MODE" };
+  return {
+    signupMode: await resolveSignupMode(c.get("db"), locked),
+    locked: locked !== null,
+    envVar: "MEALLY_SIGNUP_MODE",
+    friendCap: await friendCapState(c.get("db")),
+  };
 }
 
-adminRoutes.get("/settings", async (c) => c.json(await signupState(c)));
+adminRoutes.get("/settings", async (c) => c.json(await settingsState(c)));
 
 adminRoutes.put("/settings", async (c) => {
-  const { signupMode } = await body(c, z.object({ signupMode: z.enum(signupModes) }));
-  if (c.get("auth").lockedSignupMode)
+  const input = await body(
+    c,
+    z
+      .object({ signupMode: z.enum(signupModes).optional(), friendCap: z.number().int().min(1).max(MAX_FRIEND_CAP).optional() })
+      .refine((v) => v.signupMode !== undefined || v.friendCap !== undefined, "Nothing to change"),
+  );
+  // The env lock covers only the sign-up mode; the Friend cap stays editable.
+  if (input.signupMode !== undefined && c.get("auth").lockedSignupMode)
     throw new ApiError(409, "locked_by_env", "Locked by MEALLY_SIGNUP_MODE; change the environment variable instead");
-  await c
-    .get("db")
-    .insert(instanceSettings)
-    .values({ key: SIGNUP_KEY, value: signupMode })
-    .onConflictDoUpdate({ target: instanceSettings.key, set: { value: signupMode } });
-  return c.json(await signupState(c));
+  const db = c.get("db");
+  if (input.signupMode !== undefined)
+    await db
+      .insert(instanceSettings)
+      .values({ key: SIGNUP_KEY, value: input.signupMode })
+      .onConflictDoUpdate({ target: instanceSettings.key, set: { value: input.signupMode } });
+  if (input.friendCap !== undefined) await setFriendCap(db, input.friendCap);
+  return c.json(await settingsState(c));
 });
 
 // ---- users ----
