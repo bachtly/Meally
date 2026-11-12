@@ -23,6 +23,8 @@ import { PrintPage } from "../features/print/PrintPage";
 import { CookPage } from "../features/cook-mode/CookPage";
 import { SharePage, ShareLayout, ShareRecipePage } from "../features/share/SharePage";
 import { AdminPage } from "../features/admin/AdminPage";
+import { FriendsPage } from "../features/friends/FriendsPage";
+import { InviteLayout, InvitePage } from "../features/friends/InvitePage";
 import { MorePage } from "./pages/Placeholders";
 
 // offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
@@ -39,6 +41,9 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<ShareLayout />}>
         <Route path="/s/:token" element={<SharePage />} />
         <Route path="/s/:token/:slug" element={<ShareRecipePage />} />
+      </Route>
+      <Route element={<InviteLayout />}>
+        <Route path="/invite/:token" element={<InvitePage />} />
       </Route>
       <Route
         element={
@@ -137,6 +142,14 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="cookbooks">
               <CookbookPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/friends"
+          element={
+            <FeatureRoute on="friends">
+              <FriendsPage />
             </FeatureRoute>
           }
         />

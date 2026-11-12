@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router";
 import { api, ApiRequestError } from "../../lib/api";
 import {
@@ -8,6 +8,7 @@ import {
   Card,
   Dialog,
   EmptyState,
+  Field,
   Input,
   Skeleton,
   Switch,
@@ -18,6 +19,7 @@ import {
   useToast,
 } from "../../ui";
 import { useSession } from "../auth/useSession";
+import { useFeature } from "../features/FeaturesProvider";
 
 const errMsg = (e: unknown) => (e instanceof ApiRequestError ? e.message : "Something went wrong. Try again.");
 const send = <T,>(path: string, body: unknown, method = "PUT") => api<T>(path, { method, body: JSON.stringify(body) });
@@ -124,7 +126,7 @@ interface Flag {
 const GROUPS: [string, string[]][] = [
   ["Recipes", ["import-url", "import-files", "ingredient-parser", "foods-units", "scaling", "organizers", "cook-mode", "ratings", "timeline", "nutrition", "print"]],
   ["Planning", ["meal-plan", "shopping-lists", "cookbooks"]],
-  ["Sharing", ["share-links"]],
+  ["Sharing", ["share-links", "friends", "snaps", "push"]],
   ["Platform", ["backups", "api-tokens", "webhooks", "pwa", "ai"]],
 ];
 
@@ -371,11 +373,12 @@ const MODES = [
 ] as const;
 
 function Signup() {
+  const friendsOn = useFeature("friends");
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({
     queryKey: ["admin", "settings"],
-    queryFn: () => api<{ signupMode: string; locked: boolean; envVar: string }>("/admin/settings"),
+    queryFn: () => api<{ signupMode: string; locked: boolean; envVar: string; friendCap?: number }>("/admin/settings"),
   });
   const m = useMutation({
     mutationFn: (signupMode: string) => send("/admin/settings", { signupMode }),
@@ -386,6 +389,7 @@ function Signup() {
   if (q.isError) return <Failed what="settings" />;
   const { signupMode, locked, envVar } = q.data;
   return (
+    <div className="flex flex-col gap-6">
     <fieldset className="flex flex-col gap-3" disabled={locked}>
       <legend className="mb-2 text-lg font-semibold">Who can sign up</legend>
       {locked && (
@@ -406,5 +410,43 @@ function Signup() {
         </label>
       ))}
     </fieldset>
+    {friendsOn && q.data.friendCap != null && <FriendCap value={q.data.friendCap} />}
+    </div>
+  );
+}
+
+function FriendCap({ value }: { value: number }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [text, setText] = useState(String(value));
+  const [error, setError] = useState("");
+  const m = useMutation({
+    mutationFn: (friendCap: number) => send("/admin/settings", { friendCap }),
+    onSuccess: async () => {
+      setError("");
+      await qc.invalidateQueries({ queryKey: ["admin", "settings"] });
+      toast("Saved");
+    },
+    onError: (e) => setError(errMsg(e)),
+  });
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const n = Number(text);
+    if (!Number.isInteger(n) || n < 1) return setError("Enter a whole number, 1 or more.");
+    setError("");
+    m.mutate(n);
+  }
+  return (
+    <form onSubmit={submit} noValidate className="flex max-w-sm flex-col gap-3">
+      <h2 className="text-lg font-semibold">Friend cap</h2>
+      <Field label="Most friends per person" hint="Lowering it keeps existing friends but blocks new ones." error={error}>
+        <Input type="number" inputMode="numeric" min={1} value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+      <div>
+        <Button type="submit" loading={m.isPending}>
+          Save
+        </Button>
+      </div>
+    </form>
   );
 }
