@@ -27,6 +27,8 @@ import { FriendsPage } from "../features/friends/FriendsPage";
 import { InviteLayout, InvitePage } from "../features/friends/InvitePage";
 import { FeedPage } from "../features/snaps/FeedPage";
 import { SnapsIndex } from "../features/snaps/SnapsIndex";
+import { SnapViewPage } from "../features/snaps/SnapViewPage";
+import { LinkedRecipePage } from "../features/snaps/LinkedRecipePage";
 import { MorePage } from "./pages/Placeholders";
 
 // offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
@@ -160,6 +162,22 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="friends">
               <FriendsPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/snaps/:id"
+          element={
+            <FeatureRoute on="snaps">
+              <SnapViewPage />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="/snaps/:id/recipe"
+          element={
+            <FeatureRoute on="snaps">
+              <LinkedRecipePage />
             </FeatureRoute>
           }
         />

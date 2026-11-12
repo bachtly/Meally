@@ -8,7 +8,8 @@ import { useFeed } from "./api";
 
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
 
-export function SnapCard({ snap }: { snap: Snap }) {
+/** `link`: the heading opens the Snap view (off on the Snap view itself). */
+export function SnapCard({ snap, link = true }: { snap: Snap; link?: boolean }) {
   const [broken, setBroken] = useState(false);
   const alt = snap.caption || snap.dishName || `Snap by ${snap.author.name}`;
   const where = [snap.dishName, snap.place].filter(Boolean).join(" · ");
@@ -22,7 +23,15 @@ export function SnapCard({ snap }: { snap: Snap }) {
       {/* The scrim uses theme tokens, so text keeps AA contrast in both themes. */}
       <div className="absolute inset-x-0 top-0 bg-ink/70 px-3 py-2 text-surface">
         <h2 id={`snap-${snap.id}`} className="text-sm font-medium">
-          {snap.author.name} · {relativeTime(snap.createdAt)}
+          {link ? (
+            <Link to={`/snaps/${snap.id}`} className="inline-flex min-h-11 items-center underline">
+              {snap.author.name} · {relativeTime(snap.createdAt)}
+            </Link>
+          ) : (
+            <>
+              {snap.author.name} · {relativeTime(snap.createdAt)}
+            </>
+          )}
         </h2>
       </div>
       {(snap.caption || where || snap.recipe) && (
