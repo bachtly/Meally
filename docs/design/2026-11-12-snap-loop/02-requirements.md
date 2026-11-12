@@ -81,7 +81,7 @@ Postconditions: recipe count per User ≥ recipe count of their former Household
 - AC-6.1 When a User sends a Friendship request and the other accepts, the server shall create an accepted Friendship visible to both.
 - AC-6.2 If either User is at the Friend cap (instance setting, default 20), then the server shall refuse the request or acceptance with a clear error.
 - AC-6.3 When either User removes a Friendship, the server shall end Friend access at once (next request returns 404).
-- AC-6.4 When the Migration runs, the server shall give each Household member a full copy of its recipes, plans, lists and images, make members Friends, and drop Households.
+- AC-6.4 When the Migration runs, the server shall rekey every household-owned row to the Household's single User and drop Households. If any Household has more than one member, it aborts without changes. *(Amended by [ADR 0003](adr/0003-migrate-single-member-households-by-rekeying.md). The earlier "full copy for each member, members become Friends" wording is superseded.)*
 - AC-6.5 If any Migration step fails, then the server shall roll back and leave existing data unchanged.
 
 ## User flows

@@ -80,6 +80,10 @@ the recipe behind a friend's dish.
 | Linked recipe | The recipe a snap points to. It belongs to the snap's author | new (`recipes`) |
 | Eat-out snap | A snap of food not cooked by the author. It carries a dish name and optionally a place, and has no linked recipe at first | new |
 | Save to my recipes | Copy a friend's linked recipe into your own recipes, keeping an "adapted from" reference | new |
+| Friendship invite | A one-time link (`/invite/:token`, valid for 7 days) that makes its redeemer a Friend. It also works as a sign-up permit | new (replaces household `invites`) |
+| Push delivery | One queued Web Push send to one Push subscription, retried like webhook retries | new |
+| Draft | A Snap that hasn't been sent yet, kept in IndexedDB with its `clientId` until the server confirms it | new |
+| Migration | The one-time rekey from Households to Users ([ADR 0003](adr/0003-migrate-single-member-households-by-rekeying.md)) | new |
 | Reaction | An emoji on a snap. The author is notified and nothing is counted | new |
 | Household | **Retired.** Today's shared owner of recipes, plans and lists, replaced by user ownership plus friendships | `households`, `users.household_id` |
 | Timeline event | Existing log of made, comment or note on a recipe | `timeline_events` |

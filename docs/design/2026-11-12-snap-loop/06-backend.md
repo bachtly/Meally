@@ -185,8 +185,9 @@ The repo has no metrics stack; signals are structured logs. TBD: is a metrics en
 - Load: none planned; TBD if the Snap volume answer calls for one.
 
 ## Rollout and rollback
-1. Additive PRs behind `snaps`, `friends`, `push` (off by default), shipped while households still exist. TBD:
-   can friends work before the rekey, or does each roadmap row land after 0005?
+1. The rekey PR (roadmap F1) lands first. The additive PRs behind `snaps`, `friends` and `push` (off by default) stack
+   on it. F1 to F3 ship in the same release, so invite-only sign-up always has a working permit (see roadmap). Refer
+   to the rekey migration by role, not by number.
 2. Release with migration 0005: release notes require a fresh backup (`features/backups`) and warn that API-token
    scripts on `/household/*` and `/timeline` break. Deploy order: stop the old server, start the new one, which
    migrates before listening. Old code can't run on the new schema, so there is no mixed-version window.
