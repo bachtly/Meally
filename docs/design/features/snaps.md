@@ -38,7 +38,9 @@ deleting the Snap deletes the row and the files. Reactions are soft-deleted, so 
 
 Both are Friend paths: a non-friend, a pending Friendship and a removed Friendship all get `404`.
 
-Deferred to later PRs: `PATCH` (F6), Reactions (F7), push (F8).
+- `PATCH /api/v1/snaps/:id` `{ recipeId: string | null }`: author only, relinks or unlinks the Linked recipe. `200 Snap`. `404` when the recipe is not the author's own, and for a Friend, non-friend or pending Friendship. Caption, dish name and place stay fixed after posting (requirements).
+
+Deferred to later PRs: Reactions (F7), push (F8).
 
 ## UI
 

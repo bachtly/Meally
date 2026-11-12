@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { imageSizes, snapCreateSchema, snapListQuerySchema, type ImageSize } from "@meally/shared";
+import { imageSizes, snapCreateSchema, snapListQuerySchema, snapPatchSchema, type ImageSize } from "@meally/shared";
 import type { AppEnv } from "../../lib/context.js";
 import { ApiError } from "../../lib/errors.js";
 import { viewerOf } from "../../lib/access.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireFeature } from "../features/middleware.js";
 import { MAX_IMAGE_BYTES, readImageUpload } from "../recipes/image-input.js";
-import { createSnap, deleteSnap, getSnap, getSnapRecipe, listFeed, readSnapImage, saveSnapRecipe } from "./service.js";
+import { createSnap, deleteSnap, getSnap, getSnapRecipe, listFeed, readSnapImage, relinkSnap, saveSnapRecipe } from "./service.js";
 
 function invalid(issue?: { path: PropertyKey[]; message: string }) {
   return new ApiError(400, "invalid_body", `${issue?.path.length ? `${issue.path.join(".")}: ` : ""}${issue?.message ?? "Invalid request"}`);
@@ -46,6 +46,11 @@ snapRoutes
     },
   )
   .get("/:id", async (c) => c.json(await getSnap(c.get("db"), viewerOf(c), c.req.param("id"))))
+  .patch("/:id", async (c) => {
+    const body = snapPatchSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw invalid(body.error.issues[0]);
+    return c.json(await relinkSnap(c.get("db"), viewerOf(c), c.req.param("id"), body.data.recipeId));
+  })
   .delete("/:id", async (c) => {
     await deleteSnap(c.get("db"), c.get("platform").images, viewerOf(c), c.req.param("id"));
     return c.body(null, 204);
