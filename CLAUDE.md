@@ -12,15 +12,17 @@ Read `docs/design/03-architecture.md` before writing code.
   Start the body with "Stacked on #N; review/merge in order." Merge in order, bottom first; GitHub retargets the next
   PR when its base merges.
 - **Migration collisions.** Two branches can generate the same migration number. After a rebase, delete your generated
-  migration and its snapshot and journal entry, then run `npm run db:generate -w apps/server` again.
+  migration and its snapshot and journal entry, then run `npm run db:generate -w apps/server` again. The hand-written
+  rekey migration (ADR 0003) is exempt: keep it and renumber it by hand instead of regenerating.
 - **Never commit data dirs** (`data/`, `.vdata/`, anything under `DATA_DIR`) or test output (`playwright-report/`,
   `test-results/`). Check `git status` before committing.
 - **Every feature PR adds `docs/design/features/<key>.md`**, written from `_template.md`. Do a quick web search for
   each decision (1–3 sources) and cite them.
 - **Every non-core feature is behind its flag**: server routes use `requireFeature('<key>')`, and the web app uses
   `useFeature` / `<Feature>`. Register new flags only in `packages/shared/src/features.ts`.
-- **Tenant isolation:** every query on household data filters by `householdId` from the session. Add a test that
-  another household gets a 404.
+- **Tenant isolation:** every query filters by the session user's id (ADR 0002). Only the listed Friend paths
+  (snaps, feed, linked recipe reads, Reactions, Save to my recipes) may also allow an accepted Friendship. Add tests that another user, a non-friend, and a
+  pending or removed Friendship all get a 404. All other reads and writes stay owner-only.
 
 ## Commands (from the repo root)
 
