@@ -58,6 +58,7 @@ export function AppShell() {
               <NavLink
                 key={to}
                 to={to}
+                end={to === "/"}
                 className={({ isActive }) =>
                   cn(
                     "flex min-h-11 items-center gap-3 rounded-md px-3 text-base",
@@ -125,6 +126,7 @@ export function AppShell() {
               <li key={to} className="flex-1">
                 <NavLink
                   to={to}
+                  end={to === "/"}
                     className={({ isActive }) =>
                     cn(
                       "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs",
