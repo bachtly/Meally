@@ -19,7 +19,7 @@ function oldFolder() {
   fs.cpSync(real, dir, { recursive: true });
   const journalPath = path.join(dir, "meta/_journal.json");
   const journal = JSON.parse(fs.readFileSync(journalPath, "utf8"));
-  journal.entries = journal.entries.filter((e: { tag: string }) => e.tag !== REKEY);
+  journal.entries = journal.entries.slice(0, journal.entries.findIndex((e: { tag: string }) => e.tag === REKEY));
   fs.writeFileSync(journalPath, JSON.stringify(journal));
   return dir;
 }
