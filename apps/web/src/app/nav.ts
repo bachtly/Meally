@@ -1,4 +1,4 @@
-import { BookMarked, BookOpen, CalendarDays, Ellipsis, ShoppingCart, type LucideIcon } from "lucide-react";
+import { BookMarked, BookOpen, CalendarDays, Ellipsis, Users, ShoppingCart, type LucideIcon } from "lucide-react";
 import type { FeatureKey } from "@meally/shared";
 
 export interface NavItem {
@@ -15,5 +15,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/cookbooks", label: "Cookbooks", icon: BookMarked, feature: "cookbooks", desktopOnly: true },
   { to: "/plan", label: "Plan", icon: CalendarDays, feature: "meal-plan" },
   { to: "/shopping", label: "Shopping", icon: ShoppingCart, feature: "shopping-lists" },
+  { to: "/friends", label: "Friends", icon: Users, feature: "friends", desktopOnly: true },
   { to: "/more", label: "More", icon: Ellipsis },
 ];

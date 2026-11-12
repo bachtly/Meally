@@ -18,6 +18,11 @@ export function MorePage() {
           Admin
         </Link>
       )}
+      <Feature on="friends">
+        <Link to="/friends" className="text-accent underline">
+          Friends
+        </Link>
+      </Feature>
       <Feature on="cookbooks">
         <Link to="/cookbooks" className="text-accent underline">
           Cookbooks

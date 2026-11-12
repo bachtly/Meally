@@ -6,7 +6,7 @@ import { ApiRequestError, postJson } from "../../lib/api";
 import { Brand, Button, EmptyState, Field, Input, Skeleton } from "../../ui";
 import { useAuthStatus, useSession } from "./useSession";
 
-function AuthCard({ title, children }: { title: string; children: ReactNode }) {
+export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-accent/20 via-surface to-surface px-4 py-10">
       <main className="w-full max-w-sm rounded-xl border border-line bg-raised p-6 shadow-lg">
@@ -29,6 +29,8 @@ function useNext(): string | null {
   const raw = params.get("next") ?? (location.state as { from?: string } | null)?.from ?? null;
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
 }
+/** The token of a Friend invite link when `next` points at one. */
+const inviteTokenOf = (next: string | null) => next?.match(/^\/invite\/([^/?#]+)/)?.[1] ?? null;
 const withNext = (path: string, next: string | null) => (next ? `${path}?next=${encodeURIComponent(next)}` : path);
 
 interface FormProps {
@@ -38,10 +40,12 @@ interface FormProps {
   fields: { name: string; label: string; type: string; autoComplete: string; hint?: string }[];
   footer?: ReactNode;
   extra?: Record<string, string>;
+  /** Overrides where to go after success (default: `?next=` or `/`). */
+  redirectTo?: string;
 }
 
 /** Validates with the shared zod schema, posts, stores the session and redirects. */
-function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra }: FormProps) {
+function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra, redirectTo }: FormProps) {
   const { setSession } = useSession();
   const navigate = useNavigate();
   const next = useNext();
@@ -65,7 +69,7 @@ function AuthForm({ schema, endpoint, submitLabel, fields, footer, extra }: Form
     try {
       const me = await postJson<MeResponse>(endpoint, parsed.data);
       setSession(me);
-      navigate(next ?? "/", { replace: true });
+      navigate(redirectTo ?? next ?? "/", { replace: true });
     } catch (err) {
       setFormError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
     } finally {
@@ -143,11 +147,13 @@ export function SignUpPage() {
   if (status.data && (status.data.needsSetup || status.data.signupMode === "closed")) {
     return <Navigate to={withNext("/signin", next)} replace />;
   }
+  const token = inviteTokenOf(next);
+  const invited = status.data?.signupMode === "invite" && !!token;
   return (
     <AuthCard title="Create your account">
       {status.isLoading ? (
         <Skeleton className="h-48 w-full" />
-      ) : status.data?.signupMode === "invite" ? (
+      ) : status.data?.signupMode === "invite" && !token ? (
         <p className="text-sm text-muted">
           Sign-up is by invitation only. Ask for an invite link, or{" "}
           <Link to={withNext("/signin", next)} className="font-medium text-accent underline">
@@ -161,6 +167,9 @@ export function SignUpPage() {
           endpoint="/auth/register"
           submitLabel="Create account"
           fields={[name, email, newPassword]}
+          extra={token ? { inviteToken: token } : undefined}
+          // The server used the link up when it made the account, so the Accept page would only say it is gone.
+          redirectTo={invited ? "/friends" : undefined}
           footer={
             <p className="text-center text-sm text-muted">
               Have an account?{" "}
