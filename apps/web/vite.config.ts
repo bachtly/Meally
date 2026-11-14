@@ -44,6 +44,8 @@ export default defineConfig({
         // Never serve the app shell for API calls (auth, admin, SSE, public share JSON).
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // Push and notification-click handlers (F8) live in a plain script next to the generated worker.
+        importScripts: ["/push-sw.js"],
         runtimeCaching,
       },
     }),

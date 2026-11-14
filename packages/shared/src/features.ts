@@ -29,7 +29,7 @@ export const FEATURES = [
   { key: "pwa", label: "Installable app", description: "Install as an app; recent recipes work offline.", default: true, dependsOn: [] },
   { key: "snaps", label: "Snaps", description: "Share a photo of what you cooked with your friends.", default: true, dependsOn: [] },
   { key: "friends", label: "Friends", description: "Connect with friends by invite link.", default: true, dependsOn: [] },
-  { key: "push", label: "Push notifications", description: "Notify friends of new snaps and reactions.", default: true, dependsOn: ["snaps"] },
+  { key: "push", label: "Push notifications", description: "Notify friends of new snaps and reactions.", default: true, dependsOn: ["snaps", "pwa"] },
   { key: "ai", label: "AI helpers", description: "Bring your own key for photo and text import.", default: false, dependsOn: [] },
 ] as const satisfies readonly FeatureDef[];
 

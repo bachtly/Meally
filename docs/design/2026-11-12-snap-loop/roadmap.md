@@ -4,7 +4,7 @@ Design: [design.md](design.md). All stages ran; none were skipped ([brief](00-br
 slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
 
 ## F1 · Rekey Households to users
-- Status: ⬜
+- Status: ✅
 - Depends on: none
 - AC ids: AC-2.4, AC-5.1, AC-6.4 (as amended by ADR 0003: rekey, abort on multi-member, no auto-friend), AC-6.5
 - Design refs: [ADR 0003](adr/0003-migrate-single-member-households-by-rekeying.md),
@@ -26,7 +26,7 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
   in maintenance, migrate, deploy the function, then run the image move from the cron route.
 
 ## F2 · Shared contracts and flags
-- Status: ⬜
+- Status: ✅
 - Depends on: F1
 - AC ids: none
 - Design refs: [04-api.md#contracts](04-api.md#contracts), [03-data-model.md#attributes-new-or-changed-only](03-data-model.md#attributes-new-or-changed-only)
@@ -36,7 +36,7 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
   (`attempt`, `next_at`), the Feed index `(user_id, created_at desc, id)`, and `snaps.client_id` unique per user.
 
 ## F3 · Friends
-- Status: ⬜
+- Status: ✅
 - Depends on: F2
 - AC ids: AC-6.1, AC-6.2, AC-6.3
 - Design refs: [04-api.md#friends](04-api.md#friends), [05-ui.md#screens](05-ui.md#screens),
@@ -44,7 +44,7 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
 - Goal: invite links, `/invite/:token` accept with the Friend cap, Friends screen, remove, and the Admin Friend cap.
 
 ## F4 · Send a Snap and the Feed
-- Status: ⬜
+- Status: ✅
 - Depends on: F3
 - AC ids: AC-1.1, AC-1.2, AC-1.3, AC-1.4, AC-3.1, AC-4.1
 - Design refs: [04-api.md#post-snaps](04-api.md#post-snaps), [05-ui.md#wireframes](05-ui.md#wireframes),
@@ -52,14 +52,14 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
 - Goal: camera home with upload fallback, composer with drafts and `clientId` dedupe, keyset Feed of own and Friends' Snaps.
 
 ## F5 · Snap view and Save to my recipes
-- Status: ⬜
+- Status: ✅
 - Depends on: F4
 - AC ids: AC-2.1, AC-2.2, AC-2.3
 - Design refs: [04-api.md#get-snapsidrecipe](04-api.md#get-snapsidrecipe), [05-ui.md#states](05-ui.md#states)
 - Goal: Snap view, read-only Linked recipe with snap image paths, save with origin dedupe, two 404 tests per path.
 
 ## F6 · Link an Eat-out snap later
-- Status: ⬜
+- Status: ✅
 - Depends on: F4
 - AC ids: AC-3.2, AC-3.3, AC-3.4
 - Design refs: [04-api.md#get-snapsid--patch-snapsid--delete-snapsid](04-api.md#get-snapsid--patch-snapsid--delete-snapsid),
@@ -67,7 +67,7 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
 - Goal: author-only `PATCH` of `recipeId`, `RecipePicker` prefilled with the dish name, empty state with "New recipe".
 
 ## F7 · Reactions
-- Status: ⬜
+- Status: ✅
 - Depends on: F4
 - AC ids: AC-4.2
 - Design refs: [04-api.md#put--delete-snapsidreactionsemoji](04-api.md#put--delete-snapsidreactionsemoji)
@@ -76,7 +76,7 @@ slice (CLAUDE.md). Each slice adds `docs/design/features/<key>.md`.
   non-friend, and a removed Friendship. F5 adds the same two tests to Save to my recipes.
 
 ## F8 · Web push
-- Status: ⬜
+- Status: ✅
 - Depends on: F4, F7
 - AC ids: AC-4.3, AC-4.4, AC-4.5, AC-4.6
 - Design refs: [04-api.md#push](04-api.md#push), [06-backend.md#failure-modes](06-backend.md#failure-modes),

@@ -21,12 +21,13 @@ export const ownedBy = (column: Column, viewer: Viewer) => eq(column, viewer.use
  * Snap paths only: `column` (a Snap's author) is the viewer or someone with an accepted Friendship with the
  * viewer. A pending or removed Friendship (no row) gives nothing.
  */
-export const authoredByViewerOrFriend = (column: Column, viewer: Viewer): SQL =>
-  or(
-    eq(column, viewer.userId),
-    sql`${column} IN (
-      SELECT CASE WHEN ${friendships.userAId} = ${viewer.userId} THEN ${friendships.userBId} ELSE ${friendships.userAId} END
-      FROM ${friendships}
-      WHERE ${friendships.status} = 'accepted' AND (${friendships.userAId} = ${viewer.userId} OR ${friendships.userBId} = ${viewer.userId})
-    )`,
-  )!;
+export const authoredByViewerOrFriend = (column: Column, viewer: Viewer): SQL => or(eq(column, viewer.userId), sql`${column} IN (${acceptedFriendIds(viewer)})`)!;
+
+/**
+ * Subquery of the user ids with an accepted Friendship with the viewer. Used for the Feed above and for push
+ * fan-out (a new Snap notifies the author's Friends). Pending and removed Friendships give nothing.
+ */
+export const acceptedFriendIds = (viewer: Viewer): SQL => sql`
+  SELECT CASE WHEN ${friendships.userAId} = ${viewer.userId} THEN ${friendships.userBId} ELSE ${friendships.userAId} END
+  FROM ${friendships}
+  WHERE ${friendships.status} = 'accepted' AND (${friendships.userAId} = ${viewer.userId} OR ${friendships.userBId} = ${viewer.userId})`;

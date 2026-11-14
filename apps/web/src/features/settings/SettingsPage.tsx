@@ -8,6 +8,7 @@ import { ExportBackupsSection } from "../backups/ExportBackupsSection";
 import { TokensSection } from "../tokens/TokensSection";
 import { WebhooksSection } from "../webhooks/WebhooksSection";
 import { SharedLinksSection } from "../share/SharedLinksSection";
+import { NotificationsSection } from "../push/NotificationsSection";
 
 function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
@@ -32,6 +33,11 @@ export function SettingsPage() {
         </p>
         <p className="text-sm text-muted">Profile editing is coming soon.</p>
       </Section>
+      <Feature on="push">
+        <Section title="Notifications" id="notifications">
+          <NotificationsSection />
+        </Section>
+      </Feature>
       <Feature on="organizers">
         <Section title="Organisers">
           <Link to="/organizers" className="text-accent underline">
