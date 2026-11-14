@@ -144,7 +144,7 @@ export function SnapHome({ store = draftStore }: { store?: DraftStore }) {
         </div>
       )}
       <div className="flex-1" />
-      <CameraCapture active={!composing && !menu && !friendsOpen} onPick={(f) => void pick(f)} />
+      <CameraCapture onPick={(f) => void pick(f)} />
       <div className="flex-1" />
       <FeedHandle />
       <MenuSheet open={menu} onOpenChange={setMenu} />

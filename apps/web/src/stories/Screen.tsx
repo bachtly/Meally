@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { appRoutes } from "../app/App";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
+import { stopCamera } from "../features/snaps/camera";
 import { PwaProvider } from "../pwa/Pwa";
 import { baseRoutes, installMockApi, type Routes } from "./mockApi";
 
@@ -10,6 +11,8 @@ export type CameraMode = "live" | "off";
 
 /** A fake camera: a canvas stream with a dish drawn on it, or a denied permission. */
 export function installCamera(mode: CameraMode) {
+  // The app keeps one camera stream across screens; drop the last story's.
+  stopCamera();
   const getUserMedia = async (): Promise<MediaStream> => {
     if (mode === "off") throw new DOMException("Permission denied", "NotAllowedError");
     const c = document.createElement("canvas");
@@ -31,7 +34,7 @@ export function installCamera(mode: CameraMode) {
       g.beginPath();
       g.arc(300 + Math.sin(t / 30) * 6, 400, 190, 0, Math.PI * 2);
       g.fill();
-      // The app stops the track on shutter and route leave; stop drawing with it.
+      // The app stops the track when it lets the camera go; stop drawing with it.
       if (track?.readyState !== "ended") requestAnimationFrame(draw);
     };
     draw();

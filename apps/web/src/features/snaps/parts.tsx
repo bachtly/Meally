@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Outlet } from "react-router";
 import { cn, ToastProvider, useSnapChrome } from "../../ui";
 import { OfflineBanner } from "../../pwa/Pwa";
+import { stopCamera } from "./camera";
 
 const camButtonBase = "inline-flex shrink-0 items-center justify-center bg-cam-chip text-cam-ink hover:bg-cam-chip-hover disabled:opacity-50";
 /**
@@ -58,9 +59,11 @@ export const captionPill =
 /**
  * Full-screen dark layout for the camera, the Feed and the Snap viewer: no app header or tab bar.
  * The rest of the app is one tap away in the menu. On a wide screen it stays a phone-width column.
+ * The camera stream is shared across these screens; leaving them stops it at once.
  */
 export function SnapShell() {
   useSnapChrome();
+  useEffect(() => stopCamera, []);
   return (
     <ToastProvider>
       <div className="flex h-dvh flex-col bg-cam text-cam-ink [color-scheme:dark]">

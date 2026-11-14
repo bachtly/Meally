@@ -6,11 +6,13 @@ import { afterEach, expect, it, vi } from "vitest";
 import { appRoutes } from "../../app/App";
 import { ToastProvider } from "../../ui";
 import { FeaturesProvider } from "../features/FeaturesProvider";
+import { stopCamera } from "./camera";
 import { memoryDraftStore, type Draft } from "./drafts";
 import { SnapHome } from "./SnapHome";
 
 afterEach(() => {
   cleanup();
+  stopCamera();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   localStorage.clear();
@@ -185,38 +187,49 @@ it("falls back to Choose photo when the camera is denied", async () => {
   expect(screen.getByLabelText("Choose photo")).toBeTruthy();
 });
 
-it("stops the camera on route leave, when hidden and on the shutter", async () => {
+it("keeps one camera stream under the menu, through the shot and back", async () => {
   mockApi();
   const cam = stubCamera();
   renderHome();
+  const user = userEvent.setup();
   await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).toBeEnabled());
-  // Hidden page.
-  Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
-  act(() => void document.dispatchEvent(new Event("visibilitychange")));
-  await waitFor(() => expect(cam.stop).toHaveBeenCalledTimes(1));
-  Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
-  act(() => void document.dispatchEvent(new Event("visibilitychange")));
-  await waitFor(() => expect(cam.getUserMedia).toHaveBeenCalledTimes(2));
-  // Shutter.
+  // Menu sheet over the camera: the stream keeps running.
+  await user.click(screen.getByRole("button", { name: "Menu" }));
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).toBeEnabled());
+  // Shot, then Discard: back on the camera with the same stream.
   const video = screen.getByLabelText("Camera preview") as HTMLVideoElement;
   Object.defineProperty(video, "videoWidth", { value: 4 });
   Object.defineProperty(video, "videoHeight", { value: 3 });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: () => undefined } as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb) => cb(new Blob(["x"], { type: "image/jpeg" })));
-  await userEvent.setup().click(screen.getByRole("button", { name: "Take photo" }));
-  await waitFor(() => expect(cam.stop).toHaveBeenCalledTimes(2));
-  expect(await screen.findByRole("button", { name: "Send" })).toBeTruthy();
-  cleanup();
-  // The camera was already stopped by the shutter; leaving the page must not leave a stream running.
-  expect(cam.stop.mock.calls.length).toBeGreaterThanOrEqual(2);
+  await user.click(screen.getByRole("button", { name: "Take photo" }));
+  await user.click(await screen.findByRole("button", { name: "Discard" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).toBeEnabled());
+  expect(cam.getUserMedia).toHaveBeenCalledTimes(1);
+  expect(cam.stop).not.toHaveBeenCalled();
 });
 
-it("stops the camera when leaving the page", async () => {
+it("does not ask for a camera the browser reports as denied", async () => {
+  mockApi();
+  const getUserMedia = vi.fn();
+  const query = vi.fn(async () => ({ state: "denied", addEventListener: () => undefined, removeEventListener: () => undefined }));
+  vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { mediaDevices: { getUserMedia }, permissions: { query } }));
+  renderHome();
+  expect(await screen.findByText("Camera is off")).toBeTruthy();
+  expect(query).toHaveBeenCalledWith({ name: "camera" });
+});
+
+it("keeps the camera across the Snap screens and stops it when you leave them", async () => {
   mockApi();
   const cam = stubCamera();
-  renderHome();
-  await waitFor(() => expect(cam.getUserMedia).toHaveBeenCalled());
+  const router = renderApp("/");
   await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).toBeEnabled());
+  await act(() => router.navigate("/feed"));
+  await act(() => router.navigate("/"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).toBeEnabled());
+  expect(cam.getUserMedia).toHaveBeenCalledTimes(1);
+  expect(cam.stop).not.toHaveBeenCalled();
   cleanup();
   expect(cam.stop).toHaveBeenCalledTimes(1);
 });
