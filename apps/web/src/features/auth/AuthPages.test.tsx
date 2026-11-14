@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
 import { appRoutes } from "../../app/App";
+import { FeaturesProvider } from "../features/FeaturesProvider";
 
 afterEach(() => {
   cleanup();
@@ -30,7 +31,10 @@ function setup(path: string, signedIn = false) {
   vi.stubGlobal("fetch", fetchMock);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [path] })} />
+      {/* With no flags on, "/" goes to the recipe library, which has the app header. */}
+      <FeaturesProvider>
+        <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [path] })} />
+      </FeaturesProvider>
     </QueryClientProvider>,
   );
   return fetchMock;

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PublicRecipe, Recipe, Snap } from "@meally/shared";
-import { api, postJson } from "../../lib/api";
+import type { PublicRecipe, ReactionKey, Recipe, Snap } from "@meally/shared";
+import { api, ApiRequestError, postJson } from "../../lib/api";
+import { feedKey } from "./api";
 
 export const useSnap = (id: string) =>
   useQuery({ queryKey: ["snaps", "one", id], queryFn: () => api<Snap>(`/snaps/${encodeURIComponent(id)}`), retry: false });
@@ -55,6 +56,50 @@ export function useLinkRecipe(id: string) {
       api<Snap>(`/snaps/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ recipeId }) }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["snaps"] });
+    },
+  });
+}
+
+const oneKey = (id: string) => ["snaps", "one", id] as const;
+
+/**
+ * Toggle one of your Reactions. The button flips at once and flips back if the server refuses.
+ * PUT and DELETE are idempotent, so a repeat tap or a retry is harmless.
+ */
+export function useReact(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ emoji, on }: { emoji: ReactionKey; on: boolean }) =>
+      api<unknown>(`/snaps/${encodeURIComponent(id)}/reactions/${emoji}`, { method: on ? "PUT" : "DELETE" }),
+    onMutate: async ({ emoji, on }) => {
+      await qc.cancelQueries({ queryKey: oneKey(id) });
+      const before = qc.getQueryData<Snap>(oneKey(id));
+      qc.setQueryData<Snap>(oneKey(id), (s) =>
+        s && { ...s, myReactions: on ? [...new Set([...s.myReactions, emoji])] : s.myReactions.filter((r) => r !== emoji) },
+      );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(oneKey(id), ctx.before);
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: feedKey }),
+  });
+}
+
+/** Author-only. A 404 means it is already gone, which is what was asked. */
+export function useDeleteSnap(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        await api<void>(`/snaps/${encodeURIComponent(id)}`, { method: "DELETE" });
+      } catch (e) {
+        if (!(e instanceof ApiRequestError && e.status === 404)) throw e;
+      }
+    },
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: oneKey(id) });
+      void qc.invalidateQueries({ queryKey: feedKey });
     },
   });
 }

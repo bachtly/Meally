@@ -1,6 +1,7 @@
-import { Camera, FlipHorizontal2, Upload } from "lucide-react";
+import { CameraOff, Images, RefreshCcw } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Button, IconButton } from "../../ui";
+import { cn } from "../../ui";
+import { camButton, camButtonSquare, PhotoFrame, ThreeUp } from "./parts";
 
 type Status = "starting" | "live" | "off";
 
@@ -15,9 +16,12 @@ function usePageVisible() {
   return visible;
 }
 
+const fileLabel = "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)]";
+
 /**
- * Live camera with a "Choose photo" fallback. The stream runs only while `active` and the page is visible, and is
- * stopped on shutter, on unmount (route leave) and when the page is hidden.
+ * Square live camera with the shutter row under it: photo picker, shutter, flip, in three equal columns so the
+ * shutter is always centred. The stream runs only while `active` and the page is visible, and is stopped on
+ * shutter, on unmount (route leave) and when the page is hidden.
  */
 export function CameraCapture({ active, onPick }: { active: boolean; onPick: (file: File) => void }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -42,7 +46,7 @@ export function CameraCapture({ active, onPick }: { active: boolean; onPick: (fi
     let cancelled = false;
     setStatus("starting");
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: facing }, audio: false })
+      .getUserMedia({ video: { facingMode: facing, aspectRatio: 1 }, audio: false })
       .then((s) => {
         // The page moved on while the browser asked for permission: release it at once.
         if (cancelled) return s.getTracks().forEach((t) => t.stop());
@@ -60,15 +64,17 @@ export function CameraCapture({ active, onPick }: { active: boolean; onPick: (fi
     };
   }, [run, facing]);
 
+  /** Crops the frame to the centred square the viewfinder shows, so the Snap matches what you saw. */
   function shoot() {
     const v = video.current;
     if (!v || !v.videoWidth) return;
+    const side = Math.min(v.videoWidth, v.videoHeight);
     const canvas = document.createElement("canvas");
-    canvas.width = v.videoWidth;
-    canvas.height = v.videoHeight;
+    canvas.width = side;
+    canvas.height = side;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(v, 0, 0);
+    ctx.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, side, side);
     stop();
     canvas.toBlob(
       (blob) => {
@@ -87,34 +93,64 @@ export function CameraCapture({ active, onPick }: { active: boolean; onPick: (fi
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-ink">
-        <video ref={video} playsInline muted aria-label="Camera preview" className="size-full object-cover" hidden={status !== "live"} />
-        {status === "starting" && <div role="status" className="absolute inset-0 grid place-items-center text-sm text-surface">Starting camera…</div>}
+    <div className="flex flex-col gap-9">
+      <PhotoFrame>
+        <video
+          ref={video}
+          playsInline
+          muted
+          aria-label="Camera preview"
+          className={cn("size-full object-cover", facing === "user" && "-scale-x-100")}
+          hidden={status !== "live"}
+        />
+        {status === "starting" && (
+          <div role="status" className="absolute inset-0 grid place-items-center text-sm text-cam-muted">
+            Starting camera…
+          </div>
+        )}
         {status === "off" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-surface">
-            <p>Camera is off</p>
-            <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-accent px-4 font-medium text-accent-contrast has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
-              <Upload className="size-4" aria-hidden />
-              Choose photo
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <CameraOff className="size-8 text-cam-muted" aria-hidden />
+            <p className="font-semibold">Camera is off</p>
+            <p className="text-sm text-cam-muted">Allow the camera in your browser, or pick a photo.</p>
+            <label className={cn("inline-flex min-h-11 items-center rounded-full bg-cam-accent px-5 font-semibold text-cam-accent-ink", fileLabel)}>
+              Pick from your photos
               <input type="file" accept="image/*" className="sr-only" onChange={onFile} />
             </label>
           </div>
         )}
-      </div>
-      <div className="flex items-center justify-between">
-        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium text-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
-          <Upload className="size-5" aria-hidden />
-          Upload
-          <input type="file" accept="image/*" className="sr-only" onChange={onFile} />
-        </label>
-        <Button size="lg" className="size-16 !rounded-full !px-0" aria-label="Take photo" disabled={status !== "live"} onClick={shoot}>
-          <Camera className="size-7" aria-hidden />
-        </Button>
-        <IconButton aria-label="Flip camera" variant="ghost" disabled={status === "off"} onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}>
-          <FlipHorizontal2 className="size-5" aria-hidden />
-        </IconButton>
-      </div>
+      </PhotoFrame>
+      <ThreeUp
+        className="px-3"
+        left={
+          <label className={cn(camButtonSquare, fileLabel)}>
+            <Images className="size-6" aria-hidden />
+            <input type="file" accept="image/*" aria-label="Choose photo" className="sr-only" onChange={onFile} />
+          </label>
+        }
+        center={
+          <button
+            type="button"
+            aria-label="Take photo"
+            disabled={status !== "live"}
+            onClick={shoot}
+            className="size-22 rounded-full border-4 border-cam-accent p-1.5 disabled:opacity-50"
+          >
+            <span className="block size-full rounded-full bg-cam-ink" />
+          </button>
+        }
+        right={
+          <button
+            type="button"
+            aria-label="Flip camera"
+            disabled={status === "off"}
+            className={camButton}
+            onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+          >
+            <RefreshCcw className="size-6" aria-hidden />
+          </button>
+        }
+      />
     </div>
   );
 }

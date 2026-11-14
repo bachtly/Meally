@@ -104,7 +104,17 @@ export const baseRoutes: Routes = {
   "POST /snaps": [201, snaps.ramen],
   "PUT /snaps/*": [204, null],
   "DELETE /snaps/*": [204, null],
-  "GET /recipes*": [200, { items: [], nextCursor: null, total: 0 }],
+  "GET /recipes*": [
+    200,
+    {
+      items: [
+        { id: "r1", slug: "tonkotsu-ramen", name: "Tonkotsu ramen", imageUrl: null, totalMinutes: 750, servings: 4 },
+        { id: "r2", slug: "pho-bo", name: "Pho bo", imageUrl: null, totalMinutes: 240, servings: 6 },
+      ],
+      nextCursor: null,
+      total: 2,
+    },
+  ],
   "GET /friends": [200, { items: friends, cap: 20 }],
   "GET /friends/invites": [200, { items: [{ id: "i1", expiresAt: now + 7 * DAY, usedAt: null }] }],
   "POST /friends/invites": [201, { id: "i2", url: "https://meally.example/invite/tok", path: "/invite/tok", token: "tok", expiresAt: now + 7 * DAY }],

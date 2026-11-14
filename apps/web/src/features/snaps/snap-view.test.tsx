@@ -96,11 +96,13 @@ it("Snap view: an eat-out Snap shows dish and place and no recipe link", async (
 
 it("Snap view: the author sees who reacted, or an empty state", async () => {
   setup("/snaps/s1", { snap: [200, snap({ author: { id: "u1", name: "Ada" }, reactions: [{ userId: "f1", name: "Ana", emoji: "heart" }] })] });
-  expect(await screen.findByText("Reactions")).toBeTruthy();
-  expect(screen.getByText("Ana: heart")).toBeTruthy();
+  await userEvent.setup().click(await screen.findByRole("button", { name: /Ana reacted/ }));
+  expect(await screen.findByRole("heading", { name: "Reactions" })).toBeTruthy();
+  expect(screen.getByRole("img", { name: "heart" })).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "React" })).toBeNull();
   cleanup();
   setup("/snaps/s1", { snap: [200, snap({ author: { id: "u1", name: "Ada" }, reactions: [] })] });
-  expect(await screen.findByText("No reactions yet.")).toBeTruthy();
+  expect(await screen.findByText("No reactions yet")).toBeTruthy();
 });
 
 it("Snap view: 404 is a dead link, other failures can be retried", async () => {
@@ -188,16 +190,16 @@ function setupLink(opts: { snap?: unknown; recipes?: unknown[]; patch?: [number,
   return { calls, router };
 }
 
-it("Link: only the author sees Find a recipe", async () => {
+it("Link: only the author sees Link a recipe", async () => {
   setupLink({ snap: snap() });
   await screen.findByAltText("Soup");
-  expect(screen.queryByRole("button", { name: /Find a recipe|Change recipe/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Link a recipe|Change recipe/ })).toBeNull();
 });
 
 it("Link: the picker searches by the dish name and PATCHes the picked recipe", async () => {
   const { calls } = setupLink({ recipes: [{ id: "r1", slug: "pho", name: "Pho bo", imageUrl: null, totalMinutes: null, servings: null }] });
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Link a recipe" }));
   expect((await screen.findByLabelText("Search your recipes") as HTMLInputElement).value).toBe("Pho");
   await user.click(await screen.findByRole("button", { name: "Pho bo" }));
   await waitFor(() => expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: "r1" })));
@@ -207,7 +209,7 @@ it("Link: the picker searches by the dish name and PATCHes the picked recipe", a
 it("Link: no match shows a New recipe action that carries the name and the Snap", async () => {
   const { router } = setupLink({ recipes: [] });
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Link a recipe" }));
   expect(await screen.findByText('No recipe called "Pho"')).toBeTruthy();
   await user.click(screen.getByRole("link", { name: "New recipe" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/recipes/new"));
@@ -218,7 +220,7 @@ it("Link: no match shows a New recipe action that carries the name and the Snap"
 it("Link: saving a recipe started from a Snap links it and returns to the Snap", async () => {
   const { calls, router } = setupLink({ recipes: [] });
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Link a recipe" }));
   await user.click(await screen.findByRole("link", { name: "New recipe" }));
   await user.click((await screen.findAllByRole("button", { name: "Save recipe" }))[0]!);
   await waitFor(() => expect(router.state.location.pathname).toBe("/snaps/s1"));
@@ -228,16 +230,46 @@ it("Link: saving a recipe started from a Snap links it and returns to the Snap",
 it("Link: a 404 on link closes the picker with a message", async () => {
   setupLink({ recipes: [{ id: "r1", slug: "pho", name: "Pho bo", imageUrl: null, totalMinutes: null, servings: null }], patch: [404, { error: "not_found" }] });
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Link a recipe" }));
   await user.click(await screen.findByRole("button", { name: "Pho bo" }));
   expect(await screen.findByText("That recipe is no longer there")).toBeTruthy();
 });
 
-it("Link: the author can unlink, and the Snap offers Find a recipe again", async () => {
+it("Link: the author can unlink from the More menu", async () => {
   const withRecipe = mine({ recipe: { slug: "pho", name: "Pho bo" } });
   const { calls } = setupLink({ snap: withRecipe, patch: [200, mine()] });
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Unlink recipe" }));
+  await user.click(await screen.findByRole("button", { name: "More" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Unlink recipe" }));
   await waitFor(() => expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: null })));
   expect(await screen.findByText("Recipe unlinked")).toBeTruthy();
+});
+
+it("Reactions: a friend toggles one at once, with PUT then DELETE", async () => {
+  const { calls } = setupLink({ snap: snap() });
+  const user = userEvent.setup();
+  const heart = await screen.findByRole("button", { name: "React with heart" });
+  expect(heart).toHaveAttribute("aria-pressed", "false");
+  await user.click(heart);
+  expect(heart).toHaveAttribute("aria-pressed", "true");
+  await waitFor(() => expect(calls.some((c) => c.m === "PUT" && c.u === "/snaps/s1/reactions/heart")).toBe(true));
+  await user.click(heart);
+  await waitFor(() => expect(calls.some((c) => c.m === "DELETE" && c.u === "/snaps/s1/reactions/heart")).toBe(true));
+});
+
+it("Delete: the author confirms, the Snap is deleted and the Feed opens", async () => {
+  const { calls, router } = setupLink({ snap: mine() });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "More" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Delete Snap" }));
+  await user.click(await screen.findByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/feed"));
+  expect(calls.some((c) => c.m === "DELETE" && c.u === "/snaps/s1")).toBe(true);
+});
+
+it("Delete: a friend's Snap has no Delete", async () => {
+  setupLink({ snap: snap() });
+  await userEvent.setup().click(await screen.findByRole("button", { name: "More" }));
+  expect(await screen.findByRole("menuitem", { name: "Save photo" })).toBeTruthy();
+  expect(screen.queryByRole("menuitem", { name: "Delete Snap" })).toBeNull();
 });

@@ -29,6 +29,7 @@ import { FeedPage } from "../features/snaps/FeedPage";
 import { SnapsIndex } from "../features/snaps/SnapsIndex";
 import { SnapViewPage } from "../features/snaps/SnapViewPage";
 import { LinkedRecipePage } from "../features/snaps/LinkedRecipePage";
+import { SnapShell } from "../features/snaps/parts";
 import { MorePage } from "./pages/Placeholders";
 
 // offlineFirst: fire requests even when navigator.onLine is false so offline pages fall back to the service worker cache.
@@ -73,10 +74,11 @@ export const appRoutes = createRoutesFromElements(
           }
         />
       </Route>
+      {/* The Snap loop is full screen and dark, without the app header and tab bar; the menu leads to the rest. */}
       <Route
         element={
           <RequireAuth>
-            <AppShell />
+            <SnapShell />
           </RequireAuth>
         }
       >
@@ -89,6 +91,22 @@ export const appRoutes = createRoutesFromElements(
             </FeatureRoute>
           }
         />
+        <Route
+          path="/snaps/:id"
+          element={
+            <FeatureRoute on="snaps">
+              <SnapViewPage />
+            </FeatureRoute>
+          }
+        />
+      </Route>
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+      >
         <Route path="/recipes" element={<RecipeLibrary />} />
         <Route path="/recipes/new" element={<RecipeNewPage />} />
         <Route
@@ -162,14 +180,6 @@ export const appRoutes = createRoutesFromElements(
           element={
             <FeatureRoute on="friends">
               <FriendsPage />
-            </FeatureRoute>
-          }
-        />
-        <Route
-          path="/snaps/:id"
-          element={
-            <FeatureRoute on="snaps">
-              <SnapViewPage />
             </FeatureRoute>
           }
         />

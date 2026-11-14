@@ -64,6 +64,8 @@ function mockApi(o: Opts = {}) {
         return typeof f === "number" ? Response.json({ error: "boom" }, { status: f }) : Response.json(f);
       }
       if (u === "/meta") return Response.json({ streaming: true, presizedImages: false });
+      if (u.startsWith("/recipes?"))
+        return Response.json({ items: [{ id: "r1", slug: "pho", name: "Pho bo", imageUrl: null, totalMinutes: null, servings: null }], nextCursor: null });
       return Response.json({});
     }),
   );
@@ -104,7 +106,7 @@ it("sends a photo in two taps after the shot and goes to the Feed", async () => 
   const posts = mockApi();
   renderHome();
   const user = userEvent.setup();
-  await user.upload(await screen.findByLabelText("Upload"), photo());
+  await user.upload(await screen.findByLabelText("Choose photo"), photo());
   await user.click(await screen.findByRole("button", { name: "Send" }));
   expect(await screen.findByText("On the feed")).toBeTruthy();
   const body = posts[0]!;
@@ -112,11 +114,24 @@ it("sends a photo in two taps after the shot and goes to the Feed", async () => 
   expect(body.get("file")).toBeInstanceOf(File);
 });
 
+it("links a recipe picked before sending", async () => {
+  const posts = mockApi();
+  renderHome();
+  const user = userEvent.setup();
+  await user.upload(await screen.findByLabelText("Choose photo"), photo());
+  await user.click(await screen.findByRole("button", { name: "Recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Pho bo" }));
+  expect(await screen.findByRole("button", { name: "Pho bo", pressed: true })).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Send" }));
+  await screen.findByText("On the feed");
+  expect(posts[0]!.get("recipeId")).toBe("r1");
+});
+
 it("keeps the draft and reuses the clientId when sending fails", async () => {
   const posts = mockApi({ posts: [500, 201] });
   const store = renderHome();
   const user = userEvent.setup();
-  await user.upload(await screen.findByLabelText("Upload"), photo());
+  await user.upload(await screen.findByLabelText("Choose photo"), photo());
   await user.click(await screen.findByRole("button", { name: "Send" }));
   expect(await screen.findByText(/Your Snap is saved on this device/)).toBeTruthy();
   expect((await store.get())?.clientId).toBeTruthy();
@@ -131,7 +146,7 @@ it("shows a field error for a too-large photo and keeps no retry loop", async ()
   mockApi({ posts: [413] });
   renderHome();
   const user = userEvent.setup();
-  await user.upload(await screen.findByLabelText("Upload"), photo());
+  await user.upload(await screen.findByLabelText("Choose photo"), photo());
   await user.click(await screen.findByRole("button", { name: "Send" }));
   expect((await screen.findByRole("alert")).textContent).toContain("10 MB");
 });
@@ -155,9 +170,9 @@ it("limits caption, dish and place lengths", async () => {
   mockApi();
   renderHome();
   const user = userEvent.setup();
-  await user.upload(await screen.findByLabelText("Upload"), photo());
+  await user.upload(await screen.findByLabelText("Choose photo"), photo());
   expect(await screen.findByLabelText("Caption")).toHaveAttribute("maxlength", "2000");
-  await user.click(screen.getByLabelText("Eaten out"));
+  await user.click(screen.getByRole("button", { name: "Eaten out" }));
   expect(screen.getByLabelText("Dish")).toHaveAttribute("maxlength", "120");
   expect(screen.getByLabelText("Place")).toHaveAttribute("maxlength", "120");
 });
@@ -228,7 +243,10 @@ it("shows the camera at / when the flag is on", async () => {
   mockApi();
   renderApp("/");
   expect(await screen.findByRole("heading", { name: "Snap" })).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Feed" })).toHaveAttribute("href", "/feed");
+  for (const l of screen.getAllByRole("link", { name: "Feed" })) expect(l).toHaveAttribute("href", "/feed");
+  // No app header or tab bar on the camera: the rest of the app is in the menu.
+  expect(screen.queryByRole("navigation", { name: "Sidebar" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Menu" })).toBeTruthy();
 });
 
 it("Feed: empty, error and a list", async () => {
@@ -242,9 +260,11 @@ it("Feed: empty, error and a list", async () => {
   cleanup();
   mockApi({ feed: { items: [snap("a", { caption: "Soup", dishName: "Pho", place: "Cafe X" })], nextCursor: null } });
   renderApp("/feed");
-  expect(await screen.findByRole("heading", { name: /Ana/ })).toBeTruthy();
-  expect(screen.getByAltText("Soup")).toBeTruthy();
-  expect(screen.getByText("Pho · Cafe X")).toBeTruthy();
+  const tile = await screen.findByRole("link", { name: /^Ana, .*: Soup$/ });
+  expect(tile).toHaveAttribute("href", "/snaps/a");
+  expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+  await userEvent.setup().click(screen.getByRole("tab", { name: "Months" }));
+  expect(await screen.findByText("1 Snap")).toBeTruthy();
 });
 
 it("Feed is off with the flag", async () => {

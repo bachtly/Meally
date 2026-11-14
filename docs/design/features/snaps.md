@@ -55,7 +55,24 @@ Deferred to later PRs: push sending (F8).
 
 ## UI
 
-Not in this PR.
+Redesign v2 (14 Nov 2026), from the approved mockups (https://claude.ai/artifact/SQ5ReRrPFVoSC1YrDLaSCt). The camera, the
+Feed and the Snap viewer are one full-screen dark layout (`SnapShell`) with no app header or tab bar. The Linked
+recipe and every other page keep the normal app shell.
+
+| ID | Decision | Alternatives | Evidence |
+|---|---|---|---|
+| U1 | The camera is home and shows three controls only: your avatar (menu), a friends pill and a Feed button. Recipes, Plan, Shopping, Cookbooks, Friends, Settings and Admin move into a menu sheet. | Keep the app header and tab bar on the camera (the first build); a hamburger drawer. | [S6] Locket's camera keeps only flash and lens controls and puts History one scroll below it. |
+| U2 | Every control row (top bar, shutter row, Send row) is three equal columns, so the middle control sits in the true centre. | `justify-between` (the first build pushed the shutter right, because "Upload" had a label and Flip didn't). | Owner feedback, 14 Nov. |
+| U3 | After the shot the photo stays in the same square frame. The caption is typed over the photo; Recipe and Eaten out are chips under it; the row is Discard, Send, Save photo. | A composer sheet over the camera (the first build). | [S6] [S7] Locket sends from the camera screen itself. |
+| U4 | The Feed is a square grid, edge to edge with 2 px gaps and the newest at the bottom, with All and Months (one cover card per month) at the bottom and an Everyone filter at the top. | A scrolling list of cards (the first build). | [S8] [S9] The iOS 18 Photos library is one grid with Years, Months and All at the bottom; Months shows cover cards rather than a column grid. |
+| U5 | Tapping a photo opens it at camera size with the caption over it, a recipe chip, and one bar of six Reactions. Rare actions (Link or change recipe, Unlink, Save photo, Delete) live in a More menu. The author sees "Ana and Minh reacted" instead of the bar. | All actions as buttons under the photo. | [S6] |
+| U6 | Gestures always have a button: swipe up from the camera has the Feed button; swiping between Snaps has Newer and Older buttons and the Up and Down keys; the grid's pinch is Months and All. | Gestures only. | CLAUDE.md UI rules (accessibility). |
+| U7 | The camera, Feed and viewer are dark in both themes, using `--cam-*` tokens in `theme.css`. | Follow the light theme. | [S8] Photos and Locket both put photos on black. |
+
+States: the camera has starting, live, off (pick from your photos) and an unsent-draft banner. The composer has
+sending, a kept draft with Retry, and an inline error for 400, 413 and 415. The Feed has loading tiles, empty (Take a
+Snap, Add friends), error with Try again, a "Load earlier" error, a broken image (caption on a plain tile), and an empty
+filter. The viewer has loading, 404 (dead link), other errors with Try again, and a delete confirmation.
 
 ## Sources
 
@@ -64,3 +81,7 @@ Not in this PR.
 - [S3] MDN, "Cache-Control: immutable", https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
 - [S4] sharp, "Performance: concurrency", https://sharp.pixelplumbing.com/performance
 - [S5] Mealie docs (behaviour only; nothing copied), https://docs.mealie.io/documentation/getting-started/features/
+- [S6] Bustle, "How to use Locket", https://www.bustle.com/life/locket-app-how-to-use-tiktok-photo-widget
+- [S7] Locket Widget on the App Store, https://apps.apple.com/us/app/1600525061
+- [S8] MacRumors, "iOS 18 Photos app: all the new features", https://macrumors.com/guide/ios-18-photos
+- [S9] MacStories, "iOS and iPadOS 18: the MacStories review", https://www.macstories.net/stories/ios-and-ipados-18-the-macstories-review/9

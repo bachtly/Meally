@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 import { features, snaps } from "./mockApi";
 import { Screen } from "./Screen";
 
@@ -11,6 +12,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const WithSnaps: Story = {};
+
+export const Months: Story = {
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("tab", { name: "Months" }));
+  },
+};
+
+export const FilterMenu: Story = {
+  name: "Everyone filter",
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "Everyone" }));
+  },
+};
 
 export const MorePages: Story = {
   args: { routes: { "GET /snaps?*": [200, { items: Object.values(snaps), nextCursor: "c2" }] } },
