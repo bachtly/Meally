@@ -11,6 +11,8 @@ export interface Draft {
   eatenOut: boolean;
   dishName: string;
   place: string;
+  /** The recipe picked before sending; ignored for an Eat-out snap. Older drafts don't have it. */
+  recipe?: { id: string; name: string } | null;
   createdAt: number;
 }
 

@@ -51,9 +51,31 @@ export const ComposerEatenOut: Story = {
   play: async ({ canvasElement }) => {
     await pickPhoto(canvasElement);
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("checkbox"));
+    await userEvent.click(await body.findByRole("button", { name: "Eaten out" }));
     await userEvent.type(await body.findByLabelText("Dish"), "Pho bo");
     await userEvent.type(await body.findByLabelText("Place"), "Cafe Lu");
+  },
+};
+
+export const ComposerWithRecipe: Story = {
+  play: async ({ canvasElement }) => {
+    await pickPhoto(canvasElement);
+    const body = within(document.body);
+    await userEvent.type(await body.findByLabelText("Caption"), "Sunday ramen");
+    await userEvent.click(await body.findByRole("button", { name: "Recipe" }));
+    await userEvent.click(await body.findByRole("button", { name: "Tonkotsu ramen" }));
+  },
+};
+
+export const Menu: Story = {
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "Menu" }));
+  },
+};
+
+export const FriendsSheet: Story = {
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: /friends/ }));
   },
 };
 

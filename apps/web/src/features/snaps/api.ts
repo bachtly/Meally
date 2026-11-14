@@ -31,6 +31,7 @@ export function useSendSnap() {
       if (d.caption.trim()) body.append("caption", d.caption.trim());
       if (d.eatenOut && d.dishName.trim()) body.append("dishName", d.dishName.trim());
       if (d.eatenOut && d.place.trim()) body.append("place", d.place.trim());
+      if (!d.eatenOut && d.recipe) body.append("recipeId", d.recipe.id);
       return api<Snap>("/snaps", { method: "POST", body });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: feedKey }),

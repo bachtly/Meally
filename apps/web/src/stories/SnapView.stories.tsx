@@ -20,6 +20,40 @@ export const OwnSnapNoReactions: Story = {
   args: { path: "/snaps/s2", routes: { "GET /snaps/s2": [200, { ...snaps.pho, reactions: [] }] } },
 };
 
+export const OwnSnapMoreMenu: Story = {
+  name: "Own Snap, More menu",
+  args: { path: "/snaps/s2" },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "More" }));
+  },
+};
+
+export const OwnSnapWhoReacted: Story = {
+  name: "Own Snap, who reacted",
+  args: { path: "/snaps/s2" },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: /reacted/ }));
+  },
+};
+
+export const OwnSnapLinkRecipe: Story = {
+  name: "Own Snap, link a recipe",
+  args: { path: "/snaps/s2" },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "Link a recipe" }));
+  },
+};
+
+export const DeleteConfirm: Story = {
+  name: "Own Snap, delete confirm",
+  args: { path: "/snaps/s2" },
+  play: async ({ canvasElement }) => {
+    const body = within(document.body);
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "More" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Delete Snap" }));
+  },
+};
+
 export const NotFound: Story = { name: "Not found (non-friend or deleted)", args: { path: "/snaps/s9" } };
 
 export const Loading: Story = { args: { routes: { "GET /snaps/s1": "pending" } } };

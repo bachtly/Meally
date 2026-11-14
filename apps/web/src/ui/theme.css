@@ -21,6 +21,15 @@
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
+  /* Camera, Feed and Snap viewer: dark in both themes, so photos stand out (Locket and Photos do the same). */
+  --cam-bg: oklch(0.14 0.008 90);
+  --cam-ink: oklch(0.97 0.01 85);
+  --cam-muted: oklch(0.8 0.02 90);
+  --cam-chip: oklch(1 0 0 / 0.12);
+  --cam-chip-hover: oklch(1 0 0 / 0.2);
+  --cam-accent: oklch(0.78 0.13 120);
+  --cam-accent-ink: oklch(0.2 0.04 120);
+  --cam-scrim: oklch(0 0 0 / 0.55);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,6 +86,14 @@
   --color-success: var(--success);
   --color-ring: var(--focus-ring);
   --color-scrim: var(--scrim);
+  --color-cam: var(--cam-bg);
+  --color-cam-ink: var(--cam-ink);
+  --color-cam-muted: var(--cam-muted);
+  --color-cam-chip: var(--cam-chip);
+  --color-cam-chip-hover: var(--cam-chip-hover);
+  --color-cam-accent: var(--cam-accent);
+  --color-cam-accent-ink: var(--cam-accent-ink);
+  --color-cam-scrim: var(--cam-scrim);
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;

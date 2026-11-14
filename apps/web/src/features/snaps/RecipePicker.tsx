@@ -16,7 +16,8 @@ export function RecipePicker({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialQuery: string;
-  snapId: string;
+  /** The Snap a new recipe should link to. Left out in the composer, where the Snap doesn't exist yet. */
+  snapId?: string;
   onPick: (recipe: RecipeSummary) => void;
   busy?: boolean;
 }) {
@@ -36,10 +37,10 @@ export function RecipePicker({
   const list = useRecipes({ q, limit: 12, enabled: open });
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const name = q.trim();
-  const newHref = `/recipes/new?${new URLSearchParams({ ...(name ? { name } : {}), linkSnap: snapId })}`;
+  const newHref = `/recipes/new?${new URLSearchParams({ ...(name ? { name } : {}), ...(snapId ? { linkSnap: snapId } : {}) })}`;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Find a recipe" description="Pick the recipe to link to this Snap.">
+    <Sheet open={open} onOpenChange={onOpenChange} title="Link a recipe" description="Pick the recipe behind this Snap.">
       <Field label="Search your recipes">
         <Input type="search" maxLength={200} value={text} onChange={(e) => setText(e.target.value)} />
       </Field>
@@ -61,7 +62,7 @@ export function RecipePicker({
             </Link>
           }
         >
-          Write it down now and it will be linked to this Snap.
+          {snapId ? "Write it down now and it will be linked to this Snap." : "Write it down after you send, then link it from the Snap."}
         </EmptyState>
       ) : (
         <ul className="flex flex-col gap-1">
