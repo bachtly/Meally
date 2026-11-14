@@ -28,6 +28,8 @@ Read `docs/design/03-architecture.md` before writing code.
 
 - `npm install`
 - `npm run e2e` runs the Playwright flows (needs `npx playwright install chromium` once). CI runs it as its own job.
+- `npm run storybook` opens Storybook on port 6006. Stories live in `apps/web/src/stories/` and render real screens
+  against a mocked API (`mockApi.ts`); add a story when you add or change a screen.
 - `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. All four must pass before you push. CI runs the
   same four.
 - `npm run db:generate -w apps/server` after changing anything in `apps/server/src/db/schema/`. Commit the generated
