@@ -8,7 +8,8 @@ export function formatMinutes(m: number | null | undefined): string | null {
 
 /** Image URLs end in a size; build a srcset from the given sizes. */
 export function imageSrcSet(url: string | null, sizes: number[] = [320, 800]): string | undefined {
-  if (!url) return undefined;
+  // A data: or blob: URL (a local preview, a story fixture) has no sized copies to point at.
+  if (!url || /^(data|blob):/.test(url)) return undefined;
   const base = url.replace(/\/\d+$/, "");
   return sizes.map((s) => `${base}/${s} ${s}w`).join(", ");
 }
