@@ -232,3 +232,12 @@ it("Link: a 404 on link closes the picker with a message", async () => {
   await user.click(await screen.findByRole("button", { name: "Pho bo" }));
   expect(await screen.findByText("That recipe is no longer there")).toBeTruthy();
 });
+
+it("Link: the author can unlink, and the Snap offers Find a recipe again", async () => {
+  const withRecipe = mine({ recipe: { slug: "pho", name: "Pho bo" } });
+  const { calls } = setupLink({ snap: withRecipe, patch: [200, mine()] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Unlink recipe" }));
+  await waitFor(() => expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: null })));
+  expect(await screen.findByText("Recipe unlinked")).toBeTruthy();
+});

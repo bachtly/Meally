@@ -55,6 +55,20 @@ export function SnapViewPage() {
               {q.data.recipe ? "Change recipe" : "Find a recipe"}
             </Button>
           )}
+          {mine && q.data.recipe && (
+            <Button
+              variant="secondary"
+              disabled={link.isPending}
+              onClick={() =>
+                link.mutate(null, {
+                  onSuccess: () => toast("Recipe unlinked", "success"),
+                  onError: () => toast("Could not unlink the recipe", "danger"),
+                })
+              }
+            >
+              Unlink recipe
+            </Button>
+          )}
           {mine && (
             <RecipePicker
               open={picking}
