@@ -17,9 +17,12 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # Secrets live in the `production` environment, which only `main` can use,
+    # so a workflow pushed on another branch can't read them.
+    environment: production
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The commit CI just passed, not whatever main is now.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -34,18 +37,27 @@ jobs:
             echo "main is at $(git rev-parse --short origin/main), this run is for $(git rev-parse --short HEAD); skipping."
             echo "skip=1" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.fresh.outputs.skip != '1'
         with:
           node-version: 24
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         if: steps.fresh.outputs.skip != '1'
         with:
           terraform_version: 1.17.1
           terraform_wrapper: false
+      # Install packages and warm the npx cache before any secret is in the environment,
+      # so no package install script runs with the deploy tokens. Versions match scripts/deploy.sh.
+      - name: Install dependencies and deploy CLIs (no secrets)
+        if: steps.fresh.outputs.skip != '1'
+        run: |
+          npm ci
+          npx --yes supabase@2.122.1 --version
+          npx --yes wrangler@4.162.0 --version
       - run: bash scripts/deploy.sh
         if: steps.fresh.outputs.skip != '1'
         env:
+          MEALLY_SKIP_NPM_CI: "1"
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

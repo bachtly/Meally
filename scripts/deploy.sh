@@ -30,8 +30,8 @@ SUBDOMAIN="${MEALLY_SUBDOMAIN:-meally}"
 # The browser origin. CSRF accepts exactly this origin, so it is the custom domain, never *.pages.dev.
 PUBLIC_URL="https://$SUBDOMAIN.$DOMAIN"
 ITER="${MEALLY_PBKDF2_ITERATIONS:-100000}"
-SB="npx --yes supabase@2"
-VC="npx --yes vercel"
+SB="npx --yes supabase@2.122.1"
+WRANGLER_VERSION="4.162.0"
 
 step() { echo; echo "==> $*"; }
 redact() { local t="$*"; t="${t//$TOKEN_V/***}"; t="${t//$TOKEN_CF/***}"; t="${t//$SUPABASE_DB_PASSWORD/***}"; echo "$t"; }
@@ -41,7 +41,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 step "1. Install and build the edge bundle"
-run npm ci
+# CI installs dependencies in an earlier step with no secrets set, so no install script can read them.
+if [ "${MEALLY_SKIP_NPM_CI:-0}" = 1 ]; then echo "npm ci skipped (already installed)"; else run npm ci; fi
 run npm run build:edge -w apps/server
 run cp apps/server/dist-edge/meally.js supabase/functions/meally/meally.js
 
@@ -106,7 +107,7 @@ step "9. Build the SPA and upload it with the /api proxy function to Pages (Dire
 run node scripts/render-pages.mjs apps/web/pages/upstream.gen.ts "$REF"
 run npm run build -w apps/web
 # From apps/web so wrangler finds functions/ next to dist/.
-run bash -c "cd apps/web && npx --yes wrangler@4 pages deploy dist --project-name '$PROJECT' --branch main --commit-dirty=true"
+run bash -c "cd apps/web && npx --yes wrangler@$WRANGLER_VERSION pages deploy dist --project-name '$PROJECT' --branch main --commit-dirty=true"
 
 step "10. Smoke test"
 if [ "$DRY" = 1 ]; then
