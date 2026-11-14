@@ -110,7 +110,7 @@ describe("runtime caching rules", () => {
     // Workbox writes each matcher into sw.js with toString(), so any helper it closes over is undefined there.
     for (const [name, fn] of Object.entries(matchers)) {
       const rebuilt = new Function(`"use strict"; return (${fn.toString()});`)() as typeof fn;
-      for (const p of ["/api/v1/recipes/pasta", "/api/v1/recipes", "/api/v1/images/a/320", "/api/v1/features", "/api/v1/auth/me"]) {
+      for (const p of ["/api/v1/recipes/pasta", "/api/v1/recipes", "/api/v1/images/a/320", "/api/v1/features", "/api/v1/auth/me", "/api/v1/snaps", "/api/v1/snaps/s1", "/api/v1/snaps/s1/images/i/320"]) {
         expect(() => rebuilt(ctx(p)), `${name} ${p}`).not.toThrow();
         expect(rebuilt(ctx(p))).toBe(fn(ctx(p)));
       }
@@ -133,11 +133,25 @@ describe("runtime caching rules", () => {
     "/api/v1/recipes/pasta/image",
     "/api/v1/shares",
     "/api/v1/public/recipes/tok",
+    "/api/v1/snaps/s1/recipe",
+    "/api/v1/snaps/s1/reactions/heart",
   ])("never caches %s", (p) => expect(first(ctx(p))).toEqual([]));
   it("never caches non-GET requests", () => {
     for (const m of ["POST", "PUT", "PATCH", "DELETE"]) {
       expect(first(ctx("/api/v1/recipes/pasta", m))).toEqual([]);
       expect(first(ctx("/api/v1/recipes", m))).toEqual([]);
+      expect(first(ctx("/api/v1/snaps", m))).toEqual([]);
+      expect(first(ctx("/api/v1/snaps/s1", m))).toEqual([]);
     }
+  });
+  it("keeps the Feed, Snaps and Snap photos on the device, and clears them on sign-out", () => {
+    expect(first(ctx("/api/v1/snaps?limit=10"))).toEqual(["snaps-feed"]);
+    expect(first(ctx("/api/v1/snaps/s1"))).toEqual(["snaps"]);
+    expect(first(ctx("/api/v1/snaps/s1/images/i/320"))).toEqual(["snap-images"]);
+    const byName = (n: string) => runtimeCaching.find((r) => r.options.cacheName === n)!;
+    expect(byName("snaps-feed").handler).toBe("NetworkFirst");
+    expect(byName("snaps").handler).toBe("NetworkFirst"); // never stale-while-revalidate: it would undo a fresh Reaction
+    expect(byName("snap-images").handler).toBe("CacheFirst"); // immutable URLs
+    for (const n of ["snaps-feed", "snaps", "snap-images"]) expect(OFFLINE_CACHES).toContain(n);
   });
 });

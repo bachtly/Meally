@@ -41,6 +41,16 @@ export const EmptyWithoutFriends: Story = {
 
 export const Loading: Story = { args: { routes: { "GET /snaps?*": "pending" } } };
 
+export const CachedRefreshing: Story = {
+  name: "From the device, refreshing",
+  args: { storedFeed: Object.values(snaps), routes: { "GET /snaps?*": "pending" } },
+};
+
+export const CachedOffline: Story = {
+  name: "From the device, refresh failed",
+  args: { storedFeed: Object.values(snaps), routes: { "GET /snaps?*": [503, { error: "offline", message: "Offline" }] } },
+};
+
 export const LoadError: Story = {
   args: { routes: { "GET /snaps?*": [500, { error: "internal", message: "Boom" }] } },
 };

@@ -15,6 +15,12 @@ export const matchers = {
   images: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/images\/[^/]+\/[^/]+$/.test(url.pathname),
   /** Feature flags: lets the app boot offline. Contains no personal data. */
   features: ({ url, request }: MatchCtx) => request.method === "GET" && url.pathname === "/api/v1/features",
+  /** The Feed: /api/v1/snaps (with any query string). */
+  snapFeed: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/snaps\/?$/.test(url.pathname),
+  /** One Snap: /api/v1/snaps/<id> only (not /recipe, /reactions, /images). */
+  snapDetail: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/snaps\/[^/]+$/.test(url.pathname),
+  /** Snap photos: /api/v1/snaps/<id>/images/<imageId>/<size>. */
+  snapImages: ({ url, request }: MatchCtx) => request.method === "GET" && /^\/api\/v1\/snaps\/[^/]+\/images\/[^/]+\/[^/]+$/.test(url.pathname),
 };
 
 export const runtimeCaching = [
@@ -39,7 +45,28 @@ export const runtimeCaching = [
     handler: "NetworkFirst" as const,
     options: { cacheName: "features", networkTimeoutSeconds: 3, expiration: { maxEntries: 1 } },
   },
+  {
+    // Fresh when online (Reactions and new Snaps change it); the last copy when offline or the network stalls.
+    urlPattern: matchers.snapFeed,
+    handler: "NetworkFirst" as const,
+    options: { cacheName: "snaps-feed", networkTimeoutSeconds: 3, expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 }, cacheableResponse: { statuses: [200] } },
+  },
+  {
+    // NetworkFirst, not stale-while-revalidate: a stale copy would undo a Reaction the viewer just made.
+    urlPattern: matchers.snapDetail,
+    handler: "NetworkFirst" as const,
+    options: { cacheName: "snaps", networkTimeoutSeconds: 3, expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 }, cacheableResponse: { statuses: [200] } },
+  },
+  {
+    // Like recipe images, a Snap photo URL carries its image id, so its bytes never change.
+    urlPattern: matchers.snapImages,
+    handler: "CacheFirst" as const,
+    options: { cacheName: "snap-images", expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true }, cacheableResponse: { statuses: [200] } },
+  },
 ];
 
 /** Cache names to wipe on sign-out (shared devices). */
-export const OFFLINE_CACHES = ["recipes", "recipes-list", "images", "features"];
+export const OFFLINE_CACHES = ["recipes", "recipes-list", "images", "features", "snaps-feed", "snaps", "snap-images"];
+
+/** localStorage keys holding personal data to wipe on sign-out (the stored Feed page; see features/snaps/api.ts). */
+export const OFFLINE_STORAGE_KEYS = ["meally:feed"];
