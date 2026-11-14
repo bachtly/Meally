@@ -14,3 +14,5 @@ dist-edge/
 apps/web/pages/upstream.gen.ts
 .wrangler/
 .env*
+storybook-static/
+*storybook.log
