@@ -44,6 +44,18 @@ export const OwnSnapLinkRecipe: Story = {
   },
 };
 
+export const OwnSnapLinkRecipeLoading: Story = {
+  name: "Own Snap, link a recipe, loading",
+  args: { path: "/snaps/s2", routes: { "GET /recipes*": "pending" } },
+  play: OwnSnapLinkRecipe.play,
+};
+
+export const OwnSnapLinkRecipeError: Story = {
+  name: "Own Snap, link a recipe, error",
+  args: { path: "/snaps/s2", routes: { "GET /recipes*": [500, { error: "internal" }] } },
+  play: OwnSnapLinkRecipe.play,
+};
+
 export const DeleteConfirm: Story = {
   name: "Own Snap, delete confirm",
   args: { path: "/snaps/s2" },

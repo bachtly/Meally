@@ -206,6 +206,25 @@ it("Link: the picker searches by the dish name and PATCHes the picked recipe", a
   expect(calls.some((c) => c.u.startsWith("/recipes?") && c.u.includes("q=Pho"))).toBe(true);
 });
 
+it("Link: picker rows show the photo, time and servings, named by the recipe", async () => {
+  setupLink({
+    recipes: [
+      { id: "r1", slug: "pho", name: "Pho bo", imageUrl: "/api/v1/recipes/pho/images/i1/800", totalMinutes: 90, servings: 4 },
+      { id: "r2", slug: "pho-ga", name: "Pho ga", imageUrl: null, totalMinutes: null, servings: null },
+    ],
+  });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Link a recipe" }));
+  const withPhoto = await screen.findByRole("button", { name: "Pho bo" });
+  expect(withPhoto.querySelector("img")?.getAttribute("src")).toBe("/api/v1/recipes/pho/images/i1/800");
+  expect(withPhoto.querySelector("img")?.getAttribute("alt")).toBe("");
+  expect(withPhoto.textContent).toContain("1 h 30 min · Serves 4");
+  expect(document.getElementById(withPhoto.getAttribute("aria-describedby")!)?.textContent).toBe("1 h 30 min · Serves 4");
+  const bare = screen.getByRole("button", { name: "Pho ga" });
+  expect(bare.querySelector("img")).toBeNull();
+  expect(bare.hasAttribute("aria-describedby")).toBe(false);
+});
+
 it("Link: no match shows a New recipe action that carries the name and the Snap", async () => {
   const { router } = setupLink({ recipes: [] });
   const user = userEvent.setup();

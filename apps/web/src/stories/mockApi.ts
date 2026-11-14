@@ -108,11 +108,13 @@ export const baseRoutes: Routes = {
     200,
     {
       items: [
-        { id: "r1", slug: "tonkotsu-ramen", name: "Tonkotsu ramen", imageUrl: null, totalMinutes: 750, servings: 4 },
-        { id: "r2", slug: "pho-bo", name: "Pho bo", imageUrl: null, totalMinutes: 240, servings: 6 },
+        { id: "r1", slug: "tonkotsu-ramen", name: "Tonkotsu ramen", imageUrl: dish(50, 60), totalMinutes: 750, servings: 4 },
+        { id: "r2", slug: "pho-bo", name: "Pho bo", imageUrl: dish(150, 140), totalMinutes: 240, servings: 6 },
+        { id: "r3", slug: "banh-mi", name: "Banh mi", imageUrl: null, totalMinutes: 25, servings: null },
+        { id: "r4", slug: "grandmas-dumplings", name: "Grandma's dumplings", imageUrl: null, totalMinutes: null, servings: null },
       ],
       nextCursor: null,
-      total: 2,
+      total: 4,
     },
   ],
   "GET /friends": [200, { items: friends, cap: 20 }],
