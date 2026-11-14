@@ -8,6 +8,7 @@ import { CommandPalette } from "./CommandPalette";
 import { HeaderSearch } from "./HeaderSearch";
 import { OfflineBanner } from "../pwa/Pwa";
 import { clearOfflineCaches } from "../pwa/register";
+import { forgetPushOnThisDevice } from "../features/push/push";
 import { useVisibleNav } from "./useVisibleNav";
 
 export function AppShell() {
@@ -103,7 +104,7 @@ export function AppShell() {
                 )}
                 <DropdownMenuItem
                   onSelect={() => {
-                    void signOut().then(() => clearOfflineCaches()).then(() => navigate("/signin", { replace: true }));
+                    void forgetPushOnThisDevice().then(() => signOut()).then(() => clearOfflineCaches()).then(() => navigate("/signin", { replace: true }));
                   }}
                 >
                   <LogOut className="size-4" aria-hidden />

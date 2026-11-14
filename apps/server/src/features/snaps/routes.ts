@@ -41,7 +41,8 @@ snapRoutes
         recipeId: text("recipeId"),
       });
       if (!parsed.success) throw invalid(parsed.error.issues[0]);
-      const { snap, created } = await createSnap(c.get("db"), c.get("platform").images, viewerOf(c), parsed.data, () => readImageUpload(c));
+      const { snap, created, queued } = await createSnap(c.get("db"), c.get("platform").images, viewerOf(c), parsed.data, () => readImageUpload(c));
+      if (queued) c.get("push").kick();
       return c.json(snap, created ? 201 : 200);
     },
   )
@@ -64,7 +65,10 @@ snapRoutes
   .put("/:id/reactions/:emoji", async (c) => {
     const p = reactionParamSchema.safeParse({ emoji: c.req.param("emoji") });
     if (!p.success) throw invalid(p.error.issues[0]);
-    return c.json(await addReaction(c.get("db"), viewerOf(c), c.req.param("id"), p.data.emoji));
+    const snap = await addReaction(c.get("db"), viewerOf(c), c.req.param("id"), p.data.emoji);
+    // A first Reaction may have queued a push for the author; send it now rather than on the next tick.
+    c.get("push").kick();
+    return c.json(snap);
   })
   .delete("/:id/reactions/:emoji", async (c) => {
     const p = reactionParamSchema.safeParse({ emoji: c.req.param("emoji") });

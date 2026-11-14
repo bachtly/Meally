@@ -5,6 +5,7 @@ import { useVisibleNav } from "../../app/useVisibleNav";
 import { clearOfflineCaches } from "../../pwa/register";
 import { useSession } from "../auth/useSession";
 import { useFeature } from "../features/FeaturesProvider";
+import { forgetPushOnThisDevice } from "../push/push";
 
 interface Tile {
   to: string;
@@ -45,7 +46,7 @@ export function MenuSheet({ open, onOpenChange }: { open: boolean; onOpenChange:
       <button
         type="button"
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md font-semibold text-muted hover:text-ink"
-        onClick={() => void signOut().then(() => clearOfflineCaches()).then(() => navigate("/signin", { replace: true }))}
+        onClick={() => void forgetPushOnThisDevice().then(() => signOut()).then(() => clearOfflineCaches()).then(() => navigate("/signin", { replace: true }))}
       >
         <LogOut className="size-4" aria-hidden />
         Sign out

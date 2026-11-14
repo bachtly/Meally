@@ -33,3 +33,11 @@ select cron.schedule('meally-images-move', '* * * * *', $job$
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'meally_jobs_secret')),
     body := '{}'::jsonb, timeout_milliseconds := 20000);
 $job$);
+
+-- Sends queued Web Push notifications for new Snaps and Reactions (F8). The edge has no timers, so this is the sender.
+select cron.schedule('meally-push-deliver', '* * * * *', $job$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'meally_project_url') || '/functions/v1/meally/api/v1/internal/jobs/push.deliver',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'meally_jobs_secret')),
+    body := '{}'::jsonb, timeout_milliseconds := 20000);
+$job$);

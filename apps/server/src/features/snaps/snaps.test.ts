@@ -263,6 +263,9 @@ describe("Reactions", () => {
     await sub(o, await id(A));
     await sub(o, await id(B));
     const s = (await send(A, { clientId: "s" })).body;
+    // The new Snap itself queued a push for B (F8); this test is about Reaction pushes only.
+    expect(await o.db.select().from(pushDeliveries)).toHaveLength(1);
+    await o.db.delete(pushDeliveries);
     await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
     await call(B, "PUT", `/snaps/${s.id}/reactions/heart`);
     await call(B, "DELETE", `/snaps/${s.id}/reactions/heart`);

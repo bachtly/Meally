@@ -9,6 +9,7 @@ import type { ImageStore } from "../../ports/index.js";
 import { storeImage, type ImageInput } from "../recipes/image-input.js";
 import { decode, encode, load } from "../recipes/service.js";
 import { copyRecipe } from "../share/save.js";
+import { queueSnapPush } from "../push/service.js";
 
 /** Immutable-cache safe: the URL carries the image id, and an image never changes under an id. */
 export const snapImageUrl = (snapId: string, imageId: string, size: ImageSize) =>
@@ -140,7 +141,7 @@ export async function createSnap(
   viewer: Viewer,
   body: SnapCreate,
   upload: () => Promise<ImageInput>,
-): Promise<{ snap: Snap; created: boolean }> {
+): Promise<{ snap: Snap; created: boolean; queued?: number }> {
   const userId = viewer.userId;
   const done = async (id: string, created: boolean) => ({ snap: await getSnap(db, viewer, id), created });
   const first = await existing(db, userId, body.clientId);
@@ -157,6 +158,7 @@ export async function createSnap(
   const imageId = await processing(() => storeImage(store, userId, input));
   const id = randomUUID();
   const now = new Date();
+  let queued = 0;
   try {
     await db.transaction(async (tx) => {
       await tx.insert(images).values({ id: imageId, userId, createdAt: now });
@@ -176,6 +178,7 @@ export async function createSnap(
         .onConflictDoNothing({ target: [snaps.userId, snaps.clientId] })
         .returning({ id: snaps.id });
       if (!inserted.length) throw new LostRace();
+      queued = await queueSnapPush(tx, viewer, id, now);
     });
   } catch (e) {
     await store.delete(userId, imageId).catch(() => {});
@@ -184,7 +187,7 @@ export async function createSnap(
     if (!winner) throw new Error("Snap vanished after a lost race");
     return done(winner, false);
   }
-  return done(id, true);
+  return { ...(await done(id, true)), queued };
 }
 
 /**

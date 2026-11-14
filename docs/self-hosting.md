@@ -188,6 +188,8 @@ Fixed windows, per client address, kept in memory and reset on restart:
 | `MEALLY_BACKUP_KEEP` | `7` | How many backups to keep. |
 | `MEALLY_AI_PROVIDER`, `MEALLY_AI_API_KEY`, `MEALLY_AI_MODEL`, `MEALLY_AI_BASE_URL` | unset | Optional AI helpers. See [AI (optional)](#ai-optional). |
 | `MEALLY_FEATURE_<KEY>` | unset | `on` or `off` fixes a feature flag. See [Feature flags](#feature-flags). |
+| `MEALLY_VAPID_PUBLIC_KEY`, `MEALLY_VAPID_PRIVATE_KEY` | unset | Web Push keys (base64url P-256 pair). Unset: the server makes a pair on first use and keeps it in the database. Set both to keep the same keys across a fresh database. |
+| `MEALLY_VAPID_SUBJECT` | `BASE_URL` when https | `mailto:` or `https://` contact that push services can reach about your server. |
 
 ## Feature flags
 
@@ -218,6 +220,9 @@ when a feature it depends on is off.
 | `api-tokens` | on | Tokens for scripts. | |
 | `webhooks` | **off** | Call a URL when events happen. | `api-tokens` |
 | `pwa` | on | Install as an app; recent recipes work offline. | |
+| `snaps` | on | Snap what you cook or eat and see your friends' Snaps. | |
+| `friends` | on | Connect with friends by invite link. | |
+| `push` | on | Notify friends of new Snaps and Reactions (Web Push). Browsers talk to Google, Mozilla, Apple or Microsoft push services. | `snaps`, `pwa` |
 | `ai` | **off** | Bring your own key for photo and text import. | |
 
 The source of truth is `packages/shared/src/features.ts`.

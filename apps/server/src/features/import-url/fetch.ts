@@ -17,7 +17,8 @@ export interface FetchResult {
 export interface FetchOptions {
   /** `post` sends `body` with `headers` and never follows redirects (used by webhooks). */
   kind: "html" | "image" | "post";
-  body?: string;
+  /** Text for webhooks, bytes for Web Push (an encrypted payload). */
+  body?: string | Uint8Array;
   headers?: Record<string, string>;
 }
 
@@ -30,7 +31,7 @@ export type Fetcher = (url: string, opts: FetchOptions) => Promise<FetchResult>;
 export interface TransportRequest {
   url: URL;
   method?: "GET" | "POST";
-  body?: string;
+  body?: string | Uint8Array;
   /** The vetted address to connect to. */
   ip: string;
   headers: Record<string, string>;
