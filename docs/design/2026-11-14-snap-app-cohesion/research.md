@@ -87,7 +87,7 @@ This applies whichever direction is picked:
 
 A keeps everything the approved mockups got right: a three-control camera, Locket-style sending, a Photos-style grid. It also follows the rule from Apple and Photos that only full-screen media is always dark. B would make navigation more consistent, but it undoes the redesign the owner just approved. C alone doesn't fix the light-mode switching that the owner described.
 
-**Owner decision needed in #98:** A (recommended), B or C, and for A, whether the Feed grid should follow the theme (step 3) or stay dark.
+**Owner decision (14 Nov 2026, #98): C**, with dark as the app's default theme. With dark as the default, the cream-to-dark jump C left open only happens to people who pick Light. Recorded as U13 in `features/snaps.md` and D7 in `features/design-system.md`.
 
 ## Sources
 

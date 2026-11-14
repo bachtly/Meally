@@ -11,7 +11,7 @@ import { useEffect } from "react";
 export const STATUS_BAR = {
   light: "#fdf9f4", // --surface, light
   dark: "#13120c", // --surface, dark
-  snap: "#0a0906", // --cam-bg (dark in both themes)
+  snap: "#13120c", // --cam-bg: the Koi dark surface, in both themes
 } as const;
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";

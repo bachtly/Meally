@@ -66,7 +66,7 @@ export function SnapShell() {
   useEffect(() => stopCamera, []);
   return (
     <ToastProvider>
-      <div className="flex h-dvh flex-col bg-cam text-cam-ink [color-scheme:dark]">
+      <div className="flex h-dvh flex-col bg-cam text-cam-ink [color-scheme:dark] motion-safe:animate-[overlay-in_200ms_ease-out]">
         <OfflineBanner />
         <main className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col pt-[var(--sat)] pb-[var(--sab)] pl-[var(--sal)] pr-[var(--sar)]">
           <Outlet />

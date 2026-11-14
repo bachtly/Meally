@@ -51,7 +51,7 @@ export function AppShell() {
     <ToastProvider>
       {/* The page scrolls inside this fixed-height column, not the document. iOS 26 WebKit drifts `position: fixed`
           bottom bars up the screen while the document scrolls, so the tab bar is a flex row at the end instead. */}
-      <div className="flex h-dvh flex-col lg:pl-60 print:block print:h-auto print:pl-0">
+      <div className="flex h-dvh flex-col lg:pl-60 motion-safe:animate-[overlay-in_200ms_ease-out] print:block print:h-auto print:pl-0">
         <aside className="fixed inset-y-0 left-0 print:!hidden hidden w-60 flex-col gap-6 border-r border-line bg-raised p-4 pt-[calc(1rem+var(--sat))] pb-[calc(1rem+var(--sab))] pl-[max(1rem,var(--sal))] lg:flex">
           <Brand className="px-3 text-xl" />
           <nav aria-label="Sidebar" className="flex flex-col gap-1">
