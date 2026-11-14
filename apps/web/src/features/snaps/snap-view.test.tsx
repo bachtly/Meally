@@ -156,3 +156,88 @@ it("Linked recipe: 404 and a Snap without a recipe are dead links; errors can be
   setup("/snaps/s1/recipe", { recipe: [500, { error: "boom" }] });
   expect(await screen.findByText("Couldn't load this recipe")).toBeTruthy();
 });
+
+const mine = (extra: object = {}) => snap({ author: { id: "u1", name: "Ada" }, recipe: null, dishName: "Pho", ...extra });
+
+function setupLink(opts: { snap?: unknown; recipes?: unknown[]; patch?: [number, unknown] } = {}) {
+  const calls: { m: string; u: string; body?: string }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url).replace("/api/v1", "");
+      const m = init?.method ?? "GET";
+      calls.push({ m, u, body: init?.body as string | undefined });
+      if (u === "/auth/me") return Response.json({ user: { id: "u1", email: "a@example.com", name: "Ada", role: "member" } });
+      if (u === "/features")
+        return Response.json({ features: { snaps: { enabled: true, locked: false, source: "default", label: "Snaps", description: "x" } } });
+      if (u === "/snaps/s1" && m === "PATCH") return Response.json(opts.patch?.[1] ?? mine(), { status: opts.patch?.[0] ?? 200 });
+      if (u === "/snaps/s1") return Response.json(opts.snap ?? mine());
+      if (u.startsWith("/recipes?")) return Response.json({ items: opts.recipes ?? [], nextCursor: null });
+      if (u === "/recipes" && m === "POST") return Response.json({ id: "r9", slug: "pho", name: "Pho" }, { status: 201 });
+      return Response.json({});
+    }),
+  );
+  const router = createMemoryRouter(appRoutes, { initialEntries: ["/snaps/s1"] });
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <FeaturesProvider>
+        <RouterProvider router={router} />
+      </FeaturesProvider>
+    </QueryClientProvider>,
+  );
+  return { calls, router };
+}
+
+it("Link: only the author sees Find a recipe", async () => {
+  setupLink({ snap: snap() });
+  await screen.findByAltText("Soup");
+  expect(screen.queryByRole("button", { name: /Find a recipe|Change recipe/ })).toBeNull();
+});
+
+it("Link: the picker searches by the dish name and PATCHes the picked recipe", async () => {
+  const { calls } = setupLink({ recipes: [{ id: "r1", slug: "pho", name: "Pho bo", imageUrl: null, totalMinutes: null, servings: null }] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  expect((await screen.findByLabelText("Search your recipes") as HTMLInputElement).value).toBe("Pho");
+  await user.click(await screen.findByRole("button", { name: "Pho bo" }));
+  await waitFor(() => expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: "r1" })));
+  expect(calls.some((c) => c.u.startsWith("/recipes?") && c.u.includes("q=Pho"))).toBe(true);
+});
+
+it("Link: no match shows a New recipe action that carries the name and the Snap", async () => {
+  const { router } = setupLink({ recipes: [] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  expect(await screen.findByText('No recipe called "Pho"')).toBeTruthy();
+  await user.click(screen.getByRole("link", { name: "New recipe" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/recipes/new"));
+  expect(router.state.location.search).toBe("?name=Pho&linkSnap=s1");
+  expect(((await screen.findByLabelText(/^Name/)) as HTMLInputElement).value).toBe("Pho");
+});
+
+it("Link: saving a recipe started from a Snap links it and returns to the Snap", async () => {
+  const { calls, router } = setupLink({ recipes: [] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("link", { name: "New recipe" }));
+  await user.click((await screen.findAllByRole("button", { name: "Save recipe" }))[0]!);
+  await waitFor(() => expect(router.state.location.pathname).toBe("/snaps/s1"));
+  expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: "r9" }));
+});
+
+it("Link: a 404 on link closes the picker with a message", async () => {
+  setupLink({ recipes: [{ id: "r1", slug: "pho", name: "Pho bo", imageUrl: null, totalMinutes: null, servings: null }], patch: [404, { error: "not_found" }] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Find a recipe" }));
+  await user.click(await screen.findByRole("button", { name: "Pho bo" }));
+  expect(await screen.findByText("That recipe is no longer there")).toBeTruthy();
+});
+
+it("Link: the author can unlink, and the Snap offers Find a recipe again", async () => {
+  const withRecipe = mine({ recipe: { slug: "pho", name: "Pho bo" } });
+  const { calls } = setupLink({ snap: withRecipe, patch: [200, mine()] });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Unlink recipe" }));
+  await waitFor(() => expect(calls.find((c) => c.m === "PATCH")?.body).toBe(JSON.stringify({ recipeId: null })));
+  expect(await screen.findByText("Recipe unlinked")).toBeTruthy();
+});

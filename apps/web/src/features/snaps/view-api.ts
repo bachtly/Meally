@@ -46,3 +46,15 @@ export function toPublicRecipe(r: Recipe, scaling: boolean): PublicRecipe {
     scaling,
   };
 }
+
+/** Author-only: link a recipe to the Snap (or `null` to unlink). */
+export function useLinkRecipe(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recipeId: string | null) =>
+      api<Snap>(`/snaps/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ recipeId }) }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["snaps"] });
+    },
+  });
+}

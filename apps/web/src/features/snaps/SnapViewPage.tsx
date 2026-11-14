@@ -1,11 +1,13 @@
 import { ChevronLeft } from "lucide-react";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiRequestError } from "../../lib/api";
-import { Button, Card, EmptyState, Skeleton } from "../../ui";
+import { Button, Card, EmptyState, Skeleton, useToast } from "../../ui";
 import { useSession } from "../auth/useSession";
 import { DeadLink } from "../share/PublicRecipeView";
 import { SnapCard } from "./FeedPage";
-import { useSnap } from "./view-api";
+import { RecipePicker } from "./RecipePicker";
+import { useLinkRecipe, useSnap } from "./view-api";
 
 const linkButton = "inline-flex min-h-11 items-center justify-center rounded-md px-4 font-medium";
 
@@ -23,6 +25,10 @@ export function SnapViewPage() {
   const { id = "" } = useParams();
   const { user } = useSession();
   const q = useSnap(id);
+  const link = useLinkRecipe(id);
+  const toast = useToast();
+  const [picking, setPicking] = useState(false);
+  const mine = q.data?.author.id === user?.id;
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <BackToFeed />
@@ -44,7 +50,47 @@ export function SnapViewPage() {
               Linked recipe: {q.data.recipe.name}
             </Link>
           )}
-          {q.data.author.id === user?.id && (
+          {mine && (
+            <Button variant="secondary" onClick={() => setPicking(true)}>
+              {q.data.recipe ? "Change recipe" : "Find a recipe"}
+            </Button>
+          )}
+          {mine && q.data.recipe && (
+            <Button
+              variant="secondary"
+              disabled={link.isPending}
+              onClick={() =>
+                link.mutate(null, {
+                  onSuccess: () => toast("Recipe unlinked", "success"),
+                  onError: () => toast("Could not unlink the recipe", "danger"),
+                })
+              }
+            >
+              Unlink recipe
+            </Button>
+          )}
+          {mine && (
+            <RecipePicker
+              open={picking}
+              onOpenChange={setPicking}
+              snapId={q.data.id}
+              initialQuery={q.data.dishName ?? ""}
+              busy={link.isPending}
+              onPick={(r) =>
+                link.mutate(r.id, {
+                  onSuccess: () => {
+                    setPicking(false);
+                    toast("Recipe linked", "success");
+                  },
+                  onError: (e) => {
+                    setPicking(false);
+                    toast(e instanceof ApiRequestError && e.status === 404 ? "That recipe is no longer there" : "Could not link the recipe", "danger");
+                  },
+                })
+              }
+            />
+          )}
+          {mine && (
             <Card className="flex flex-col gap-2 p-4">
               <h2 className="text-sm font-medium">Reactions</h2>
               {!q.data.reactions || q.data.reactions.length === 0 ? (

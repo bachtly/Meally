@@ -1,12 +1,13 @@
 import { ImagePlus } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { nutritionFields } from "@meally/shared";
-import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { useHoldUpdates } from "../../pwa/updates";
 import type { Recipe } from "@meally/shared";
 import { ApiRequestError } from "../../lib/api";
 import { Button, Dialog, EmptyState, Field, Input, Skeleton, Textarea, useToast } from "../../ui";
 import { useRecipe, useSaveRecipe } from "./api";
+import { useLinkRecipe } from "../snaps/view-api";
 import { buildInput, initialForm, shownTotal, snapshot, type Errors, type FormState } from "./editorModel";
 import { RowsEditor } from "./RowsEditor";
 import { useFeature } from "../features/FeaturesProvider";
@@ -77,8 +78,9 @@ function PhotoPicker({ current, file, onFile }: { current: string | null; file: 
 }
 
 /** `initial` pre-fills a new (unsaved) recipe, for example from an import preview. */
-export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: Recipe }) {
+export function RecipeEditor({ recipe, initial, linkSnapId, presetName }: { recipe?: Recipe; initial?: Recipe; linkSnapId?: string; presetName?: string }) {
   const navigate = useNavigate();
+  const link = useLinkRecipe(linkSnapId ?? "");
   const toast = useToast();
   const save = useSaveRecipe(recipe?.slug);
   const organizersOn = useFeature("organizers");
@@ -86,7 +88,7 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
   const tagOpts = useOrganizers("tags", organizersOn).data ?? [];
   const catOpts = useOrganizers("categories", organizersOn).data ?? [];
   const toolOpts = useOrganizers("tools", organizersOn).data ?? [];
-  const [form, setForm] = useState<FormState>(() => initialForm(recipe ?? initial));
+  const [form, setForm] = useState<FormState>(() => ({ ...initialForm(recipe ?? initial), ...(presetName ? { name: presetName } : {}) }));
   const [photo, setPhoto] = useState<File | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const baseline = useRef(snapshot(form, false));
@@ -123,7 +125,12 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
         onSuccess: ({ recipe: saved, imageError }) => {
           allowLeave.current = true;
           toast(imageError ? `Saved, but the photo could not be uploaded. ${imageError}` : "Recipe saved", imageError ? "danger" : "success");
-          navigate(`/recipes/${saved.slug}`);
+          if (!linkSnapId) return navigate(`/recipes/${saved.slug}`);
+          /** Started from a Snap: link the new recipe, then go back to the Snap either way. */
+          link.mutate(saved.id, {
+            onError: () => toast("Recipe saved, but it could not be linked to the Snap", "danger"),
+            onSettled: () => navigate(`/snaps/${encodeURIComponent(linkSnapId)}`),
+          });
         },
         onError: (e) => {
           const msg = e instanceof ApiRequestError ? e.message : "Could not save the recipe";
@@ -289,7 +296,13 @@ export function RecipeEditor({ recipe, initial }: { recipe?: Recipe; initial?: R
   );
 }
 
-export const RecipeNewPage = () => <RecipeEditor />;
+/** `?name=` pre-fills the name and `?linkSnap=<id>` links the saved recipe to that Snap (from the RecipePicker). */
+export function RecipeNewPage() {
+  const [params] = useSearchParams();
+  const name = params.get("name")?.slice(0, 200);
+  const linkSnapId = params.get("linkSnap") ?? undefined;
+  return <RecipeEditor linkSnapId={linkSnapId} presetName={name} />;
+}
 
 export function RecipeEditPage() {
   const { slug = "" } = useParams();
