@@ -4,6 +4,7 @@ export * from "./Display";
 export * from "./Overlays";
 export * from "./Toast";
 export * from "./ThemeToggle";
+export * from "./statusBar";
 export { cn } from "./cn";
 export * from "./Switch";
 export * from "./Brand";
