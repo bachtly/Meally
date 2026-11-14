@@ -69,6 +69,7 @@ recipe and every other page keep the normal app shell.
 | U6 | Gestures always have a button: swipe up from the camera has the Feed button; swiping between Snaps has Newer and Older buttons and the Up and Down keys; the grid's pinch is Months and All. | Gestures only. | CLAUDE.md UI rules (accessibility). |
 | U7 | The camera, Feed and viewer are dark in both themes, using `--cam-*` tokens in `theme.css`. | Follow the light theme. | [S8] Photos and Locket both put photos on black. |
 | U8 | Link a recipe lists each recipe as a row: a 48 px photo thumbnail (a warm-tinted initial when there is none), the name, and a muted "1 h 30 min · Serves 4" line. The photo is decorative; the name is the button's accessible name and the meta line is its description. | Name-only rows (the first build), which made recipes with similar names hard to tell apart. | [S10] [S11] |
+| U12 | Composer inputs (caption, Dish, Place) use 16 px text. Under 16 px, iOS Safari zooms in on focus and leaves the page wider than the screen (#99). e2e flow 9 checks it at 360 px. | 15 px text; `maximum-scale=1` in the viewport meta, which blocks pinch zoom. | [S17] |
 
 States: the camera has starting, live, off (pick from your photos) and an unsent-draft banner. The composer has
 sending, a kept draft with Retry, and an inline error for 400, 413 and 415. The Feed has loading tiles, empty (Take a
@@ -129,3 +130,4 @@ is the trade-off between asking less and privacy and battery: the browser's came
 - [S14] Ben Frain, "iOS 26 Safari theme-color tab tinting with fixed position elements", https://benfrain.com/ios26-safari-theme-color-tab-tinting-with-fixed-position-elements/
 - [S15] WebKit bug 215884, "getUserMedia recurring permissions prompts in standalone", https://bugs.webkit.org/show_bug.cgi?id=215884
 - [S16] MDN, "Permissions: query() method", https://developer.mozilla.org/docs/Web/API/Permissions/query
+- [S17] CSS-Tricks, "16px or larger text prevents iOS form zoom", https://css-tricks.com/16px-or-larger-text-prevents-ios-form-zoom/

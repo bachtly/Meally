@@ -217,3 +217,22 @@ test("8. the library toolbar fits a 360px phone", async ({ page, recipe }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBe(0);
 });
+
+test("9. the Snap composer with Eaten out fits a 360px phone", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Snap", exact: true })).toBeAttached();
+  // A 1x1 PNG, picked from the photo library button (there is no camera in the test browser).
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+  await page.getByLabel("Choose photo").setInputFiles({ name: "dish.png", mimeType: "image/png", buffer: png });
+  await page.getByRole("button", { name: "Eaten out" }).click();
+  await page.getByLabel("Dish").fill("Pho bo with extra herbs and a long name");
+  await page.getByLabel("Place").fill("A cafe with a very long name on a side street");
+  await page.getByLabel("Caption").fill("Sunday lunch with everyone at the corner table");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBe(0);
+  // iOS Safari zooms in on focus, and leaves the page wider than the screen, for inputs under 16px.
+  const sizes = await page.locator("form input").evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)));
+  expect(sizes).toHaveLength(3);
+  for (const s of sizes) expect(s).toBeGreaterThanOrEqual(16);
+});
