@@ -88,6 +88,29 @@ the system setting. `theme.css` paints `<html>` with `--cam-bg` under `data-chro
 | U10 | Also paint `<html>` dark on the Snap screens. | Rely on `theme-color` alone. | [S14] Safari 26 tabs ignore `theme-color` and sample the page background. |
 | U11 | Keep iOS's default status-bar style (no `apple-mobile-web-app-status-bar-style`). | `black-translucent` everywhere, with safe-area padding. | [S12] The meta is deprecated apart from `black-translucent`, which always uses white icons, so they would vanish on the cream light pages. |
 
+### Camera permission
+
+Owner report (#100): the camera asked for permission each time. The first build stopped the stream and called
+`getUserMedia` again every time the camera came back (after a sheet, after the shot, after the Feed, after the page
+was hidden). Chrome on Android remembers a grant, so this only showed up elsewhere. iOS home-screen apps forget the
+grant when the route changes or the stream is restarted, and they don't keep it between sessions [S15]. No web API can
+make iOS remember it, so we call `getUserMedia` as rarely as we can. One stream is shared by the Snap screens
+(`features/snaps/camera.ts`):
+
+| When | What happens to the stream |
+|---|---|
+| The camera screen shows | Reuse the live stream; call `getUserMedia` only if there is none or its track has ended. Never before this screen shows. |
+| Menu or friends sheet over the camera | Keeps running. |
+| After the shot, or on the Feed or viewer | Kept for 60 s (`KEEP_MS`), then stopped. |
+| The page is hidden (app switched, screen locked) | Kept for 15 s (`HIDDEN_MS`), then stopped. iOS may also mute it on its own. |
+| You leave the Snap screens (`SnapShell` unmounts) | Stopped at once. |
+| Flip camera | The old stream stops and the other lens is requested. |
+
+Where the browser supports `navigator.permissions.query({ name: "camera" })` (Chrome; Safari 16 and later [S16]), a
+`denied` answer shows "Camera is off" without calling `getUserMedia`, and a later change to granted starts the camera.
+When the query throws, or the browser has none, we call `getUserMedia` as before. Giving up a kept stream after a delay
+is the trade-off between asking less and privacy and battery: the browser's camera indicator stays on for that long.
+
 ## Sources
 
 - [S1] Stripe, "Idempotent requests", https://docs.stripe.com/api/idempotent_requests
@@ -104,3 +127,5 @@ the system setting. `theme.css` paints `<html>` with `--cam-bg` under `data-chro
 - [S12] Maximiliano Firtman, "iOS PWA compatibility", https://firt.dev/notes/pwa-ios/
 - [S13] Progressier, "Complete guide to customizing the mobile status bar", https://intercom.help/progressier/en/articles/10574799-complete-guide-to-customizing-the-mobile-status-bar-in-a-website-or-pwa
 - [S14] Ben Frain, "iOS 26 Safari theme-color tab tinting with fixed position elements", https://benfrain.com/ios26-safari-theme-color-tab-tinting-with-fixed-position-elements/
+- [S15] WebKit bug 215884, "getUserMedia recurring permissions prompts in standalone", https://bugs.webkit.org/show_bug.cgi?id=215884
+- [S16] MDN, "Permissions: query() method", https://developer.mozilla.org/docs/Web/API/Permissions/query

@@ -1,11 +1,12 @@
 import { CameraOff, Images, RefreshCcw } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { cn } from "../../ui";
+import { cameraPermission, HIDDEN_MS, KEEP_MS, openCamera, releaseCamera, type Facing } from "./camera";
 import { camButton, camButtonSquare, PhotoFrame, ThreeUp } from "./parts";
 
 type Status = "starting" | "live" | "off";
 
-/** True while the page is visible; the camera is released when the tab or app goes to the background. */
+/** True while the page is visible; the camera is let go when the tab or app goes to the background. */
 function usePageVisible() {
   const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState !== "hidden");
   useEffect(() => {
@@ -20,49 +21,64 @@ const fileLabel = "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-vis
 
 /**
  * Square live camera with the shutter row under it: photo picker, shutter, flip, in three equal columns so the
- * shutter is always centred. The stream runs only while `active` and the page is visible, and is stopped on
- * shutter, on unmount (route leave) and when the page is hidden.
+ * shutter is always centred. The stream is shared (`camera.ts`) so coming back to the camera reuses it instead of
+ * asking the browser again: it keeps running under the menu and friends sheets, is kept for a while after the shot
+ * or a trip to the Feed, and for a shorter while when the page is hidden. `SnapShell` stops it when you leave the
+ * Snap screens.
  */
-export function CameraCapture({ active, onPick }: { active: boolean; onPick: (file: File) => void }) {
+export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<Status>("starting");
-  const [facing, setFacing] = useState<"environment" | "user">("environment");
+  const [facing, setFacing] = useState<Facing>("environment");
+  /** undefined until asked; "unknown" where the browser can't tell (then we just call getUserMedia). */
+  const [permission, setPermission] = useState<PermissionState | "unknown">();
   const visible = usePageVisible();
-  const stream = useRef<MediaStream | null>(null);
-  const run = active && visible;
+  const known = permission !== undefined;
+  const denied = permission === "denied";
 
-  const stop = () => {
-    stream.current?.getTracks().forEach((t) => t.stop());
-    stream.current = null;
-    if (video.current) video.current.srcObject = null;
-  };
+  // Where the browser tells us, a denied camera shows "Camera is off" without a call, and a later grant starts it.
+  useEffect(() => {
+    let live = true;
+    let perm: PermissionStatus | null = null;
+    const on = () => perm && setPermission(perm.state);
+    void cameraPermission().then((p) => {
+      if (!live) return;
+      if (!p) return setPermission("unknown");
+      perm = p;
+      on();
+      p.addEventListener?.("change", on);
+    });
+    return () => {
+      live = false;
+      perm?.removeEventListener?.("change", on);
+    };
+  }, []);
 
   useEffect(() => {
-    if (!run) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!visible || !known) return;
+    if (!navigator.mediaDevices?.getUserMedia || denied) {
       setStatus("off");
       return;
     }
     let cancelled = false;
+    const v = video.current;
     setStatus("starting");
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: facing, aspectRatio: 1 }, audio: false })
+    openCamera(facing)
       .then((s) => {
-        // The page moved on while the browser asked for permission: release it at once.
-        if (cancelled) return s.getTracks().forEach((t) => t.stop());
-        stream.current = s;
-        if (video.current) {
-          video.current.srcObject = s;
-          void Promise.resolve(video.current.play?.()).catch(() => undefined);
+        if (cancelled) return;
+        if (v) {
+          v.srcObject = s;
+          void Promise.resolve(v.play?.()).catch(() => undefined);
         }
         setStatus("live");
       })
       .catch(() => !cancelled && setStatus("off"));
     return () => {
       cancelled = true;
-      stop();
+      if (v) v.srcObject = null;
+      releaseCamera(document.visibilityState === "hidden" ? HIDDEN_MS : KEEP_MS);
     };
-  }, [run, facing]);
+  }, [visible, known, facing, denied]);
 
   /** Crops the frame to the centred square the viewfinder shows, so the Snap matches what you saw. */
   function shoot() {
@@ -75,7 +91,6 @@ export function CameraCapture({ active, onPick }: { active: boolean; onPick: (fi
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, side, side);
-    stop();
     canvas.toBlob(
       (blob) => {
         if (blob) onPick(new File([blob], "snap.jpg", { type: "image/jpeg" }));
