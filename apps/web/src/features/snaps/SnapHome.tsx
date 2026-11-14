@@ -153,8 +153,9 @@ export function SnapHome({ store = draftStore }: { store?: DraftStore }) {
   );
 }
 
+/** 16 px text: iOS Safari zooms the page in on focus for smaller inputs and leaves it wider than the screen. */
 const darkInput =
-  "min-h-11 w-full rounded-xl border-0 bg-cam-chip px-3 text-[15px] text-cam-ink placeholder:text-cam-muted focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]";
+  "min-h-11 w-full rounded-xl border-0 bg-cam-chip px-3 text-base text-cam-ink placeholder:text-cam-muted focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]";
 
 function Composer({ draft, store, onDone, onDiscard }: { draft: Draft; store: DraftStore; onDone: () => void; onDiscard: () => void }) {
   const navigate = useNavigate();
@@ -233,11 +234,11 @@ function Composer({ draft, store, onDone, onDiscard }: { draft: Draft; store: Dr
       </div>
       {eatenOut && (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-cam-muted">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-cam-muted">
             Dish
             <input className={darkInput} maxLength={SNAP_DISH_NAME_MAX} value={dishName} onChange={(e) => setDishName(e.target.value)} />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-cam-muted">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-cam-muted">
             Place
             <input className={darkInput} maxLength={SNAP_PLACE_MAX} value={place} onChange={(e) => setPlace(e.target.value)} />
           </label>

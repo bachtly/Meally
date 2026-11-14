@@ -52,9 +52,9 @@ export function PhotoFrame({ children, className }: { children: ReactNode; class
   return <div className={cn("relative aspect-square w-full overflow-hidden rounded-[2.75rem] bg-cam-chip", className)}>{children}</div>;
 }
 
-/** Caption over the bottom of the photo, as Locket draws it. */
+/** Caption over the bottom of the photo, as Locket draws it. 16 px, because the composer uses it on an input (see darkInput). */
 export const captionPill =
-  "absolute bottom-4 left-1/2 max-w-[85%] -translate-x-1/2 truncate rounded-full bg-cam-scrim px-4 py-2.5 text-center text-[15px] font-semibold text-cam-ink";
+  "absolute bottom-4 left-1/2 max-w-[85%] -translate-x-1/2 truncate rounded-full bg-cam-scrim px-4 py-2.5 text-center text-base font-semibold text-cam-ink";
 
 /**
  * Full-screen dark layout for the camera, the Feed and the Snap viewer: no app header or tab bar.
