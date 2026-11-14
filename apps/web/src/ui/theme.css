@@ -21,10 +21,12 @@
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
-  /* Camera, Feed and Snap viewer: dark in both themes, so photos stand out (Locket and Photos do the same). */
-  --cam-bg: oklch(0.14 0.008 90);
-  --cam-ink: oklch(0.97 0.01 85);
-  --cam-muted: oklch(0.8 0.02 90);
+  /* Camera, Feed and Snap viewer: dark in both themes, so photos stand out (Locket and Photos do the same).
+     They use the Koi dark palette (surface, text, muted, accent below), so the Snap screens look like Meally in
+     dark mode rather than a second app (#98, direction C). */
+  --cam-bg: oklch(0.18 0.012 95);
+  --cam-ink: oklch(0.95 0.01 85);
+  --cam-muted: oklch(0.75 0.02 90);
   --cam-chip: oklch(1 0 0 / 0.12);
   --cam-chip-hover: oklch(1 0 0 / 0.2);
   --cam-accent: oklch(0.78 0.13 120);
@@ -53,7 +55,10 @@
   }
 }
 
-:root[data-theme="dark"] {
+/* Explicit dark, and everything opened from a Snap screen (menus, sheets and dialogs portal to <body>, so they
+   take the dark tokens from the root while SnapShell marks it). */
+:root[data-theme="dark"],
+:root[data-chrome="snap"] {
   color-scheme: dark;
   --surface: oklch(0.18 0.012 95);
   --surface-raised: oklch(0.23 0.016 95);

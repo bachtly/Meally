@@ -6,23 +6,27 @@ import { syncStatusBar } from "./statusBar";
 export type ThemeChoice = "light" | "dark" | "system";
 const KEY = "meally-theme";
 
+/** Dark is the default (#98); "system" is a choice people make in Settings, so it is stored like the others. */
+export const DEFAULT_THEME: ThemeChoice = "dark";
+
 export function readTheme(): ThemeChoice {
   try {
     const v = localStorage.getItem(KEY);
-    if (v === "light" || v === "dark") return v;
+    if (v === "light" || v === "dark" || v === "system") return v;
   } catch {
-    // storage blocked: fall back to system
+    // storage blocked: fall back to the default
   }
-  return "system";
+  return DEFAULT_THEME;
 }
 
-export function applyTheme(choice: ThemeChoice) {
+/** Shows `choice`, and remembers it unless `save` is false (startup, so the default can change later). */
+export function applyTheme(choice: ThemeChoice, save = true) {
   if (choice === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", choice);
   syncStatusBar();
+  if (!save) return;
   try {
-    if (choice === "system") localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, choice);
+    localStorage.setItem(KEY, choice);
   } catch {
     // storage blocked: the choice lasts for this page only
   }

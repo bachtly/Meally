@@ -15,7 +15,7 @@ const preview: Preview = {
     },
     a11y: { test: "todo" },
   },
-  initialGlobals: { viewport: { value: "phoneL", isRotated: false }, theme: "light" },
+  initialGlobals: { viewport: { value: "phoneL", isRotated: false }, theme: "dark" },
   globalTypes: {
     theme: {
       description: "Colour theme",

@@ -4,7 +4,7 @@ import { App } from "./app/App";
 import { applyTheme, readTheme, watchStatusBar } from "./ui";
 import "./index.css";
 
-applyTheme(readTheme());
+applyTheme(readTheme(), false);
 watchStatusBar();
 
 createRoot(document.getElementById("root")!).render(
