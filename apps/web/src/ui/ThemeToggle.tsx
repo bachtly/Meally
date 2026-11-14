@@ -1,6 +1,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { cn } from "./cn";
+import { syncStatusBar } from "./statusBar";
 
 export type ThemeChoice = "light" | "dark" | "system";
 const KEY = "meally-theme";
@@ -18,6 +19,7 @@ export function readTheme(): ThemeChoice {
 export function applyTheme(choice: ThemeChoice) {
   if (choice === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", choice);
+  syncStatusBar();
   try {
     if (choice === "system") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, choice);

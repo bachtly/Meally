@@ -75,6 +75,19 @@ sending, a kept draft with Retry, and an inline error for 400, 413 and 415. The 
 Snap, Add friends), error with Try again, a "Load earlier" error, a broken image (caption on a plain tile), and an empty
 filter. The viewer has loading, 404 (dead link), other errors with Try again, and a delete confirmation.
 
+### Status bar
+
+The status bar above the dark screens must be dark too (#96). `SnapShell` calls `useSnapChrome()`
+(`apps/web/src/ui/statusBar.ts`), which sets `<html data-chrome="snap">` and writes the camera colour into
+`<meta name="theme-color">`. On leave it puts back the page colour: the light or dark surface, from the theme toggle or
+the system setting. `theme.css` paints `<html>` with `--cam-bg` under `data-chrome="snap"`.
+
+| ID | Decision | Alternatives | Evidence |
+|---|---|---|---|
+| U9 | Drive one `theme-color` meta from JS: camera black on the Snap screens, otherwise the surface colour for the current theme. Re-sync on theme toggle and system changes. | One fixed meta (the bug); two `media` metas (they can't follow the in-app theme toggle). | [S12] Installed apps on iOS 15.4+ tint the status bar from `theme-color`. [S13] Android follows runtime changes to the meta. |
+| U10 | Also paint `<html>` dark on the Snap screens. | Rely on `theme-color` alone. | [S14] Safari 26 tabs ignore `theme-color` and sample the page background. |
+| U11 | Keep iOS's default status-bar style (no `apple-mobile-web-app-status-bar-style`). | `black-translucent` everywhere, with safe-area padding. | [S12] The meta is deprecated apart from `black-translucent`, which always uses white icons, so they would vanish on the cream light pages. |
+
 ## Sources
 
 - [S1] Stripe, "Idempotent requests", https://docs.stripe.com/api/idempotent_requests
@@ -88,3 +101,6 @@ filter. The viewer has loading, 404 (dead link), other errors with Try again, an
 - [S9] MacStories, "iOS and iPadOS 18: the MacStories review", https://www.macstories.net/stories/ios-and-ipados-18-the-macstories-review/9
 - [S10] W3C WAI, "Decorative images", https://www.w3.org/WAI/tutorials/images/decorative/
 - [S11] W3C WAI, "An alt decision tree", https://www.w3.org/WAI/tutorials/images/decision-tree/
+- [S12] Maximiliano Firtman, "iOS PWA compatibility", https://firt.dev/notes/pwa-ios/
+- [S13] Progressier, "Complete guide to customizing the mobile status bar", https://intercom.help/progressier/en/articles/10574799-complete-guide-to-customizing-the-mobile-status-bar-in-a-website-or-pwa
+- [S14] Ben Frain, "iOS 26 Safari theme-color tab tinting with fixed position elements", https://benfrain.com/ios26-safari-theme-color-tab-tinting-with-fixed-position-elements/

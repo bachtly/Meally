@@ -100,6 +100,9 @@
 }
 
 html { background: var(--surface); color: var(--text); font-family: var(--font-sans); }
+/* Camera, Feed and Snap viewer (SnapShell sets data-chrome): dark page behind the status bar and on overscroll.
+   Safari 26 tabs tint their bars from this background; installed apps use theme-color (src/ui/statusBar.ts). */
+:root[data-chrome="snap"] { background: var(--cam-bg); color-scheme: dark; }
 body { margin: 0; min-height: 100dvh; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
