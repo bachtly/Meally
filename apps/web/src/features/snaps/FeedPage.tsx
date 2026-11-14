@@ -24,7 +24,8 @@ function Tile({ snap }: { snap: Snap }) {
       {broken ? (
         <span className="grid size-full place-items-center p-2 text-center text-xs text-cam-muted">{text || "Photo unavailable"}</span>
       ) : (
-        <img src={snap.thumbUrl} alt="" loading="lazy" onError={() => setBroken(true)} className="size-full object-cover" />
+        // Eager: a page is 10 Snaps, already warmed from the camera screen and served from the device cache.
+        <img src={snap.thumbUrl} alt="" onError={() => setBroken(true)} className="size-full object-cover" />
       )}
       {snap.recipe && <BookOpen className="absolute bottom-1.5 left-1.5 size-4 text-cam-ink drop-shadow-[0_1px_2px_rgb(0_0_0/0.7)]" aria-hidden />}
     </Link>
@@ -87,6 +88,8 @@ export function FeedPage() {
   const authors = useMemo(() => [...new Map(all.map((s) => [s.author.id, s.author.id === user?.id ? "You" : s.author.name])).entries()], [all, user?.id]);
   const shown = who ? all.filter((s) => s.author.id === who) : all;
   const whoName = who ? authors.find(([id]) => id === who)?.[1] : undefined;
+  // Local-first: a failed background refresh keeps the cached Snaps on screen; the error state is for nothing to show.
+  const failed = q.isError && all.length === 0;
 
   const tab = (v: View, label: string) => (
     <button
@@ -109,7 +112,7 @@ export function FeedPage() {
         ))}
       </div>
     );
-  } else if (q.isError) {
+  } else if (failed) {
     body = (
       <div className="m-auto flex flex-col items-center gap-3 px-8 text-center">
         <h2 className="text-xl font-bold">Couldn't load the Feed</h2>
@@ -175,7 +178,7 @@ export function FeedPage() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-cam">
-      {view === "months" || all.length === 0 || q.isPending || q.isError ? <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{body}</div> : body}
+      {view === "months" || all.length === 0 || q.isPending || failed ? <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{body}</div> : body}
 
       <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-cam to-transparent" />
       <div className="absolute inset-x-4 top-4 flex items-start justify-between gap-3">

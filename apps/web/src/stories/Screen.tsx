@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import type { Snap } from "@meally/shared";
 import { appRoutes } from "../app/App";
+import { FEED_STORE_KEY } from "../features/snaps/api";
 import { FeaturesProvider } from "../features/features/FeaturesProvider";
 import { stopCamera } from "../features/snaps/camera";
 import { PwaProvider } from "../pwa/Pwa";
@@ -52,11 +54,14 @@ export const clearDrafts = () =>
 
 /**
  * One real app screen: the app's own routes and providers, at `path`, with the API answered by `routes`
- * (merged over `baseRoutes`). A fresh query cache per story keeps stories independent.
+ * (merged over `baseRoutes`). A fresh query cache per story keeps stories independent. The Feed page the app
+ * keeps on the device is reset too, or set to `storedFeed` (what a returning device would show at once).
  */
-export function Screen({ path, routes = {} }: { path: string; routes?: Routes }) {
+export function Screen({ path, routes = {}, storedFeed }: { path: string; routes?: Routes; storedFeed?: Snap[] }) {
   const [state] = useState(() => {
     installMockApi({ ...baseRoutes, ...routes });
+    if (storedFeed) localStorage.setItem(FEED_STORE_KEY, JSON.stringify({ userId: "u1", page: { items: storedFeed, nextCursor: null } }));
+    else localStorage.removeItem(FEED_STORE_KEY);
     return {
       qc: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } }),
       router: createMemoryRouter(appRoutes, { initialEntries: [path] }),

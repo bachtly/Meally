@@ -35,7 +35,12 @@ function FriendsPill({ onClick }: { onClick: () => void }) {
 /** The newest three Snaps as a small stack, so the way to the Feed shows there is something there. */
 function FeedHandle() {
   const feed = useFeed();
-  const thumbs = (feed.data?.pages[0]?.items ?? []).slice(0, 3);
+  const first = feed.data?.pages[0]?.items;
+  const thumbs = (first ?? []).slice(0, 3);
+  // Prefetch: warm the first page's thumbnails so the Feed grid paints from the cache when it opens.
+  useEffect(() => {
+    for (const s of first ?? []) new Image().src = s.thumbUrl;
+  }, [first]);
   return (
     <Link to="/feed" className="mx-auto flex min-h-14 flex-col items-center gap-1 px-4 font-semibold">
       <span className="flex items-center gap-2">

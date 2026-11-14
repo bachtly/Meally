@@ -1,4 +1,4 @@
-import { OFFLINE_CACHES } from "../../pwa/runtimeCaching";
+import { OFFLINE_CACHES, OFFLINE_STORAGE_KEYS } from "../../pwa/runtimeCaching";
 
 export interface SwDeps {
   sw: ServiceWorkerContainer | undefined;
@@ -40,8 +40,15 @@ export async function syncServiceWorker(enabled: boolean, { sw, onUpdate, doc = 
   });
 }
 
-/** Removes cached recipe data (call on sign-out so a shared device keeps nothing). */
+/** Removes cached recipes and Snaps (call on sign-out so a shared device keeps nothing). */
 export async function clearOfflineCaches(): Promise<void> {
+  for (const k of OFFLINE_STORAGE_KEYS) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      // storage blocked: nothing was stored
+    }
+  }
   if (typeof caches === "undefined") return;
   await Promise.all(OFFLINE_CACHES.map((n) => caches.delete(n).catch(() => false)));
 }

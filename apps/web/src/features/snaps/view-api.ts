@@ -1,10 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PublicRecipe, ReactionKey, Recipe, Snap } from "@meally/shared";
+import { useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import type { PublicRecipe, ReactionKey, Recipe, Snap, SnapListResponse } from "@meally/shared";
 import { api, ApiRequestError, postJson } from "../../lib/api";
-import { feedKey } from "./api";
+import { feedKey, snapFromFeed } from "./api";
 
-export const useSnap = (id: string) =>
-  useQuery({ queryKey: ["snaps", "one", id], queryFn: () => api<Snap>(`/snaps/${encodeURIComponent(id)}`), retry: false });
+/**
+ * One Snap. Opened from the grid it renders at once from the Feed cache (as old as the Feed), then revalidates.
+ */
+export function useSnap(id: string) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ["snaps", "one", id],
+    queryFn: () => api<Snap>(`/snaps/${encodeURIComponent(id)}`),
+    retry: false,
+    initialData: () => snapFromFeed(qc.getQueryData<InfiniteData<SnapListResponse>>(feedKey), id),
+    initialDataUpdatedAt: () => qc.getQueryState(feedKey)?.dataUpdatedAt,
+  });
+}
 
 /** The Linked recipe as the server sends it: a full recipe plus the viewer's own copy, if there is one. */
 export type LinkedRecipe = Recipe & { savedSlug: string | null };

@@ -20,6 +20,7 @@ photos of the finished dish. This is our own design.
 | D7 | The Linked recipe is read through `GET /snaps/:id/recipe`, with its image under `/snaps/:id/images/:imageId/:size` (the Snap's image or the recipe's current image). A recipe is only returned when it belongs to the Snap's author. | Reusing `/recipes/:slug` for Friends (it is owner-only, ADR 0002). | ADR 0002. |
 | D8 | Save to my recipes copies the recipe like a share link does (shared `copyRecipe`), and dedupes by `origin_recipe_id`: `201` for a new copy, `200` with the existing slug. The author gets `409 own_recipe`. | A new copy on every tap. | [S5] says copying a shared recipe should give an independent copy the saver can edit. |
 | D6 | Devices that cannot run sharp (edge) send `w320`, `w800`, `w1600` parts, resized in the browser. The existing `readImageUpload` already handles this. | Resizing on the edge (sharp does not run there). | Existing `ImageStore.acceptsPresized`. |
+| D9 | The Feed is local-first. The last first page is kept in localStorage, keyed to the user, and used as `initialData` with `initialDataUpdatedAt: 0`: it shows at once and revalidates. A Snap opened from the grid takes the Feed's copy as its initial data, with the thumbnail behind the full photo. The service worker keeps the Feed and a Snap NetworkFirst (3 s timeout) and photos CacheFirst. All of it is wiped on sign-out (`OFFLINE_CACHES`, `OFFLINE_STORAGE_KEYS`). A failed refresh keeps cached Snaps on screen. | Network-only (a skeleton on every cold open, #101); stale-while-revalidate for a Snap (a stale copy would undo a Reaction just made); persisting the whole query cache (more to clear on a shared device). | [S18] for `initialData` and `initialDataUpdatedAt`; [S19] for CacheFirst on immutable URLs and NetworkFirst for data that changes. |
 
 ## Data and API
 
@@ -131,3 +132,5 @@ is the trade-off between asking less and privacy and battery: the browser's came
 - [S15] WebKit bug 215884, "getUserMedia recurring permissions prompts in standalone", https://bugs.webkit.org/show_bug.cgi?id=215884
 - [S16] MDN, "Permissions: query() method", https://developer.mozilla.org/docs/Web/API/Permissions/query
 - [S17] CSS-Tricks, "16px or larger text prevents iOS form zoom", https://css-tricks.com/16px-or-larger-text-prevents-ios-form-zoom/
+- [S18] TanStack Query, "Initial query data", https://tanstack.com/query/latest/docs/framework/react/guides/initial-query-data
+- [S19] Chrome for Developers, "Workbox caching strategies", https://developer.chrome.com/docs/workbox/caching-strategies-overview

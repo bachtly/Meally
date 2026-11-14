@@ -161,7 +161,8 @@ export function SnapViewPage() {
       </div>
     );
   }
-  if (q.isError) {
+  // A failed background refresh keeps the Snap from the Feed cache on screen; only a 404 (gone) or nothing cached is a dead end.
+  if (q.isError && (!snap || (q.error instanceof ApiRequestError && q.error.status === 404))) {
     return (
       <div className="flex flex-1 flex-col justify-center gap-4 px-4">
         <div className="rounded-lg bg-raised p-4 text-ink">
@@ -232,7 +233,14 @@ export function SnapViewPage() {
       <div className="flex-1" />
       <article aria-label={alt} onPointerDown={onPointerDown} onPointerUp={onPointerUp} className="touch-pan-x">
         <PhotoFrame>
-          <img src={snap.imageUrl} alt={alt} className="size-full object-cover" draggable={false} />
+          {/* The grid's thumbnail is already on the device: it fills the frame until the full photo arrives. */}
+          <img
+            src={snap.imageUrl}
+            alt={alt}
+            className="size-full bg-cover bg-center object-cover"
+            style={{ backgroundImage: `url("${snap.thumbUrl}")` }}
+            draggable={false}
+          />
           {snap.caption && <p className={captionPill}>{snap.caption}</p>}
         </PhotoFrame>
       </article>
