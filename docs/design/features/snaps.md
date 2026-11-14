@@ -68,6 +68,7 @@ recipe and every other page keep the normal app shell.
 | U5 | Tapping a photo opens it at camera size with the caption over it, a recipe chip, and one bar of six Reactions. Rare actions (Link or change recipe, Unlink, Save photo, Delete) live in a More menu. The author sees "Ana and Minh reacted" instead of the bar. | All actions as buttons under the photo. | [S6] |
 | U6 | Gestures always have a button: swipe up from the camera has the Feed button; swiping between Snaps has Newer and Older buttons and the Up and Down keys; the grid's pinch is Months and All. | Gestures only. | CLAUDE.md UI rules (accessibility). |
 | U7 | The camera, Feed and viewer are dark in both themes, using `--cam-*` tokens in `theme.css`. | Follow the light theme. | [S8] Photos and Locket both put photos on black. |
+| U8 | Link a recipe lists each recipe as a row: a 48 px photo thumbnail (a warm-tinted initial when there is none), the name, and a muted "1 h 30 min · Serves 4" line. The photo is decorative; the name is the button's accessible name and the meta line is its description. | Name-only rows (the first build), which made recipes with similar names hard to tell apart. | [S10] [S11] |
 
 States: the camera has starting, live, off (pick from your photos) and an unsent-draft banner. The composer has
 sending, a kept draft with Retry, and an inline error for 400, 413 and 415. The Feed has loading tiles, empty (Take a
@@ -85,3 +86,5 @@ filter. The viewer has loading, 404 (dead link), other errors with Try again, an
 - [S7] Locket Widget on the App Store, https://apps.apple.com/us/app/1600525061
 - [S8] MacRumors, "iOS 18 Photos app: all the new features", https://macrumors.com/guide/ios-18-photos
 - [S9] MacStories, "iOS and iPadOS 18: the MacStories review", https://www.macstories.net/stories/ios-and-ipados-18-the-macstories-review/9
+- [S10] W3C WAI, "Decorative images", https://www.w3.org/WAI/tutorials/images/decorative/
+- [S11] W3C WAI, "An alt decision tree", https://www.w3.org/WAI/tutorials/images/decision-tree/
