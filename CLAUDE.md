@@ -50,3 +50,14 @@ Read `docs/design/03-architecture.md` before writing code.
 
 Write the PR body in sections: Summary, What changes, Design note link, How to verify (the commands you ran and
 their results), and anything you deferred.
+
+## Check command
+
+```sh
+npm run lint && npm run typecheck && npm test && npm run build && npm run build:edge -w apps/server
+```
+
+## Agent runs
+
+- Ignore "PRs are stacked": the agent workflow always branches from `main` and opens the PR itself.
+- Don't edit `.github/workflows/`. E2E (Playwright), Windows and real-Postgres tests run only in CI.
