@@ -100,9 +100,22 @@ function stubCamera() {
   const stop = vi.fn();
   const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
   const getUserMedia = vi.fn(async () => stream);
-  vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { mediaDevices: { getUserMedia } }));
+  const query = vi.fn(async () => ({ state: "granted", addEventListener: () => undefined, removeEventListener: () => undefined }));
+  vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { mediaDevices: { getUserMedia }, permissions: { query } }));
   return { stop, getUserMedia };
 }
+
+it("does not ask for the camera on launch until the user turns it on", async () => {
+  mockApi();
+  const stop = vi.fn();
+  const getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop, readyState: "live" }] }) as unknown as MediaStream);
+  const query = vi.fn(async () => ({ state: "prompt", addEventListener: () => undefined, removeEventListener: () => undefined }));
+  vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { mediaDevices: { getUserMedia }, permissions: { query } }));
+  renderHome();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Turn on camera" }));
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
+});
 
 it("sends a photo in two taps after the shot and goes to the Feed", async () => {
   const posts = mockApi();
@@ -183,6 +196,7 @@ it("falls back to Choose photo when the camera is denied", async () => {
   mockApi();
   vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { mediaDevices: { getUserMedia: vi.fn(async () => Promise.reject(new Error("denied"))) } }));
   renderHome();
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Turn on camera" }));
   expect(await screen.findByText("Camera is off")).toBeTruthy();
   expect(screen.getByLabelText("Choose photo")).toBeTruthy();
 });
