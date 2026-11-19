@@ -151,7 +151,16 @@ export function SnapHome({ store = draftStore }: { store?: DraftStore }) {
       <div className="flex-1" />
       <CameraCapture onPick={(f) => void pick(f)} />
       <div className="flex-1" />
-      <FeedHandle />
+      <ThreeUp
+        className="px-3"
+        left={
+          <Link to="/recipes" aria-label="Recipes" className={cn(camChip, "min-h-12")}>
+            <BookOpen className="size-4" aria-hidden />
+            Recipes
+          </Link>
+        }
+        center={<FeedHandle />}
+      />
       <MenuSheet open={menu} onOpenChange={setMenu} />
       {friendsOn && <FriendsSheet open={friendsOpen} onOpenChange={setFriendsOpen} />}
     </div>
