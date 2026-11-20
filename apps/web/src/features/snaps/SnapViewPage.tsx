@@ -279,9 +279,14 @@ export function SnapViewPage() {
       <ThreeUp
         className="mt-4 px-3"
         left={
-          <Link to="/feed" aria-label="Back to the Feed" className={camButton}>
-            <LayoutGrid className="size-5" aria-hidden />
-          </Link>
+          <span className="flex gap-1">
+            <Link to="/feed" aria-label="Back to the Feed" className={camButton}>
+              <LayoutGrid className="size-5" aria-hidden />
+            </Link>
+            <Link to="/recipes" aria-label="Recipes" className={camButton}>
+              <BookOpen className="size-5" aria-hidden />
+            </Link>
+          </span>
         }
         center={
           <Link to="/" aria-label="Back to camera" className="inline-flex size-16 rounded-full border-[3px] border-cam-accent p-1">

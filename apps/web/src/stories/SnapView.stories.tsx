@@ -13,6 +13,11 @@ type Story = StoryObj<typeof meta>;
 
 export const FriendsSnapWithRecipe: Story = { name: "Friend's Snap, with recipe" };
 
+export const FriendsSnapNarrow: Story = {
+  name: "Friend's Snap, 360 px (Recipes button)",
+  globals: { viewport: { value: "phone", isRotated: false } },
+};
+
 export const OwnEatOutSnap: Story = { name: "Own Eat-out snap, with reactions", args: { path: "/snaps/s2" } };
 
 export const OwnSnapNoReactions: Story = {

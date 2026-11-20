@@ -132,9 +132,14 @@ export function SnapHome({ store = draftStore }: { store?: DraftStore }) {
         }
         center={friendsOn && <FriendsPill onClick={() => setFriendsOpen(true)} />}
         right={
-          <Link to="/feed" aria-label="Feed" className={camButtonSm}>
-            <LayoutGrid className="size-5" aria-hidden />
-          </Link>
+          <div className="flex gap-2">
+            <Link to="/recipes" aria-label="Recipes" className={camButtonSm}>
+              <BookOpen className="size-5" aria-hidden />
+            </Link>
+            <Link to="/feed" aria-label="Feed" className={camButtonSm}>
+              <LayoutGrid className="size-5" aria-hidden />
+            </Link>
+          </div>
         }
       />
       {loaded && draft && (
@@ -151,7 +156,7 @@ export function SnapHome({ store = draftStore }: { store?: DraftStore }) {
       <div className="flex-1" />
       <CameraCapture onPick={(f) => void pick(f)} />
       <div className="flex-1" />
-      <FeedHandle />
+      <ThreeUp className="px-3" center={<FeedHandle />} />
       <MenuSheet open={menu} onOpenChange={setMenu} />
       {friendsOn && <FriendsSheet open={friendsOpen} onOpenChange={setFriendsOpen} />}
     </div>

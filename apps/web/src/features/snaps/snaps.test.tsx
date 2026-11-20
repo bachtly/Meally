@@ -274,6 +274,8 @@ it("shows the camera at / when the flag is on", async () => {
   // No app header or tab bar on the camera: the rest of the app is in the menu.
   expect(screen.queryByRole("navigation", { name: "Sidebar" })).toBeNull();
   expect(screen.getByRole("button", { name: "Menu" })).toBeTruthy();
+  // Recipes is one tap from the camera, not only inside the menu.
+  expect(screen.getByRole("link", { name: "Recipes" })).toHaveAttribute("href", "/recipes");
 });
 
 it("Feed: empty, error and a list", async () => {
