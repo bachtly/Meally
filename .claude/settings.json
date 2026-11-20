@@ -7,15 +7,12 @@
       "Bash(npm test:*)",
       "Bash(npm run build)",
       "Bash(npm run build:edge -w apps/server)",
-      "Bash(npm run db:generate -w apps/server)"
+      "Bash(npm run db:generate -w apps/server)",
+      "Bash(npm run lint && npm run typecheck && npm test && npm run build && npm run build:edge -w apps/server)"
     ],
     "deny": [
       "Bash(curl:*)",
-      "Bash(wget:*)",
-      "Bash(gh:*)",
-      "Bash(git push:*)",
-      "Edit(.github/workflows/**)",
-      "Write(.github/workflows/**)"
+      "Bash(wget:*)"
     ]
   }
 }
