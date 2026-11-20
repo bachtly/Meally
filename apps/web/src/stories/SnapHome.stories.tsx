@@ -41,6 +41,11 @@ type Story = StoryObj<typeof meta>;
 
 export const CameraOn: Story = {};
 
+export const CameraOnNarrow: Story = {
+  name: "Camera on, 360 px (Recipes link)",
+  globals: { viewport: { value: "phone", isRotated: false } },
+};
+
 export const CameraOff: Story = { beforeEach: () => installCamera("off") };
 
 export const Composer: Story = {
