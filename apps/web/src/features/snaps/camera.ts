@@ -49,6 +49,11 @@ export function openCamera(facing: Facing): Promise<MediaStream> {
   return promise;
 }
 
+/** True while a stream is open or being opened, so reusing it cannot prompt. */
+export function cameraIsOpen(): boolean {
+  return !!pending || (!!current && isLive(current.stream));
+}
+
 /** Stops the stream after `ms` unless it is opened again first. */
 export function releaseCamera(ms: number) {
   cancelTimer();

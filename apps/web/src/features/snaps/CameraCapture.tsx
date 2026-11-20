@@ -1,10 +1,10 @@
 import { CameraOff, Images, RefreshCcw } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { cn } from "../../ui";
-import { cameraPermission, HIDDEN_MS, KEEP_MS, openCamera, releaseCamera, type Facing } from "./camera";
+import { cameraIsOpen, cameraPermission, HIDDEN_MS, KEEP_MS, openCamera, releaseCamera, type Facing } from "./camera";
 import { camButton, camButtonSquare, PhotoFrame, ThreeUp } from "./parts";
 
-type Status = "starting" | "live" | "off";
+type Status = "idle" | "starting" | "live" | "off";
 
 /** True while the page is visible; the camera is let go when the tab or app goes to the background. */
 function usePageVisible() {
@@ -28,12 +28,17 @@ const fileLabel = "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-vis
  */
 export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
   const video = useRef<HTMLVideoElement>(null);
-  const [status, setStatus] = useState<Status>("starting");
+  const [status, setStatus] = useState<Status>("idle");
   const [facing, setFacing] = useState<Facing>("environment");
   /** undefined until asked; "unknown" where the browser can't tell (then we just call getUserMedia). */
   const [permission, setPermission] = useState<PermissionState | "unknown">();
   const visible = usePageVisible();
+  /** The user tapped "Turn on camera" (or a stream is already open): only then may we call getUserMedia. */
+  const [armed, setArmed] = useState(cameraIsOpen);
   const known = permission !== undefined;
+  // A fresh launch must not pop the browser's camera prompt (iOS asks again on each launch): start by itself only
+  // when the browser says it is already granted, or a stream is open; otherwise wait for a tap.
+  const mayStart = armed || permission === "granted";
   const denied = permission === "denied";
 
   // Where the browser tells us, a denied camera shows "Camera is off" without a call, and a later grant starts it.
@@ -60,6 +65,10 @@ export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
       setStatus("off");
       return;
     }
+    if (!mayStart) {
+      setStatus("idle");
+      return;
+    }
     let cancelled = false;
     const v = video.current;
     setStatus("starting");
@@ -78,7 +87,7 @@ export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
       if (v) v.srcObject = null;
       releaseCamera(document.visibilityState === "hidden" ? HIDDEN_MS : KEEP_MS);
     };
-  }, [visible, known, facing, denied]);
+  }, [visible, known, facing, denied, mayStart]);
 
   /** Crops the frame to the centred square the viewfinder shows, so the Snap matches what you saw. */
   function shoot() {
@@ -118,6 +127,18 @@ export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
           className={cn("size-full object-cover", facing === "user" && "-scale-x-100")}
           hidden={status !== "live"}
         />
+        {status === "idle" && known && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm text-cam-muted">The camera is off until you turn it on.</p>
+            <button
+              type="button"
+              onClick={() => setArmed(true)}
+              className="inline-flex min-h-11 items-center rounded-full bg-cam-accent px-5 font-semibold text-cam-accent-ink"
+            >
+              Turn on camera
+            </button>
+          </div>
+        )}
         {status === "starting" && (
           <div role="status" className="absolute inset-0 grid place-items-center text-sm text-cam-muted">
             Starting camera…
@@ -158,7 +179,7 @@ export function CameraCapture({ onPick }: { onPick: (file: File) => void }) {
           <button
             type="button"
             aria-label="Flip camera"
-            disabled={status === "off"}
+            disabled={status === "off" || status === "idle"}
             className={camButton}
             onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
           >
