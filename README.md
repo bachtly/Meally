@@ -11,7 +11,14 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Node 24](https://img.shields.io/badge/node-%3E%3D24-339933.svg?logo=node.js&logoColor=white)](package.json)
 
-<img src="docs/assets/plan.png" alt="Meally's weekly meal plan: a Monday-to-Sunday grid of breakfast and dinner recipes" width="860" />
+<p>
+  <img src="docs/assets/recipe.png" alt="Recipe page on a phone, with servings scaling and a metric/US toggle" width="250" />
+  &nbsp;
+  <img src="docs/assets/plan.png" alt="Weekly meal plan on a phone, with breakfast and dinner for each day" width="250" />
+  &nbsp;
+  <img src="docs/assets/shopping.png" alt="Shopping list on a phone, built from the week's plan and grouped by aisle" width="250" />
+</p>
+<sub>Recipe → weekly plan → shopping list, on an iPhone-sized screen.</sub>
 
 </div>
 
@@ -147,24 +154,19 @@ are in [`docs/deploy.md`](docs/deploy.md).
 
 <table>
   <tr>
-    <td><img src="docs/assets/recipes.png" alt="Recipe library" /><br/><sub>Recipe library</sub></td>
-    <td><img src="docs/assets/recipe.png" alt="Recipe page with scaling and unit toggle" /><br/><sub>Recipe with scaling and metric/US toggle</sub></td>
+    <td align="center"><img src="docs/assets/recipes.png" alt="Recipe library" width="220" /><br/><sub>Recipe library</sub></td>
+    <td align="center"><img src="docs/assets/cook-mode.png" alt="Cook mode, one step at a time" width="220" /><br/><sub>Cook mode</sub></td>
+    <td align="center"><img src="docs/assets/import.png" alt="Import a recipe from a link" width="220" /><br/><sub>Import from a link or bookmarklet</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/assets/shopping.png" alt="Shopping list grouped by aisle" /><br/><sub>Shopping list from the week's plan</sub></td>
-    <td><img src="docs/assets/cook-mode.png" alt="Cook mode, one step at a time" /><br/><sub>Cook mode</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/import.png" alt="Import a recipe from a link" /><br/><sub>Import from a link or bookmarklet</sub></td>
-    <td><img src="docs/assets/snap.png" alt="Snap camera screen" /><br/><sub>Snap: share what you cooked</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/recipes-dark.png" alt="Recipe library in dark theme" /><br/><sub>Dark theme: library</sub></td>
-    <td><img src="docs/assets/recipe-dark.png" alt="Recipe page in dark theme" /><br/><sub>Dark theme: recipe</sub></td>
+    <td align="center"><img src="docs/assets/snap.png" alt="Snap camera screen" width="220" /><br/><sub>Snap: share what you cooked</sub></td>
+    <td align="center"><img src="docs/assets/recipes-dark.png" alt="Recipe library in dark theme" width="220" /><br/><sub>Dark theme: library</sub></td>
+    <td align="center"><img src="docs/assets/recipe-dark.png" alt="Recipe page in dark theme" width="220" /><br/><sub>Dark theme: recipe</sub></td>
   </tr>
 </table>
 
-Captured from a local build with the demo seed data at 1280×800.
+Captured with Playwright's iPhone 15 profile (393×852, 2× scale) from a local build with the demo seed data. Meally
+is mobile-first; the same screens adapt to a sidebar layout on desktop.
 
 </details>
 
